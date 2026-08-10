@@ -1,0 +1,103 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/continuumx1/knw/internal/explain"
+	knwkube "github.com/continuumx1/knw/internal/kubernetes"
+)
+
+func main() {
+	client, err := knwkube.NewClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
+		os.Exit(1)
+	}
+
+	args := os.Args[1:]
+
+	if len(args) == 0 {
+		printClusterInfo(client)
+		return
+	}
+
+	if args[0] == "why" {
+		if len(args) != 2 {
+			fmt.Println("Usage: knw why <kind>/<name>")
+			os.Exit(1)
+		}
+
+		kind, name, ok := parseResource(args[1])
+		if !ok {
+			fmt.Println("Invalid resource format.")
+			fmt.Println("Example: knw why pod/payment-api")
+			os.Exit(1)
+		}
+
+		if strings.ToLower(kind) != "pod" {
+			fmt.Printf("KNW v0.1 currently supports: pod\n")
+			os.Exit(1)
+		}
+
+		result, err := explain.PodWhy(
+			context.Background(),
+			client.Clientset,
+			client.Namespace,
+			name,
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("KNW — Know what's happening.")
+		fmt.Println()
+		fmt.Print(result)
+
+		return
+	}
+
+	fmt.Printf("Unknown command: %s\n", args[0])
+	fmt.Println()
+	fmt.Println("Available commands:")
+	fmt.Println("  knw why <kind>/<name>")
+}
+
+func parseResource(value string) (string, string, bool) {
+	parts := strings.SplitN(value, "/", 2)
+
+	if len(parts) != 2 {
+		return "", "", false
+	}
+
+	if parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
+
+func printClusterInfo(client *knwkube.Client) {
+	version, err := client.Clientset.Discovery().ServerVersion()
+	if err != nil {
+		fmt.Fprintf(
+			os.Stderr,
+			"KNW error: cannot connect to Kubernetes: %v\n",
+			err,
+		)
+		os.Exit(1)
+	}
+
+	fmt.Println("KNW — Know what's happening.")
+	fmt.Println()
+	fmt.Println("Cluster")
+	fmt.Printf("  Context:     %s\n", client.Context)
+	fmt.Printf("  Server:      %s\n", client.Server)
+	fmt.Printf("  Kubernetes:  %s\n", version.GitVersion)
+	fmt.Printf("  Namespace:   %s\n", client.Namespace)
+	fmt.Println()
+	fmt.Println("✓ Connected")
+}
