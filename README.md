@@ -1,8 +1,10 @@
-# KNW
+<p align="center">
+  <img src="docs/images/knw-logo-text.png" alt="KNW" width="620">
+</p>
 
-**Know What's happening.**
+<h1 align="center">KNW — Know What's happening</h1>
 
-*Every K8s Resource Has a Story.*
+<p align="center"><em>Every K8s Resource Has a Story.</em></p>
 
 KNW is an open-source Kubernetes context and investigation engine. It discovers
 the relationships between Kubernetes resources and explains them to humans, so
@@ -246,6 +248,10 @@ Contributions are welcome. Please keep changes small and focused, follow
 [Conventional Commits](https://www.conventionalcommits.org/), and include tests
 for new relationship logic. Contribution and security-reporting guidelines will
 be added as the project grows.
+
+<p align="center">
+  <img src="docs/images/knw-mantis-logo.png" alt="KNW mantis mascot" width="120">
+</p>
 
 ## License
 
