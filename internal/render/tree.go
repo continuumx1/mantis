@@ -92,7 +92,12 @@ func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
 
 // IngressTree renders a human-readable explanation of an Ingress from the
 // Ingress itself and its resolved relationships.
-func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation) string {
+//
+// existence reports which target refs were verified against the cluster: a ref
+// mapped to false was checked and is absent (rendered as "not found"); a ref
+// absent from the map was not verified and is rendered plainly. This keeps a
+// declared reference distinct from a confirmed-missing target.
+func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation, existence map[graph.ResourceRef]bool) string {
 	ingRef := graph.ResourceRef{
 		Kind:      "Ingress",
 		Name:      ing.Name,
@@ -107,7 +112,11 @@ func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation) string {
 	b.WriteString("Routes to\n")
 	if routes := relationsFrom(relations, ingRef, graph.RoutesTo); len(routes) > 0 {
 		for _, route := range routes {
-			fmt.Fprintf(&b, "  └── %s/%s\n", route.To.Kind, route.To.Name)
+			if exists, checked := existence[route.To]; checked && !exists {
+				fmt.Fprintf(&b, "  └── %s/%s (not found)\n", route.To.Kind, route.To.Name)
+			} else {
+				fmt.Fprintf(&b, "  └── %s/%s\n", route.To.Kind, route.To.Name)
+			}
 		}
 	} else {
 		b.WriteString("  └── No service backends\n")
