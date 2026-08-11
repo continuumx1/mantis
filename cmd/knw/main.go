@@ -88,6 +88,42 @@ func main() {
 		return
 	}
 
+	if args[0] == "history" {
+		if len(args) != 2 {
+			fmt.Println("Usage: knw history <kind>/<name>")
+			os.Exit(1)
+		}
+
+		kind, name, ok := parseResource(args[1])
+		if !ok {
+			fmt.Println("Invalid resource format.")
+			fmt.Println("Example: knw history deployment/payment-api")
+			os.Exit(1)
+		}
+
+		if strings.ToLower(kind) != "deployment" {
+			fmt.Printf("KNW history currently supports: deployment\n")
+			os.Exit(1)
+		}
+
+		result, err := explain.DeploymentHistory(
+			context.Background(),
+			client.Clientset,
+			client.Namespace,
+			name,
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("KNW — Know what's happening.")
+		fmt.Println()
+		fmt.Print(result)
+
+		return
+	}
+
 	if args[0] == "map" {
 		if len(args) > 2 {
 			fmt.Println("Usage: knw map [namespace]")
@@ -129,14 +165,16 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  knw                          Show cluster connection info")
 	fmt.Println("  knw inspect <kind>/<name>    Explain a resource and its relationships")
+	fmt.Println("  knw history <kind>/<name>    Show a resource's revision history")
 	fmt.Println("  knw map [namespace]          Map a namespace's resource graph")
 	fmt.Println("  knw help                     Show this help")
 	fmt.Println()
 	fmt.Println("Supported kinds for 'inspect': pod, service, ingress")
+	fmt.Println("Supported kinds for 'history': deployment")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  knw inspect pod/payment-api")
-	fmt.Println("  knw inspect ingress/payment-api")
+	fmt.Println("  knw history deployment/payment-api")
 	fmt.Println("  knw map kube-system")
 	fmt.Println()
 	fmt.Println("KNW is read-only and never modifies your cluster.")
