@@ -1,2 +1,2 @@
 # knw
-Know what's happening in your Kubernetes cluster.
+Know the story of your Kubernetes resources.
