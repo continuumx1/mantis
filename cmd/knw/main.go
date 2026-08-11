@@ -8,6 +8,7 @@ import (
 
 	"github.com/continuumx1/knw/internal/explain"
 	knwkube "github.com/continuumx1/knw/internal/kubernetes"
+	"github.com/continuumx1/knw/internal/render"
 )
 
 func main() {
@@ -138,6 +139,7 @@ func printClusterInfo(client *knwkube.Client) {
 		os.Exit(1)
 	}
 
+	fmt.Println(render.Mascot(stdoutIsTerminal()))
 	fmt.Println("KNW — Know what's happening.")
 	fmt.Println()
 	fmt.Println("Cluster")
@@ -147,4 +149,14 @@ func printClusterInfo(client *knwkube.Client) {
 	fmt.Printf("  Namespace:   %s\n", client.Namespace)
 	fmt.Println()
 	fmt.Println("✓ Connected")
+}
+
+// stdoutIsTerminal reports whether standard output is a terminal, so KNW emits
+// ANSI colour only when it will be displayed and never into a pipe or file.
+func stdoutIsTerminal() bool {
+	info, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
