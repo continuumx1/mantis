@@ -31,8 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# KNW build binary
-knw
+# KNW build binary (root-anchored so it does not match the cmd/knw/ directory)
+/knw
 
 # macOS
 .DS_Store

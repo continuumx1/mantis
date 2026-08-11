@@ -37,16 +37,62 @@ func main() {
 			os.Exit(1)
 		}
 
-		if strings.ToLower(kind) != "pod" {
-			fmt.Printf("KNW v0.1 currently supports: pod\n")
+		var result string
+
+		switch strings.ToLower(kind) {
+		case "pod":
+			result, err = explain.PodWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
+		case "service":
+			result, err = explain.ServiceWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
+		case "ingress":
+			result, err = explain.IngressWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
+		default:
+			fmt.Printf("KNW v0.1 currently supports: pod, service, ingress\n")
 			os.Exit(1)
 		}
 
-		result, err := explain.PodWhy(
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("KNW — Know what's happening.")
+		fmt.Println()
+		fmt.Print(result)
+
+		return
+	}
+
+	if args[0] == "map" {
+		if len(args) > 2 {
+			fmt.Println("Usage: knw map [namespace]")
+			os.Exit(1)
+		}
+
+		namespace := client.Namespace
+		if len(args) == 2 {
+			namespace = args[1]
+		}
+
+		result, err := explain.MapNamespace(
 			context.Background(),
 			client.Clientset,
-			client.Namespace,
-			name,
+			namespace,
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
@@ -64,6 +110,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("Available commands:")
 	fmt.Println("  knw why <kind>/<name>")
+	fmt.Println("  knw map [namespace]")
 }
 
 func parseResource(value string) (string, string, bool) {
