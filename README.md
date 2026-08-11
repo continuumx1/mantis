@@ -98,7 +98,11 @@ knw inspect ingress/payment-api
 # Map every resource KNW understands in a namespace
 knw map
 knw map kube-system
+knw map --all          # include system-managed ConfigMaps/Secrets
 ```
+
+KNW honours your `KUBECONFIG` environment variable and standard kubeconfig
+resolution, and is strictly read-only.
 
 ## Example
 
@@ -126,15 +130,16 @@ Mounts
 Runs on
   └── Node/minikube
 
-Status
-  └── Pending
+Health
+  └── Phase: Pending
+  └── app: waiting (ContainerCreating), not ready, restarts: 0
 ```
 
 At a glance: this pod is stuck `Pending` because it mounts a `Secret` that does
 not exist. KNW only writes `(not found)` after actually checking the API and
 confirming the resource is absent — it never guesses.
 
-Mapping a whole namespace:
+Mapping a whole namespace (system-managed noise hidden by default):
 
 ```
 $ knw map
@@ -144,19 +149,23 @@ NAMESPACE/default
 WORKLOADS
 └── Deployment/nginx
     └── ReplicaSet/nginx-56c45fd5ff
-        └── Pod/nginx-56c45fd5ff-2cslb  (runs-on Node/minikube)
+        └── Pod/nginx-56c45fd5ff-2cslb (Running · 1/1)  (runs-on Node/minikube)
 
 NETWORKING
 └── Service/nginx
-    └── selects Pod/nginx-56c45fd5ff-2cslb
+    └── serves Pod/nginx-56c45fd5ff-2cslb (Running · 1/1)
 └── Ingress/broken
     └── routes-to Service/does-not-exist (not found)
 
 CONFIG & STORAGE
 └── ConfigMap/nginx-config
-└── PersistentVolumeClaim/data
-    └── bound-to PersistentVolume/pvc-abc123
+    └── used-by Pod/nginx-56c45fd5ff-2cslb
+└── PersistentVolumeClaim/data (Bound · 10Gi · RWO)
+    └── bound-to PersistentVolume/pvc-abc123 (10Gi · Retain)
 ```
+
+Pods show live health, PVCs/PVs show size and reclaim policy, and services show
+their **real endpoints** (from EndpointSlices), not just selector matches.
 
 ## Architecture
 
@@ -188,6 +197,7 @@ Relationships are named for their **Kubernetes semantics**, not for convenience.
 | `controlled-by` | A resource is controlled by its owner | `ownerReferences` |
 | `runs-on` | A Pod is scheduled onto a Node | `pod.spec.nodeName` |
 | `selects` | A Service selects Pods | `service.spec.selector` |
+| `serves` | A Service actually backs a Pod | EndpointSlices |
 | `routes-to` | An Ingress routes to a Service | ingress backends |
 | `references` | A Pod consumes config via the environment | `env` / `envFrom` |
 | `mounts` | A Pod mounts config as a volume | `volumes` |

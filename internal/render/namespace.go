@@ -24,12 +24,13 @@ var workloadKinds = map[string]bool{
 // NamespaceTree renders the whole-namespace graph as grouped sections: the
 // ownership forest (WORKLOADS), the traffic path (NETWORKING), and configuration
 // and storage. Ownership is the primary spine; other relationships appear as
-// annotations so a DAG stays readable in a terminal.
-func NamespaceTree(namespace string, c *graph.Context) string {
+// annotations so a DAG stays readable in a terminal. skipped lists resource
+// kinds that could not be read (e.g. RBAC-denied).
+func NamespaceTree(namespace string, c *graph.Context, skipped []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "NAMESPACE/%s\n\n", namespace)
 
-	nodes := resolvedRefs(c)
+	nodes := visibleRefs(c)
 
 	// Index the controller hierarchy from controlled-by edges (child -> parent).
 	childrenOf := map[graph.ResourceRef][]graph.ResourceRef{}
@@ -56,15 +57,21 @@ func NamespaceTree(namespace string, c *graph.Context) string {
 		b.WriteString("\n")
 	}
 
-	// NETWORKING: services and ingresses with their targets.
+	// NETWORKING: services (with their real endpoints) and ingresses.
 	services := refsOfKind(nodes, "Service")
 	ingresses := refsOfKind(nodes, "Ingress")
 	if len(services)+len(ingresses) > 0 {
 		b.WriteString("NETWORKING\n")
 		for _, svc := range services {
-			fmt.Fprintf(&b, "└── %s\n", label(svc, c))
-			for _, sel := range c.From(svc, graph.Selects) {
-				fmt.Fprintf(&b, "    └── selects %s\n", label(sel.To, c))
+			fmt.Fprintf(&b, "└── %s\n", labelWithAttrs(svc, c))
+			serves := c.From(svc, graph.Serves)
+			switch {
+			case len(serves) > 0:
+				for _, e := range serves {
+					fmt.Fprintf(&b, "    └── serves %s\n", labelWithAttrs(e.To, c))
+				}
+			case len(c.From(svc, graph.Selects)) > 0:
+				fmt.Fprintf(&b, "    └── selects %d pod(s) but no ready endpoints\n", len(c.From(svc, graph.Selects)))
 			}
 		}
 		for _, ing := range ingresses {
@@ -76,28 +83,48 @@ func NamespaceTree(namespace string, c *graph.Context) string {
 		b.WriteString("\n")
 	}
 
-	// CONFIG & STORAGE.
+	// CONFIG & STORAGE, with the pods that use each config resource.
+	usedBy := map[graph.ResourceRef][]graph.ResourceRef{}
+	for _, r := range c.Relations {
+		if r.Type == graph.References || r.Type == graph.Mounts {
+			usedBy[r.To] = append(usedBy[r.To], r.From)
+		}
+	}
+
 	configMaps := refsOfKind(nodes, "ConfigMap")
 	secrets := refsOfKind(nodes, "Secret")
 	pvcs := refsOfKind(nodes, "PersistentVolumeClaim")
 	if len(configMaps)+len(secrets)+len(pvcs) > 0 {
 		b.WriteString("CONFIG & STORAGE\n")
 		for _, cm := range configMaps {
-			fmt.Fprintf(&b, "└── %s\n", label(cm, c))
+			writeConfigResource(&b, c, cm, usedBy[cm])
 		}
 		for _, sec := range secrets {
-			fmt.Fprintf(&b, "└── %s\n", label(sec, c))
+			writeConfigResource(&b, c, sec, usedBy[sec])
 		}
 		for _, pvc := range pvcs {
-			fmt.Fprintf(&b, "└── %s\n", label(pvc, c))
+			fmt.Fprintf(&b, "└── %s\n", labelWithAttrs(pvc, c))
 			for _, bound := range c.From(pvc, graph.BoundTo) {
-				fmt.Fprintf(&b, "    └── bound-to %s\n", label(bound.To, c))
+				fmt.Fprintf(&b, "    └── bound-to %s\n", labelWithAttrs(bound.To, c))
 			}
 		}
 		b.WriteString("\n")
 	}
 
-	return strings.TrimRight(b.String(), "\n") + "\n"
+	out := strings.TrimRight(b.String(), "\n") + "\n"
+	if len(skipped) > 0 {
+		out += fmt.Sprintf("\nSkipped (no access): %s\n", strings.Join(skipped, ", "))
+	}
+	return out
+}
+
+// writeConfigResource prints a config resource and the pods that use it.
+func writeConfigResource(b *strings.Builder, c *graph.Context, ref graph.ResourceRef, users []graph.ResourceRef) {
+	fmt.Fprintf(b, "└── %s\n", labelWithAttrs(ref, c))
+	sortRefs(users)
+	for _, user := range users {
+		fmt.Fprintf(b, "    └── used-by %s\n", label(user, c))
+	}
 }
 
 // writeWorkload prints a resource and, recursively, everything it controls.
@@ -108,7 +135,7 @@ func writeWorkload(
 	childrenOf map[graph.ResourceRef][]graph.ResourceRef,
 	depth int,
 ) {
-	line := label(ref, c)
+	line := labelWithAttrs(ref, c)
 	if ref.Kind == "Pod" {
 		if runsOn := c.From(ref, graph.RunsOn); len(runsOn) > 0 {
 			line += fmt.Sprintf("  (runs-on %s)", label(runsOn[0].To, c))
@@ -123,11 +150,21 @@ func writeWorkload(
 	}
 }
 
-// resolvedRefs returns the refs of all verified-existing nodes, sorted.
-func resolvedRefs(c *graph.Context) []graph.ResourceRef {
+// labelWithAttrs renders a node with its compact attributes appended, e.g.
+// "PersistentVolumeClaim/data (Bound · 10Gi · RWO)".
+func labelWithAttrs(ref graph.ResourceRef, c *graph.Context) string {
+	s := label(ref, c)
+	if attrs := c.Attributes(ref); len(attrs) > 0 {
+		s += " (" + strings.Join(attrs, " · ") + ")"
+	}
+	return s
+}
+
+// visibleRefs returns the refs of all verified-existing, non-hidden nodes.
+func visibleRefs(c *graph.Context) []graph.ResourceRef {
 	var out []graph.ResourceRef
 	for _, n := range c.Nodes() {
-		if n.Resolved {
+		if n.Resolved && !n.Hidden {
 			out = append(out, n.Ref)
 		}
 	}

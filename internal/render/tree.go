@@ -230,6 +230,16 @@ func ServiceTree(svc *corev1.Service, c *graph.Context) string {
 		}
 	}
 
+	b.WriteString("\n")
+	b.WriteString("Serves (endpoints)\n")
+	if serves := c.From(svcRef, graph.Serves); len(serves) > 0 {
+		for _, e := range serves {
+			fmt.Fprintf(&b, "  └── %s\n", label(e.To, c))
+		}
+	} else {
+		b.WriteString("  └── No ready endpoints\n")
+	}
+
 	return b.String()
 }
 

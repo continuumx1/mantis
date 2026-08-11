@@ -17,6 +17,11 @@ const (
 	// selector (spec.selector matching the Pod's labels).
 	Selects RelationType = "selects"
 
+	// Serves means the source Service actually backs the target Pod, as recorded
+	// in its EndpointSlices — the real traffic path, which can differ from the
+	// selector match (e.g. a matched Pod that is not a ready endpoint).
+	Serves RelationType = "serves"
+
 	// RoutesTo means the source Ingress routes traffic to the target Service,
 	// as declared by an ingress backend (default backend or a rule path).
 	RoutesTo RelationType = "routes-to"

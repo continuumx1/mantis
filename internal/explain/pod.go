@@ -11,11 +11,11 @@ import (
 	"github.com/continuumx1/knw/internal/render"
 )
 
-// PodWhy explains a Pod by loading it, resolving its relationships through the
-// graph engine, and rendering the result. The investigation logic lives in the
-// graph package and the presentation logic in the render package; this function
-// only wires them together for the CLI.
-func PodWhy(
+// InspectPod explains a Pod by loading it, resolving its relationships through
+// the graph engine, and rendering the result. The investigation logic lives in
+// the graph package and the presentation logic in the render package; this
+// function only wires them together for the CLI.
+func InspectPod(
 	ctx context.Context,
 	clientset kubernetes.Interface,
 	namespace string,

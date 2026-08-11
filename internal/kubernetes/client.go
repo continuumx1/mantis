@@ -2,8 +2,6 @@ package kubernetes
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -16,34 +14,33 @@ type Client struct {
 	Server    string
 }
 
+// NewClient builds a read-only Kubernetes client using the standard kubeconfig
+// resolution rules: it honours $KUBECONFIG (including multi-path lists) and
+// falls back to ~/.kube/config, and it uses the kubeconfig's current context and
+// namespace.
 func NewClient() (*Client, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("find home directory: %w", err)
-	}
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		loadingRules,
+		&clientcmd.ConfigOverrides{},
+	)
 
-	kubeconfig := filepath.Join(home, ".kube", "config")
-
-	config, err := clientcmd.LoadFromFile(kubeconfig)
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load kubeconfig: %w", err)
 	}
 
-	currentContext := config.CurrentContext
-
-	contextConfig, ok := config.Contexts[currentContext]
-	if !ok {
-		return nil, fmt.Errorf("context %q not found", currentContext)
+	namespace, _, err := clientConfig.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("resolve namespace: %w", err)
 	}
-
-	namespace := contextConfig.Namespace
 	if namespace == "" {
 		namespace = "default"
 	}
 
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return nil, fmt.Errorf("build Kubernetes config: %w", err)
+	currentContext := ""
+	if rawConfig, err := clientConfig.RawConfig(); err == nil {
+		currentContext = rawConfig.CurrentContext
 	}
 
 	clientset, err := kubernetes.NewForConfig(restConfig)

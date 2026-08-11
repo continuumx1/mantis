@@ -11,9 +11,9 @@ import (
 	"github.com/continuumx1/knw/internal/render"
 )
 
-// IngressWhy explains an Ingress by loading it, resolving which Services it
+// InspectIngress explains an Ingress by loading it, resolving which Services it
 // routes to through the graph engine, and rendering the result.
-func IngressWhy(
+func InspectIngress(
 	ctx context.Context,
 	clientset kubernetes.Interface,
 	namespace string,

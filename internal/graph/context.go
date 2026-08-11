@@ -11,9 +11,18 @@ import (
 // verified about it. A Node exists in a Context only when its existence was
 // actually checked, so a Node's presence means "verified" and Resolved reports
 // the outcome.
+//
+// Attributes are compact, pre-formatted display details (e.g. a Pod's health or
+// a PVC's size and reclaim policy) that a whole-graph renderer shows inline.
+// Hidden marks a node that exists and participates in the graph — so references
+// to it are still resolved correctly — but that the map renderer should not list
+// on its own (used to suppress system-managed noise unless the caller asks for
+// it).
 type Node struct {
-	Ref      ResourceRef
-	Resolved bool
+	Ref        ResourceRef
+	Resolved   bool
+	Attributes []string
+	Hidden     bool
 }
 
 // Context is the structured investigation result for a subject resource: the
@@ -35,14 +44,24 @@ type Context struct {
 // I/O, which keeps it usable directly from tests; Build is the cluster-backed
 // entry point.
 func New(subject ResourceRef, relations []Relation, existence map[ResourceRef]bool) *Context {
-	nodes := make(map[ResourceRef]Node, len(existence))
+	nodes := make([]Node, 0, len(existence))
 	for ref, resolved := range existence {
-		nodes[ref] = Node{Ref: ref, Resolved: resolved}
+		nodes = append(nodes, Node{Ref: ref, Resolved: resolved})
+	}
+	return NewFromNodes(subject, relations, nodes)
+}
+
+// NewFromNodes assembles a Context from fully-formed nodes, letting a builder
+// attach attributes and hidden flags. It performs no I/O.
+func NewFromNodes(subject ResourceRef, relations []Relation, nodes []Node) *Context {
+	byRef := make(map[ResourceRef]Node, len(nodes))
+	for _, n := range nodes {
+		byRef[n.Ref] = n
 	}
 	return &Context{
 		Subject:   subject,
 		Relations: relations,
-		nodes:     nodes,
+		nodes:     byRef,
 	}
 }
 
@@ -78,6 +97,11 @@ func (c *Context) From(from ResourceRef, t RelationType) []Relation {
 func (c *Context) Existence(ref ResourceRef) (resolved bool, checked bool) {
 	n, ok := c.nodes[ref]
 	return n.Resolved, ok
+}
+
+// Attributes returns the compact display details recorded for ref, if any.
+func (c *Context) Attributes(ref ResourceRef) []string {
+	return c.nodes[ref].Attributes
 }
 
 // Nodes returns every node in the Context, sorted by kind then name. It lets a

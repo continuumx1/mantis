@@ -11,9 +11,10 @@ import (
 	"github.com/continuumx1/knw/internal/render"
 )
 
-// ServiceWhy explains a Service by loading it, resolving which Pods it selects
-// through the graph engine, and rendering the result.
-func ServiceWhy(
+// InspectService explains a Service by loading it, resolving both the Pods it
+// selects and the Pods actually backing it (its endpoints), then rendering the
+// result.
+func InspectService(
 	ctx context.Context,
 	clientset kubernetes.Interface,
 	namespace string,
@@ -30,6 +31,12 @@ func ServiceWhy(
 	if err != nil {
 		return "", fmt.Errorf("resolve relationships for service %q: %w", name, err)
 	}
+
+	endpoints, err := graph.ResolveServiceEndpoints(ctx, clientset, svc)
+	if err != nil {
+		return "", fmt.Errorf("resolve endpoints for service %q: %w", name, err)
+	}
+	relations = append(relations, endpoints...)
 
 	subject := graph.ResourceRef{Kind: "Service", Name: svc.Name, Namespace: svc.Namespace}
 	investigation, err := graph.Build(ctx, clientset, subject, relations)
