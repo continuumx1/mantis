@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 
 	"github.com/continuumx1/knw/internal/graph"
 )
@@ -84,6 +85,32 @@ func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
 		for _, sel := range relationsFrom(relations, svcRef, graph.Selects) {
 			fmt.Fprintf(&b, "  └── %s/%s\n", sel.To.Kind, sel.To.Name)
 		}
+	}
+
+	return b.String()
+}
+
+// IngressTree renders a human-readable explanation of an Ingress from the
+// Ingress itself and its resolved relationships.
+func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation) string {
+	ingRef := graph.ResourceRef{
+		Kind:      "Ingress",
+		Name:      ing.Name,
+		Namespace: ing.Namespace,
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "INGRESS/%s\n\n", ing.Name)
+	b.WriteString("WHY\n\n")
+
+	b.WriteString("Routes to\n")
+	if routes := relationsFrom(relations, ingRef, graph.RoutesTo); len(routes) > 0 {
+		for _, route := range routes {
+			fmt.Fprintf(&b, "  └── %s/%s\n", route.To.Kind, route.To.Name)
+		}
+	} else {
+		b.WriteString("  └── No service backends\n")
 	}
 
 	return b.String()

@@ -54,8 +54,15 @@ func main() {
 				client.Namespace,
 				name,
 			)
+		case "ingress":
+			result, err = explain.IngressWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
 		default:
-			fmt.Printf("KNW v0.1 currently supports: pod, service\n")
+			fmt.Printf("KNW v0.1 currently supports: pod, service, ingress\n")
 			os.Exit(1)
 		}
 

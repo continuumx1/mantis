@@ -16,6 +16,10 @@ const (
 	// Selects means the source Service selects the target Pod via its label
 	// selector (spec.selector matching the Pod's labels).
 	Selects RelationType = "selects"
+
+	// RoutesTo means the source Ingress routes traffic to the target Service,
+	// as declared by an ingress backend (default backend or a rule path).
+	RoutesTo RelationType = "routes-to"
 )
 
 // Relation is a single directed edge in the resource graph: From is related to
