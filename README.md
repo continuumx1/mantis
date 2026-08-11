@@ -91,9 +91,9 @@ KNW uses your current kubeconfig context and its namespace.
 knw
 
 # Explain a single resource and what surrounds it
-knw why pod/payment-api
-knw why service/payment-api
-knw why ingress/payment-api
+knw inspect pod/payment-api
+knw inspect service/payment-api
+knw inspect ingress/payment-api
 
 # Map every resource KNW understands in a namespace
 knw map
@@ -105,11 +105,11 @@ knw map kube-system
 Investigating a single pod:
 
 ```
-$ knw why pod/knw-demo
+$ knw inspect pod/knw-demo
 
 POD/knw-demo
 
-WHY
+CONTEXT
 
 Origin
   └── Directly created
@@ -200,9 +200,9 @@ shown as `(not found)`; one that was never verified is shown plainly.
 
 ## Current limitations
 
-- **`why` supports Pod, Service, and Ingress.** Other kinds are mapped by
-  `knw map` but not yet available as a `why` subject.
-- **No `--namespace` flag on `why`** — it uses the current context's namespace.
+- **`inspect` supports Pod, Service, and Ingress.** Other kinds are mapped by
+  `knw map` but not yet available as a `inspect` subject.
+- **No `--namespace` flag on `inspect`** — it uses the current context's namespace.
   Only `map` takes an explicit namespace argument.
 - **No custom resources (CRDs) yet** — only the built-in kinds listed above.
 - **No change / history / GitOps awareness** — KNW explains the current state,
@@ -213,13 +213,13 @@ shown as `(not found)`; one that was never verified is shown plainly.
 **Current**
 
 - Relationship engine with a structured `Context`
-- `knw why` for Pod, Service, Ingress
+- `knw inspect` for Pod, Service, Ingress
 - `knw map` for whole-namespace resource graphs
 - Verified dangling-reference detection
 
 **Planned**
 
-- More `why` subjects (Deployment, StatefulSet, PVC, …)
+- More `inspect` subjects (Deployment, StatefulSet, PVC, …)
 - A consistent `--namespace` flag
 - Reverse lookups (e.g. which pods use this ConfigMap)
 - Structured/JSON output for scripting

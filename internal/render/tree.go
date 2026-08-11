@@ -23,7 +23,7 @@ func PodTree(pod *corev1.Pod, c *graph.Context) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "POD/%s\n\n", pod.Name)
-	b.WriteString("WHY\n\n")
+	b.WriteString("CONTEXT\n\n")
 
 	// Ownership
 	owners := c.From(podRef, graph.ControlledBy)
@@ -77,7 +77,7 @@ func ServiceTree(svc *corev1.Service, c *graph.Context) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "SERVICE/%s\n\n", svc.Name)
-	b.WriteString("WHY\n\n")
+	b.WriteString("CONTEXT\n\n")
 
 	b.WriteString("Selects\n")
 	switch {
@@ -108,7 +108,7 @@ func IngressTree(ing *networkingv1.Ingress, c *graph.Context) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "INGRESS/%s\n\n", ing.Name)
-	b.WriteString("WHY\n\n")
+	b.WriteString("CONTEXT\n\n")
 
 	b.WriteString("Routes to\n")
 	if routes := c.From(ingRef, graph.RoutesTo); len(routes) > 0 {

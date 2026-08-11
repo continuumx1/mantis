@@ -34,16 +34,16 @@ func main() {
 		return
 	}
 
-	if args[0] == "why" {
+	if args[0] == "inspect" {
 		if len(args) != 2 {
-			fmt.Println("Usage: knw why <kind>/<name>")
+			fmt.Println("Usage: knw inspect <kind>/<name>")
 			os.Exit(1)
 		}
 
 		kind, name, ok := parseResource(args[1])
 		if !ok {
 			fmt.Println("Invalid resource format.")
-			fmt.Println("Example: knw why pod/payment-api")
+			fmt.Println("Example: knw inspect pod/payment-api")
 			os.Exit(1)
 		}
 
@@ -127,16 +127,16 @@ func printUsage() {
 	fmt.Println("Every K8s Resource Has a Story.")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  knw                       Show cluster connection info")
-	fmt.Println("  knw why <kind>/<name>     Explain a resource and its relationships")
-	fmt.Println("  knw map [namespace]       Map a namespace's resource graph")
-	fmt.Println("  knw help                  Show this help")
+	fmt.Println("  knw                          Show cluster connection info")
+	fmt.Println("  knw inspect <kind>/<name>    Explain a resource and its relationships")
+	fmt.Println("  knw map [namespace]          Map a namespace's resource graph")
+	fmt.Println("  knw help                     Show this help")
 	fmt.Println()
-	fmt.Println("Supported kinds for 'why': pod, service, ingress")
+	fmt.Println("Supported kinds for 'inspect': pod, service, ingress")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  knw why pod/payment-api")
-	fmt.Println("  knw why ingress/payment-api")
+	fmt.Println("  knw inspect pod/payment-api")
+	fmt.Println("  knw inspect ingress/payment-api")
 	fmt.Println("  knw map kube-system")
 	fmt.Println()
 	fmt.Println("KNW is read-only and never modifies your cluster.")

@@ -42,7 +42,7 @@ func TestPodTree_Golden(t *testing.T) {
 	}
 
 	want := "POD/app\n\n" +
-		"WHY\n\n" +
+		"CONTEXT\n\n" +
 		"Ownership\n" +
 		"  └── ReplicaSet/app-rs\n" +
 		"       └── Deployment/app\n\n" +
@@ -71,7 +71,7 @@ func TestPodTree_DirectlyCreatedUnscheduled(t *testing.T) {
 	}
 
 	want := "POD/standalone\n\n" +
-		"WHY\n\n" +
+		"CONTEXT\n\n" +
 		"Origin\n" +
 		"  └── Directly created\n\n" +
 		"Owner\n" +
