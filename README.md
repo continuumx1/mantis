@@ -1,8 +1,11 @@
 <p align="center">
-  <img src="docs/images/knw-logo-text.png" alt="KNW" width="620">
+  <img src="docs/images/knw-mantis-logo.png" alt="KNW mantis mascot" width="420">
+</p>
+<p align="center">
+  <img src="docs/images/knw-logo-text.png" alt="KNW" width="220">
 </p>
 
-<h1 align="center">KNW — Know What's happening</h1>
+<h1 align="center">KNW — Know the story of your kubernetes resources</h1>
 
 <p align="center"><em>Every K8s Resource Has a Story.</em></p>
 
@@ -249,9 +252,6 @@ Contributions are welcome. Please keep changes small and focused, follow
 for new relationship logic. Contribution and security-reporting guidelines will
 be added as the project grows.
 
-<p align="center">
-  <img src="docs/images/knw-mantis-logo.png" alt="KNW mantis mascot" width="120">
-</p>
 
 ## License
 
