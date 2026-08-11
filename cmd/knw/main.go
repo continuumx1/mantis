@@ -12,13 +12,22 @@ import (
 )
 
 func main() {
+	args := os.Args[1:]
+
+	// Help must work without a cluster connection.
+	if len(args) > 0 {
+		switch args[0] {
+		case "-h", "--help", "help":
+			printUsage()
+			return
+		}
+	}
+
 	client, err := knwkube.NewClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
 		os.Exit(1)
 	}
-
-	args := os.Args[1:]
 
 	if len(args) == 0 {
 		printClusterInfo(client)
@@ -107,11 +116,30 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Unknown command: %s\n", args[0])
+	fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", args[0])
+	printUsage()
+	os.Exit(1)
+}
+
+// printUsage prints the KNW command overview.
+func printUsage() {
+	fmt.Println("KNW — Know what's happening.")
+	fmt.Println("Every K8s Resource Has a Story.")
 	fmt.Println()
-	fmt.Println("Available commands:")
-	fmt.Println("  knw why <kind>/<name>")
-	fmt.Println("  knw map [namespace]")
+	fmt.Println("Usage:")
+	fmt.Println("  knw                       Show cluster connection info")
+	fmt.Println("  knw why <kind>/<name>     Explain a resource and its relationships")
+	fmt.Println("  knw map [namespace]       Map a namespace's resource graph")
+	fmt.Println("  knw help                  Show this help")
+	fmt.Println()
+	fmt.Println("Supported kinds for 'why': pod, service, ingress")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  knw why pod/payment-api")
+	fmt.Println("  knw why ingress/payment-api")
+	fmt.Println("  knw map kube-system")
+	fmt.Println()
+	fmt.Println("KNW is read-only and never modifies your cluster.")
 }
 
 func parseResource(value string) (string, string, bool) {
@@ -139,7 +167,7 @@ func printClusterInfo(client *knwkube.Client) {
 		os.Exit(1)
 	}
 
-	fmt.Println(render.Mascot(stdoutIsTerminal()))
+	fmt.Println(render.Mascot(colorMode()))
 	fmt.Println("KNW — Know what's happening.")
 	fmt.Println()
 	fmt.Println("Cluster")
@@ -159,4 +187,19 @@ func stdoutIsTerminal() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+// colorMode decides how much colour to use: none when output is not a terminal
+// or NO_COLOR is set, truecolor when the terminal advertises it, otherwise the
+// widely supported 256-colour palette.
+func colorMode() render.ColorMode {
+	if os.Getenv("NO_COLOR") != "" || !stdoutIsTerminal() {
+		return render.ColorNone
+	}
+	switch os.Getenv("COLORTERM") {
+	case "truecolor", "24bit":
+		return render.ColorTrue
+	default:
+		return render.Color256
+	}
 }
