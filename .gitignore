@@ -31,6 +31,9 @@ go.work.sum
 # .idea/
 # .vscode/
 
+# Local Claude Code settings (per-user, not shared)
+.claude/settings.local.json
+
 # KNW build binary (root-anchored so it does not match the cmd/knw/ directory)
 /knw
 
