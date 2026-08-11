@@ -58,6 +58,37 @@ func PodTree(pod *corev1.Pod, relations []graph.Relation) string {
 	return b.String()
 }
 
+// ServiceTree renders a human-readable explanation of a Service from the
+// Service itself and its resolved relationships. It distinguishes a Service
+// with no selector (endpoints managed manually) from a selector that simply
+// matched no Pods.
+func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
+	svcRef := graph.ResourceRef{
+		Kind:      "Service",
+		Name:      svc.Name,
+		Namespace: svc.Namespace,
+	}
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "SERVICE/%s\n\n", svc.Name)
+	b.WriteString("WHY\n\n")
+
+	b.WriteString("Selects\n")
+	switch {
+	case len(svc.Spec.Selector) == 0:
+		b.WriteString("  └── No selector (endpoints managed manually)\n")
+	case len(relationsFrom(relations, svcRef, graph.Selects)) == 0:
+		b.WriteString("  └── No matching pods\n")
+	default:
+		for _, sel := range relationsFrom(relations, svcRef, graph.Selects) {
+			fmt.Fprintf(&b, "  └── %s/%s\n", sel.To.Kind, sel.To.Name)
+		}
+	}
+
+	return b.String()
+}
+
 // relationsFrom returns the relations of the given type originating at from.
 func relationsFrom(relations []graph.Relation, from graph.ResourceRef, t graph.RelationType) []graph.Relation {
 	var out []graph.Relation

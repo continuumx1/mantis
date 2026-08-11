@@ -12,6 +12,10 @@ const (
 
 	// RunsOn means the source Pod is scheduled onto the target Node.
 	RunsOn RelationType = "runs-on"
+
+	// Selects means the source Service selects the target Pod via its label
+	// selector (spec.selector matching the Pod's labels).
+	Selects RelationType = "selects"
 )
 
 // Relation is a single directed edge in the resource graph: From is related to

@@ -37,17 +37,28 @@ func main() {
 			os.Exit(1)
 		}
 
-		if strings.ToLower(kind) != "pod" {
-			fmt.Printf("KNW v0.1 currently supports: pod\n")
+		var result string
+
+		switch strings.ToLower(kind) {
+		case "pod":
+			result, err = explain.PodWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
+		case "service":
+			result, err = explain.ServiceWhy(
+				context.Background(),
+				client.Clientset,
+				client.Namespace,
+				name,
+			)
+		default:
+			fmt.Printf("KNW v0.1 currently supports: pod, service\n")
 			os.Exit(1)
 		}
 
-		result, err := explain.PodWhy(
-			context.Background(),
-			client.Clientset,
-			client.Namespace,
-			name,
-		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
 			os.Exit(1)
