@@ -33,10 +33,11 @@ func PodWhy(
 		return "", fmt.Errorf("resolve relationships for pod %q: %w", name, err)
 	}
 
-	existence, err := graph.VerifyExistence(ctx, clientset, graph.TargetRefs(relations))
+	subject := graph.ResourceRef{Kind: "Pod", Name: pod.Name, Namespace: pod.Namespace}
+	investigation, err := graph.Build(ctx, clientset, subject, relations)
 	if err != nil {
-		return "", fmt.Errorf("verify pod %q targets: %w", name, err)
+		return "", fmt.Errorf("build context for pod %q: %w", name, err)
 	}
 
-	return render.PodTree(pod, relations, existence), nil
+	return render.PodTree(pod, investigation), nil
 }

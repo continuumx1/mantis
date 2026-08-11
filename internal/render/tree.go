@@ -11,12 +11,9 @@ import (
 )
 
 // PodTree renders a human-readable explanation of a Pod from the Pod itself and
-// its resolved relationships. Relationship structure comes from the graph;
-// intrinsic properties (name, status) come from the Pod.
-//
-// existence carries verified target existence (see IngressTree): a target
-// confirmed absent is rendered with a "(not found)" suffix.
-func PodTree(pod *corev1.Pod, relations []graph.Relation, existence map[graph.ResourceRef]bool) string {
+// its investigation context. Relationship structure and verified node existence
+// come from the Context; intrinsic properties (name, status) come from the Pod.
+func PodTree(pod *corev1.Pod, c *graph.Context) string {
 	podRef := graph.ResourceRef{
 		Kind:      "Pod",
 		Name:      pod.Name,
@@ -29,7 +26,7 @@ func PodTree(pod *corev1.Pod, relations []graph.Relation, existence map[graph.Re
 	b.WriteString("WHY\n\n")
 
 	// Ownership
-	owners := relationsFrom(relations, podRef, graph.ControlledBy)
+	owners := c.From(podRef, graph.ControlledBy)
 	if len(owners) == 0 {
 		b.WriteString("Origin\n")
 		b.WriteString("  └── Directly created\n\n")
@@ -38,23 +35,23 @@ func PodTree(pod *corev1.Pod, relations []graph.Relation, existence map[graph.Re
 	} else {
 		b.WriteString("Ownership\n")
 		for _, owner := range owners {
-			fmt.Fprintf(&b, "  └── %s\n", label(owner.To, existence))
+			fmt.Fprintf(&b, "  └── %s\n", label(owner.To, c))
 
-			for _, grandOwner := range relationsFrom(relations, owner.To, graph.ControlledBy) {
-				fmt.Fprintf(&b, "       └── %s\n", label(grandOwner.To, existence))
+			for _, grandOwner := range c.From(owner.To, graph.ControlledBy) {
+				fmt.Fprintf(&b, "       └── %s\n", label(grandOwner.To, c))
 			}
 		}
 		b.WriteString("\n")
 	}
 
 	// Configuration
-	writeSection(&b, "References", relationsFrom(relations, podRef, graph.References), existence)
-	writeSection(&b, "Mounts", relationsFrom(relations, podRef, graph.Mounts), existence)
+	writeSection(&b, "References", c.From(podRef, graph.References), c)
+	writeSection(&b, "Mounts", c.From(podRef, graph.Mounts), c)
 
 	// Node
 	b.WriteString("Runs on\n")
-	if nodes := relationsFrom(relations, podRef, graph.RunsOn); len(nodes) > 0 {
-		fmt.Fprintf(&b, "  └── %s\n\n", label(nodes[0].To, existence))
+	if nodes := c.From(podRef, graph.RunsOn); len(nodes) > 0 {
+		fmt.Fprintf(&b, "  └── %s\n\n", label(nodes[0].To, c))
 	} else {
 		b.WriteString("  └── Not scheduled\n\n")
 	}
@@ -67,10 +64,10 @@ func PodTree(pod *corev1.Pod, relations []graph.Relation, existence map[graph.Re
 }
 
 // ServiceTree renders a human-readable explanation of a Service from the
-// Service itself and its resolved relationships. It distinguishes a Service
-// with no selector (endpoints managed manually) from a selector that simply
-// matched no Pods.
-func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
+// Service itself and its investigation context. It distinguishes a Service with
+// no selector (endpoints managed manually) from a selector that simply matched
+// no Pods.
+func ServiceTree(svc *corev1.Service, c *graph.Context) string {
 	svcRef := graph.ResourceRef{
 		Kind:      "Service",
 		Name:      svc.Name,
@@ -86,11 +83,11 @@ func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
 	switch {
 	case len(svc.Spec.Selector) == 0:
 		b.WriteString("  └── No selector (endpoints managed manually)\n")
-	case len(relationsFrom(relations, svcRef, graph.Selects)) == 0:
+	case len(c.From(svcRef, graph.Selects)) == 0:
 		b.WriteString("  └── No matching pods\n")
 	default:
-		for _, sel := range relationsFrom(relations, svcRef, graph.Selects) {
-			fmt.Fprintf(&b, "  └── %s/%s\n", sel.To.Kind, sel.To.Name)
+		for _, sel := range c.From(svcRef, graph.Selects) {
+			fmt.Fprintf(&b, "  └── %s\n", label(sel.To, c))
 		}
 	}
 
@@ -98,13 +95,10 @@ func ServiceTree(svc *corev1.Service, relations []graph.Relation) string {
 }
 
 // IngressTree renders a human-readable explanation of an Ingress from the
-// Ingress itself and its resolved relationships.
-//
-// existence reports which target refs were verified against the cluster: a ref
-// mapped to false was checked and is absent (rendered as "not found"); a ref
-// absent from the map was not verified and is rendered plainly. This keeps a
-// declared reference distinct from a confirmed-missing target.
-func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation, existence map[graph.ResourceRef]bool) string {
+// Ingress itself and its investigation context. A target confirmed absent by
+// the Context is rendered with a "(not found)" suffix; a declared reference that
+// was not verified is rendered plainly.
+func IngressTree(ing *networkingv1.Ingress, c *graph.Context) string {
 	ingRef := graph.ResourceRef{
 		Kind:      "Ingress",
 		Name:      ing.Name,
@@ -117,9 +111,9 @@ func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation, existenc
 	b.WriteString("WHY\n\n")
 
 	b.WriteString("Routes to\n")
-	if routes := relationsFrom(relations, ingRef, graph.RoutesTo); len(routes) > 0 {
+	if routes := c.From(ingRef, graph.RoutesTo); len(routes) > 0 {
 		for _, route := range routes {
-			fmt.Fprintf(&b, "  └── %s\n", label(route.To, existence))
+			fmt.Fprintf(&b, "  └── %s\n", label(route.To, c))
 		}
 	} else {
 		b.WriteString("  └── No service backends\n")
@@ -131,34 +125,23 @@ func IngressTree(ing *networkingv1.Ingress, relations []graph.Relation, existenc
 // writeSection renders a titled block of relation targets, one per line, and
 // nothing at all when there are no relations. A trailing blank line separates it
 // from the next section.
-func writeSection(b *strings.Builder, header string, rels []graph.Relation, existence map[graph.ResourceRef]bool) {
+func writeSection(b *strings.Builder, header string, rels []graph.Relation, c *graph.Context) {
 	if len(rels) == 0 {
 		return
 	}
 	b.WriteString(header + "\n")
 	for _, r := range rels {
-		fmt.Fprintf(b, "  └── %s\n", label(r.To, existence))
+		fmt.Fprintf(b, "  └── %s\n", label(r.To, c))
 	}
 	b.WriteString("\n")
 }
 
 // label renders a resource reference as "Kind/Name", appending "(not found)"
-// only when existence has verified the target and confirmed it absent. Refs that
+// only when the Context verified the target and confirmed it absent. Refs that
 // were not verified are rendered plainly.
-func label(ref graph.ResourceRef, existence map[graph.ResourceRef]bool) string {
-	if exists, checked := existence[ref]; checked && !exists {
+func label(ref graph.ResourceRef, c *graph.Context) string {
+	if resolved, checked := c.Existence(ref); checked && !resolved {
 		return fmt.Sprintf("%s/%s (not found)", ref.Kind, ref.Name)
 	}
 	return fmt.Sprintf("%s/%s", ref.Kind, ref.Name)
-}
-
-// relationsFrom returns the relations of the given type originating at from.
-func relationsFrom(relations []graph.Relation, from graph.ResourceRef, t graph.RelationType) []graph.Relation {
-	var out []graph.Relation
-	for _, r := range relations {
-		if r.From == from && r.Type == t {
-			out = append(out, r)
-		}
-	}
-	return out
 }

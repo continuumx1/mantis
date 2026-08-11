@@ -55,7 +55,7 @@ func TestPodTree_Golden(t *testing.T) {
 		"Status\n" +
 		"  └── Running\n"
 
-	got := PodTree(pod, relations, existence)
+	got := PodTree(pod, graph.New(podRef, relations, existence))
 	if got != want {
 		t.Errorf("PodTree output mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
@@ -81,7 +81,8 @@ func TestPodTree_DirectlyCreatedUnscheduled(t *testing.T) {
 		"Status\n" +
 		"  └── Pending\n"
 
-	got := PodTree(pod, nil, nil)
+	subject := graph.ResourceRef{Kind: "Pod", Name: "standalone", Namespace: "default"}
+	got := PodTree(pod, graph.New(subject, nil, nil))
 	if got != want {
 		t.Errorf("PodTree output mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}

@@ -31,10 +31,11 @@ func IngressWhy(
 		return "", fmt.Errorf("resolve relationships for ingress %q: %w", name, err)
 	}
 
-	existence, err := graph.VerifyExistence(ctx, clientset, graph.TargetRefs(relations))
+	subject := graph.ResourceRef{Kind: "Ingress", Name: ing.Name, Namespace: ing.Namespace}
+	investigation, err := graph.Build(ctx, clientset, subject, relations)
 	if err != nil {
-		return "", fmt.Errorf("verify ingress %q targets: %w", name, err)
+		return "", fmt.Errorf("build context for ingress %q: %w", name, err)
 	}
 
-	return render.IngressTree(ing, relations, existence), nil
+	return render.IngressTree(ing, investigation), nil
 }

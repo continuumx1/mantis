@@ -31,5 +31,11 @@ func ServiceWhy(
 		return "", fmt.Errorf("resolve relationships for service %q: %w", name, err)
 	}
 
-	return render.ServiceTree(svc, relations), nil
+	subject := graph.ResourceRef{Kind: "Service", Name: svc.Name, Namespace: svc.Namespace}
+	investigation, err := graph.Build(ctx, clientset, subject, relations)
+	if err != nil {
+		return "", fmt.Errorf("build context for service %q: %w", name, err)
+	}
+
+	return render.ServiceTree(svc, investigation), nil
 }
