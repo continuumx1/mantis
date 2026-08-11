@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"sort"
 
 	"k8s.io/client-go/kubernetes"
 )
@@ -77,4 +78,21 @@ func (c *Context) From(from ResourceRef, t RelationType) []Relation {
 func (c *Context) Existence(ref ResourceRef) (resolved bool, checked bool) {
 	n, ok := c.nodes[ref]
 	return n.Resolved, ok
+}
+
+// Nodes returns every node in the Context, sorted by kind then name. It lets a
+// whole-graph renderer enumerate resources (including those that are only ever
+// a relationship source, such as a Deployment nothing points at).
+func (c *Context) Nodes() []Node {
+	out := make([]Node, 0, len(c.nodes))
+	for _, n := range c.nodes {
+		out = append(out, n)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Ref.Kind != out[j].Ref.Kind {
+			return out[i].Ref.Kind < out[j].Ref.Kind
+		}
+		return out[i].Ref.Name < out[j].Ref.Name
+	})
+	return out
 }

@@ -142,6 +142,18 @@ func podConfigurationRelations(podRef ResourceRef, pod *corev1.Pod) []Relation {
 	return relations
 }
 
+// podStorageRelations reads the Pod spec for the PersistentVolumeClaims it
+// claims through volumes and returns them as claims edges. No API calls.
+func podStorageRelations(podRef ResourceRef, pod *corev1.Pod) []Relation {
+	names := map[string]struct{}{}
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			names[vol.PersistentVolumeClaim.ClaimName] = struct{}{}
+		}
+	}
+	return edgesTo(podRef, Claims, "PersistentVolumeClaim", pod.Namespace, names)
+}
+
 // edgesTo builds sorted edges from a single source to a set of named resources
 // of one kind, so output is deterministic regardless of map iteration order.
 func edgesTo(from ResourceRef, t RelationType, kind, namespace string, names map[string]struct{}) []Relation {

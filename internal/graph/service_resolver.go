@@ -43,12 +43,27 @@ func ResolveService(
 		return nil, fmt.Errorf("list pods in namespace %q: %w", svc.Namespace, err)
 	}
 
-	selector := labels.SelectorFromSet(svc.Spec.Selector)
+	return selectsRelations(svcRef, svc.Spec.Selector, podList.Items), nil
+}
+
+// selectsRelations matches a label selector against a set of Pods and returns
+// sorted selects edges from svcRef to each matching Pod in the same namespace.
+// It is shared by ResolveService (which lists the Pods) and the namespace
+// builder (which already holds them), so selection logic lives in one place.
+func selectsRelations(svcRef ResourceRef, selector map[string]string, pods []corev1.Pod) []Relation {
+	if len(selector) == 0 {
+		return nil
+	}
+
+	sel := labels.SelectorFromSet(selector)
 
 	var relations []Relation
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		if selector.Matches(labels.Set(pod.Labels)) {
+	for i := range pods {
+		pod := &pods[i]
+		if pod.Namespace != svcRef.Namespace {
+			continue
+		}
+		if sel.Matches(labels.Set(pod.Labels)) {
 			relations = append(relations, Relation{
 				From: svcRef,
 				Type: Selects,
@@ -61,10 +76,9 @@ func ResolveService(
 		}
 	}
 
-	// Deterministic output regardless of listing order.
 	sort.Slice(relations, func(i, j int) bool {
 		return relations[i].To.Name < relations[j].To.Name
 	})
 
-	return relations, nil
+	return relations
 }

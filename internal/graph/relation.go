@@ -28,6 +28,14 @@ const (
 	// Mounts means the source Pod mounts the target ConfigMap or Secret as a
 	// volume.
 	Mounts RelationType = "mounts"
+
+	// Claims means the source Pod claims the target PersistentVolumeClaim
+	// through a volume.
+	Claims RelationType = "claims"
+
+	// BoundTo means the source PersistentVolumeClaim is bound to the target
+	// PersistentVolume.
+	BoundTo RelationType = "bound-to"
 )
 
 // Relation is a single directed edge in the resource graph: From is related to

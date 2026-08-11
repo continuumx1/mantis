@@ -78,10 +78,39 @@ func main() {
 		return
 	}
 
+	if args[0] == "map" {
+		if len(args) > 2 {
+			fmt.Println("Usage: knw map [namespace]")
+			os.Exit(1)
+		}
+
+		namespace := client.Namespace
+		if len(args) == 2 {
+			namespace = args[1]
+		}
+
+		result, err := explain.MapNamespace(
+			context.Background(),
+			client.Clientset,
+			namespace,
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "KNW error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("KNW — Know what's happening.")
+		fmt.Println()
+		fmt.Print(result)
+
+		return
+	}
+
 	fmt.Printf("Unknown command: %s\n", args[0])
 	fmt.Println()
 	fmt.Println("Available commands:")
 	fmt.Println("  knw why <kind>/<name>")
+	fmt.Println("  knw map [namespace]")
 }
 
 func parseResource(value string) (string, string, bool) {
