@@ -47,6 +47,8 @@ func PodTree(pod *corev1.Pod, c *graph.Context) string {
 	// Configuration
 	writeSection(&b, "References", c.From(podRef, graph.References), c)
 	writeSection(&b, "Mounts", c.From(podRef, graph.Mounts), c)
+	writePodResources(&b, pod)
+	writePodProbes(&b, pod)
 
 	// Node
 	b.WriteString("Runs on\n")
@@ -56,11 +58,148 @@ func PodTree(pod *corev1.Pod, c *graph.Context) string {
 		b.WriteString("  └── Not scheduled\n\n")
 	}
 
-	// Status
-	b.WriteString("Status\n")
-	fmt.Fprintf(&b, "  └── %s\n", pod.Status.Phase)
+	writePodHealth(&b, pod)
 
 	return b.String()
+}
+
+// writePodHealth reports the pod phase and, per container, its state, readiness,
+// and restart count from the container statuses.
+func writePodHealth(b *strings.Builder, pod *corev1.Pod) {
+	b.WriteString("Health\n")
+	fmt.Fprintf(b, "  └── Phase: %s\n", pod.Status.Phase)
+
+	statusByName := make(map[string]corev1.ContainerStatus, len(pod.Status.ContainerStatuses))
+	for _, cs := range pod.Status.ContainerStatuses {
+		statusByName[cs.Name] = cs
+	}
+
+	for _, container := range pod.Spec.Containers {
+		cs, ok := statusByName[container.Name]
+		if !ok {
+			fmt.Fprintf(b, "  └── %s: no status reported\n", container.Name)
+			continue
+		}
+		fmt.Fprintf(b, "  └── %s: %s\n", container.Name, containerHealth(cs))
+	}
+}
+
+// writePodResources lists per-container CPU/memory requests and limits, omitting
+// the section entirely when no container declares any.
+func writePodResources(b *strings.Builder, pod *corev1.Pod) {
+	var lines []string
+	for _, container := range pod.Spec.Containers {
+		summary := formatResources(container.Resources.Requests, container.Resources.Limits)
+		if summary == "" {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", container.Name, summary))
+	}
+	if len(lines) == 0 {
+		return
+	}
+
+	b.WriteString("Resources\n")
+	for _, line := range lines {
+		fmt.Fprintf(b, "  └── %s\n", line)
+	}
+	b.WriteString("\n")
+}
+
+// writePodProbes lists the configured liveness, readiness, and startup probes
+// per container, omitting the section when none are configured.
+func writePodProbes(b *strings.Builder, pod *corev1.Pod) {
+	var lines []string
+	for _, container := range pod.Spec.Containers {
+		var probes []string
+		if container.LivenessProbe != nil {
+			probes = append(probes, "liveness "+probeSummary(container.LivenessProbe))
+		}
+		if container.ReadinessProbe != nil {
+			probes = append(probes, "readiness "+probeSummary(container.ReadinessProbe))
+		}
+		if container.StartupProbe != nil {
+			probes = append(probes, "startup "+probeSummary(container.StartupProbe))
+		}
+		if len(probes) == 0 {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", container.Name, strings.Join(probes, ", ")))
+	}
+	if len(lines) == 0 {
+		return
+	}
+
+	b.WriteString("Probes\n")
+	for _, line := range lines {
+		fmt.Fprintf(b, "  └── %s\n", line)
+	}
+	b.WriteString("\n")
+}
+
+// containerHealth summarizes a container's state, readiness, and restart count.
+func containerHealth(cs corev1.ContainerStatus) string {
+	state := "unknown"
+	switch {
+	case cs.State.Waiting != nil:
+		state = "waiting"
+		if cs.State.Waiting.Reason != "" {
+			state += " (" + cs.State.Waiting.Reason + ")"
+		}
+	case cs.State.Terminated != nil:
+		state = "terminated"
+		if cs.State.Terminated.Reason != "" {
+			state += " (" + cs.State.Terminated.Reason + ")"
+		}
+	case cs.State.Running != nil:
+		state = "running"
+	}
+
+	readiness := "not ready"
+	if cs.Ready {
+		readiness = "ready"
+	}
+
+	return fmt.Sprintf("%s, %s, restarts: %d", state, readiness, cs.RestartCount)
+}
+
+// formatResources renders requests and limits as a compact single line.
+func formatResources(requests, limits corev1.ResourceList) string {
+	var parts []string
+	if s := resourceParts(requests); s != "" {
+		parts = append(parts, "requests "+s)
+	}
+	if s := resourceParts(limits); s != "" {
+		parts = append(parts, "limits "+s)
+	}
+	return strings.Join(parts, "; ")
+}
+
+func resourceParts(rl corev1.ResourceList) string {
+	var parts []string
+	if q, ok := rl[corev1.ResourceCPU]; ok {
+		parts = append(parts, "cpu="+q.String())
+	}
+	if q, ok := rl[corev1.ResourceMemory]; ok {
+		parts = append(parts, "mem="+q.String())
+	}
+	return strings.Join(parts, " ")
+}
+
+// probeSummary renders a probe's handler compactly (e.g. "http :80/healthz").
+func probeSummary(p *corev1.Probe) string {
+	switch {
+	case p.HTTPGet != nil:
+		return fmt.Sprintf("http :%s%s", p.HTTPGet.Port.String(), p.HTTPGet.Path)
+	case p.TCPSocket != nil:
+		return fmt.Sprintf("tcp :%s", p.TCPSocket.Port.String())
+	case p.GRPC != nil:
+		return fmt.Sprintf("grpc :%d", p.GRPC.Port)
+	case p.Exec != nil:
+		return "exec"
+	default:
+		return "configured"
+	}
 }
 
 // ServiceTree renders a human-readable explanation of a Service from the

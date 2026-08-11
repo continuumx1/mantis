@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/continuumx1/knw/internal/graph"
 )
@@ -52,8 +54,8 @@ func TestPodTree_Golden(t *testing.T) {
 		"  └── Secret/app-tls (not found)\n\n" +
 		"Runs on\n" +
 		"  └── Node/worker-1\n\n" +
-		"Status\n" +
-		"  └── Running\n"
+		"Health\n" +
+		"  └── Phase: Running\n"
 
 	got := PodTree(pod, graph.New(podRef, relations, existence))
 	if got != want {
@@ -64,6 +66,72 @@ func TestPodTree_Golden(t *testing.T) {
 // TestPodTree_DirectlyCreatedUnscheduled locks the fallback layout for a Pod
 // with no owners and no node, ensuring the pre-configuration output is
 // unchanged.
+// TestPodTree_HealthResourcesProbes locks the Resources, Probes, and per-
+// container Health sections for a fully populated pod.
+func TestPodTree_HealthResourcesProbes(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  "app",
+				Image: "nginx",
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				},
+				LivenessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{Port: intstr.FromInt(80), Path: "/healthz"},
+					},
+				},
+				ReadinessProbe: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(80)},
+					},
+				},
+			}},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name:         "app",
+				Ready:        true,
+				RestartCount: 2,
+				State:        corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+			}},
+		},
+	}
+
+	subject := graph.ResourceRef{Kind: "Pod", Name: "app", Namespace: "default"}
+
+	want := "POD/app\n\n" +
+		"CONTEXT\n\n" +
+		"Origin\n" +
+		"  └── Directly created\n\n" +
+		"Owner\n" +
+		"  └── None\n\n" +
+		"Resources\n" +
+		"  └── app: requests cpu=100m mem=128Mi; limits cpu=500m mem=256Mi\n\n" +
+		"Probes\n" +
+		"  └── app: liveness http :80/healthz, readiness tcp :80\n\n" +
+		"Runs on\n" +
+		"  └── Not scheduled\n\n" +
+		"Health\n" +
+		"  └── Phase: Running\n" +
+		"  └── app: running, ready, restarts: 2\n"
+
+	got := PodTree(pod, graph.New(subject, nil, nil))
+	if got != want {
+		t.Errorf("PodTree output mismatch.\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
 func TestPodTree_DirectlyCreatedUnscheduled(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "standalone", Namespace: "default"},
@@ -78,8 +146,8 @@ func TestPodTree_DirectlyCreatedUnscheduled(t *testing.T) {
 		"  └── None\n\n" +
 		"Runs on\n" +
 		"  └── Not scheduled\n\n" +
-		"Status\n" +
-		"  └── Pending\n"
+		"Health\n" +
+		"  └── Phase: Pending\n"
 
 	subject := graph.ResourceRef{Kind: "Pod", Name: "standalone", Namespace: "default"}
 	got := PodTree(pod, graph.New(subject, nil, nil))
