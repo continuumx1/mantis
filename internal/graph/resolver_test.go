@@ -66,6 +66,67 @@ func TestResolvePod_ControlledByChainAndNode(t *testing.T) {
 	}
 }
 
+func TestResolvePod_ConfigurationReferencesAndMounts(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "app",
+					EnvFrom: []corev1.EnvFromSource{
+						{ConfigMapRef: &corev1.ConfigMapEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "app-config"},
+						}},
+					},
+					Env: []corev1.EnvVar{
+						{Name: "PASSWORD", ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "app-secret"},
+								Key:                  "password",
+							},
+						}},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{Name: "cfg", VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "nginx-conf"},
+					},
+				}},
+				{Name: "tls", VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{SecretName: "tls-cert"},
+				}},
+			},
+		},
+	}
+
+	relations, err := ResolvePod(context.Background(), fake.NewSimpleClientset(), pod)
+	if err != nil {
+		t.Fatalf("ResolvePod returned error: %v", err)
+	}
+
+	podRef := ResourceRef{Kind: "Pod", Name: "app", Namespace: "default"}
+	cm := func(n string) ResourceRef { return ResourceRef{Kind: "ConfigMap", Name: n, Namespace: "default"} }
+	sec := func(n string) ResourceRef { return ResourceRef{Kind: "Secret", Name: n, Namespace: "default"} }
+
+	if !hasRelation(relations, podRef, References, cm("app-config")) {
+		t.Errorf("missing references edge to ConfigMap/app-config; got %+v", relations)
+	}
+	if !hasRelation(relations, podRef, References, sec("app-secret")) {
+		t.Errorf("missing references edge to Secret/app-secret; got %+v", relations)
+	}
+	if !hasRelation(relations, podRef, Mounts, cm("nginx-conf")) {
+		t.Errorf("missing mounts edge to ConfigMap/nginx-conf; got %+v", relations)
+	}
+	if !hasRelation(relations, podRef, Mounts, sec("tls-cert")) {
+		t.Errorf("missing mounts edge to Secret/tls-cert; got %+v", relations)
+	}
+	if len(relations) != 4 {
+		t.Fatalf("expected 4 configuration edges (no owner, no node), got %d: %+v", len(relations), relations)
+	}
+}
+
 func TestResolvePod_DirectlyCreatedUnscheduled(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "standalone", Namespace: "default"},

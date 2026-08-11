@@ -33,5 +33,10 @@ func PodWhy(
 		return "", fmt.Errorf("resolve relationships for pod %q: %w", name, err)
 	}
 
-	return render.PodTree(pod, relations), nil
+	existence, err := graph.VerifyExistence(ctx, clientset, graph.TargetRefs(relations))
+	if err != nil {
+		return "", fmt.Errorf("verify pod %q targets: %w", name, err)
+	}
+
+	return render.PodTree(pod, relations, existence), nil
 }

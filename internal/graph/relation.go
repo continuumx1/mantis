@@ -20,6 +20,14 @@ const (
 	// RoutesTo means the source Ingress routes traffic to the target Service,
 	// as declared by an ingress backend (default backend or a rule path).
 	RoutesTo RelationType = "routes-to"
+
+	// References means the source Pod consumes the target ConfigMap or Secret
+	// through the environment (env / envFrom).
+	References RelationType = "references"
+
+	// Mounts means the source Pod mounts the target ConfigMap or Secret as a
+	// volume.
+	Mounts RelationType = "mounts"
 )
 
 // Relation is a single directed edge in the resource graph: From is related to

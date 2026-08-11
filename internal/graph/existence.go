@@ -61,6 +61,10 @@ func getExists(
 		_, getErr = clientset.CoreV1().Pods(ref.Namespace).Get(ctx, ref.Name, opts)
 	case "Service":
 		_, getErr = clientset.CoreV1().Services(ref.Namespace).Get(ctx, ref.Name, opts)
+	case "ConfigMap":
+		_, getErr = clientset.CoreV1().ConfigMaps(ref.Namespace).Get(ctx, ref.Name, opts)
+	case "Secret":
+		_, getErr = clientset.CoreV1().Secrets(ref.Namespace).Get(ctx, ref.Name, opts)
 	case "Node":
 		_, getErr = clientset.CoreV1().Nodes().Get(ctx, ref.Name, opts)
 	case "ReplicaSet":
