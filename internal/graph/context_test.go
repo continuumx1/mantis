@@ -38,3 +38,25 @@ func TestContext_FromAndExistence(t *testing.T) {
 		t.Errorf("unchecked: want checked=false, got checked=true")
 	}
 }
+
+func TestContext_Into(t *testing.T) {
+	svc := ResourceRef{Kind: "Service", Name: "web", Namespace: "default"}
+	pod := ResourceRef{Kind: "Pod", Name: "web-1", Namespace: "default"}
+	other := ResourceRef{Kind: "Pod", Name: "web-2", Namespace: "default"}
+
+	c := New(svc, []Relation{
+		{From: svc, Type: Selects, To: pod},
+		{From: svc, Type: Selects, To: other},
+		{From: svc, Type: Serves, To: pod},
+	}, nil)
+
+	if got := c.Into(pod, Selects); len(got) != 1 || got[0].From != svc {
+		t.Errorf("Into(pod, Selects) = %+v, want one edge from Service/web", got)
+	}
+	if got := c.Into(pod, Serves); len(got) != 1 {
+		t.Errorf("Into(pod, Serves) = %+v, want one serves edge", got)
+	}
+	if got := c.Into(other, Serves); len(got) != 0 {
+		t.Errorf("Into(other, Serves) = %+v, want none", got)
+	}
+}

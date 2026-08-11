@@ -91,6 +91,18 @@ func (c *Context) From(from ResourceRef, t RelationType) []Relation {
 	return out
 }
 
+// Into returns the relations of the given type pointing at to. It is the reverse
+// of From, enabling queries such as "which Services select this Pod?".
+func (c *Context) Into(to ResourceRef, t RelationType) []Relation {
+	var out []Relation
+	for _, r := range c.Relations {
+		if r.To == to && r.Type == t {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // Existence reports what is known about ref. checked is false for refs whose
 // existence was never verified, in which case resolved is meaningless and the
 // caller must not treat the resource as missing.

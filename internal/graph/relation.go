@@ -43,10 +43,30 @@ const (
 	BoundTo RelationType = "bound-to"
 )
 
+// Certainty records how much KNW trusts a relationship. Every edge today is
+// Observed — derived directly from a Kubernetes API field — so the zero value
+// means Observed. Inferred is reserved for future edges deduced rather than
+// read, which must always be rendered as such and never presented as fact.
+type Certainty string
+
+const (
+	// Observed edges are read straight from the API (the default).
+	Observed Certainty = ""
+	// Inferred edges are deduced and must be visibly distinguished.
+	Inferred Certainty = "inferred"
+)
+
 // Relation is a single directed edge in the resource graph: From is related to
-// To with the given semantic Type.
+// To with the given semantic Type. Certainty defaults to Observed.
 type Relation struct {
-	From ResourceRef
-	Type RelationType
-	To   ResourceRef
+	From      ResourceRef
+	Type      RelationType
+	To        ResourceRef
+	Certainty Certainty
+}
+
+// IsInferred reports whether the relationship was deduced rather than read from
+// the API, in which case a renderer must mark it as not a verified fact.
+func (r Relation) IsInferred() bool {
+	return r.Certainty == Inferred
 }

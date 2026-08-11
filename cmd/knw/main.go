@@ -90,22 +90,38 @@ func handleResource(ctx context.Context, client *knwkube.Client, verb string, ar
 	emit(result)
 }
 
-// handleMap parses the optional namespace and --all flag, then prints the map.
+// handleMap maps either a whole namespace or, when given a kind/name, a single
+// resource's relationship graph. It also accepts the --all flag and an optional
+// namespace.
 func handleMap(ctx context.Context, client *knwkube.Client, args []string) {
 	showAll := false
 	namespace := client.Namespace
+	subject := ""
 
 	for _, arg := range args {
 		switch {
 		case arg == "--all":
 			showAll = true
 		case strings.HasPrefix(arg, "-"):
-			usageError("Usage: knw map [--all] [namespace]")
+			usageError("Usage: knw map [--all] [namespace | <kind>/<name>]")
 		case strings.Contains(arg, "/"):
-			usageError(fmt.Sprintf("map takes a namespace, not a resource.\nDid you mean: knw inspect %s", arg))
+			subject = arg
 		default:
 			namespace = arg
 		}
+	}
+
+	if subject != "" {
+		kind, name, ok := parseResource(subject)
+		if !ok {
+			usageError("Invalid resource format.\nExample: knw map pod/web-1234")
+		}
+		result, err := explain.MapResource(ctx, client.Clientset, namespace, kind, name)
+		if err != nil {
+			fail(err)
+		}
+		emit(result)
+		return
 	}
 
 	result, err := explain.MapNamespace(ctx, client.Clientset, namespace, showAll)
@@ -152,7 +168,8 @@ func printUsage() {
 	fmt.Println("  knw                          Show cluster connection info")
 	fmt.Println("  knw inspect <kind>/<name>    Explain a resource and its relationships")
 	fmt.Println("  knw history <kind>/<name>    Show a resource's revision history")
-	fmt.Println("  knw map [--all] [namespace]  Map a namespace's resource graph")
+	fmt.Println("  knw map [--all] [namespace]  Map a whole namespace's resource graph")
+	fmt.Println("  knw map <kind>/<name>        Map one resource's relationships")
 	fmt.Println("  knw help                     Show this help")
 	fmt.Println()
 	fmt.Println("Supported kinds for 'inspect': pod, service, ingress")
@@ -162,6 +179,7 @@ func printUsage() {
 	fmt.Println("  knw inspect pod/payment-api")
 	fmt.Println("  knw history deployment/payment-api")
 	fmt.Println("  knw map kube-system")
+	fmt.Println("  knw map pod/payment-api-abc123")
 	fmt.Println()
 	fmt.Println("KNW is read-only and never modifies your cluster.")
 }
