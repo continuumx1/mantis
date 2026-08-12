@@ -1,0 +1,14 @@
+# Keep the build context small and reproducible.
+.git
+.gitignore
+docs/
+build/
+*.md
+LICENSE
+NOTICE
+# Local build artifacts
+knw
+knw-api
+knw-web
+bin/
+dist/

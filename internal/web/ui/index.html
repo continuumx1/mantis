@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KNW — Cluster Resource Graph</title>
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #0a0e13; --ground-2: #0e141b; --panel: #121a23; --panel-2: #172230; --line: #223041;
+    --ink: #e7eef6; --muted: #8595a6; --faint: #5a6b7d; --brand: #a6e22e;
+    --cat-workload: #6ea8fe; --cat-pod: #a6e22e; --cat-network: #d980fb; --cat-config: #e3b341; --cat-storage: #34d1bf; --cat-node: #96a4b5;
+    --ns-cluster: #8595a6;
+    --ok: #3fb950; --warn: #d29922; --crit: #f85149;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-ui); overflow: hidden; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 10px 1px color-mix(in srgb, var(--brand) 70%, transparent); }
+  .brand b { font-family: var(--font-mono); font-size: 18px; letter-spacing: 1px; }
+  .brand span { color: var(--muted); font-size: 12px; }
+  .chip { font-family: var(--font-mono); font-size: 12px; padding: 4px 10px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .chip b { color: var(--brand); font-weight: 600; }
+  .spacer { flex: 1; }
+  .stat { color: var(--faint); font-size: 12px; font-family: var(--font-mono); }
+  .stat b { color: var(--muted); }
+  .live { color: var(--ok); }
+
+  main { position: relative; flex: 1; min-height: 0; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--line) 0.6px, transparent 0.6px);
+    background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
+  #canvas.panning { cursor: grabbing; }
+
+  .region-box { fill-opacity: 0.05; stroke-width: 1; stroke-opacity: .5; }
+  .region-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .5px; }
+
+  .edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
+  .edge-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; opacity: 0; transition: opacity .18s; pointer-events: none; }
+
+  .node { cursor: pointer; }
+  .node .chip-bg { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .18s, filter .18s; }
+  .node .kind { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .6px; text-transform: uppercase; }
+  .node .name { font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink); }
+  .node .sub  { font-family: var(--font-mono); font-size: 8px; fill: var(--crit); letter-spacing: .5px; }
+  .node .ready { font-family: var(--font-mono); font-size: 9px; font-weight: 600; text-anchor: end; }
+  .node:hover .chip-bg { stroke: color-mix(in srgb, var(--brand) 55%, var(--line)); }
+  .node.selected .chip-bg { stroke: var(--brand); stroke-width: 1.6; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--brand) 45%, transparent)); }
+  .node.dim { opacity: .22; }
+  .node.ghost .chip-bg { stroke: var(--crit); stroke-dasharray: 4 3; fill: color-mix(in srgb, var(--crit) 8%, var(--panel-2)); }
+  .node.ghost .name { fill: var(--muted); }
+
+  .status-ring { fill: none; stroke-width: 2; }
+  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
+  .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
+  @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
+
+  .legend { position: absolute; left: 16px; bottom: 16px; z-index: 4; background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 11.5px; max-width: 240px; }
+  .legend h4 { margin: 0 0 8px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; color: var(--muted); font-family: var(--font-mono); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .legend .ln { width: 16px; border-top-width: 2px; border-top-style: solid; flex: none; }
+  .legend .divider { height: 1px; background: var(--line); margin: 10px 0; }
+
+  .panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 320px; z-index: 6; background: color-mix(in srgb, var(--panel) 95%, transparent); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  .panel .hint { color: var(--faint); font-size: 13px; line-height: 1.55; margin-top: 4px; }
+  .panel .hint b { color: var(--muted); }
+  .p-kind { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  .p-name { font-family: var(--font-mono); font-size: 15px; word-break: break-all; line-height: 1.35; color: var(--ink); }
+  .p-ns { font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; border-radius: 20px; border: 1px solid; width: fit-content; }
+  .badge::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; }
+  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+  .tab { padding: 7px 11px; font-size: 11px; font-family: var(--font-mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--brand); border-color: var(--brand); }
+
+  .kv { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .kv > div { display: flex; gap: 8px; }
+  .kv .k { color: var(--faint); min-width: 84px; font-family: var(--font-mono); }
+  .kv .v { color: var(--muted); font-family: var(--font-mono); word-break: break-all; }
+
+  .sec-h { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; margin: 4px 0 2px; }
+  .attr { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); word-break: break-all; }
+
+  .rel { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-family: var(--font-mono); font-size: 12px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+  .rel:hover .rel-target { color: var(--brand); }
+  .rel .verb { color: var(--muted); } .rel .arrow { color: var(--faint); } .rel-target { color: var(--ink); }
+  .rel .cross-tag { color: var(--warn); font-size: 9px; margin-left: auto; } .rel .rk { font-size: 9px; }
+
+  .controls { position: absolute; top: 14px; left: 16px; z-index: 4; display: flex; gap: 8px; }
+  .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  .overlay { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: color-mix(in srgb, var(--ground) 80%, transparent); backdrop-filter: blur(2px); }
+  .overlay .card { max-width: 460px; padding: 22px 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .overlay h3 { margin: 0 0 8px; font-family: var(--font-mono); font-size: 15px; color: var(--ink); }
+  .overlay p { margin: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .overlay code { font-family: var(--font-mono); color: var(--brand); }
+  .overlay.err h3 { color: var(--crit); }
+
+  @media (max-width: 780px) { .panel { width: auto; left: 14px; top: auto; height: 46%; } .legend { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <span class="dot"></span>
+    <div class="brand"><b>KNW</b><span>Every K8s Resource Has a Story</span></div>
+    <div class="chip">cluster: <b id="clusterName">…</b></div>
+    <div class="spacer"></div>
+    <div class="stat"><b id="nCount">0</b> resources &nbsp;·&nbsp; <b id="eCount">0</b> relationships &nbsp;·&nbsp; <b id="nsCount">0</b> namespaces &nbsp;·&nbsp; <span class="live">● live</span></div>
+  </header>
+
+  <main>
+    <div class="controls">
+      <button class="btn" id="reset">Reset view</button>
+      <button class="btn" id="relayout">Re-layout</button>
+      <button class="btn" id="refresh">Refresh</button>
+    </div>
+
+    <svg id="canvas"><defs></defs>
+      <g id="viewport"><g id="regions"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
+    </svg>
+
+    <div class="legend">
+      <h4>Resource</h4>
+      <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
+      <div class="row"><span class="sw" style="background:var(--cat-pod)"></span>Pod</div>
+      <div class="row"><span class="sw" style="background:var(--cat-network)"></span>Service / Ingress</div>
+      <div class="row"><span class="sw" style="background:var(--cat-config)"></span>Config / Secret</div>
+      <div class="row"><span class="sw" style="background:var(--cat-storage)"></span>Storage</div>
+      <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
+      <div class="divider"></div>
+      <h4>Reading the map</h4>
+      <div class="row"><span class="ln" style="border-color:var(--cat-node)"></span>relationship (edge)</div>
+      <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
+      <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
+    </div>
+
+    <aside class="panel" id="panel"></aside>
+    <div class="overlay" id="overlay"><div class="card"><h3>Connecting to your cluster…</h3><p>Reading resources and relationships.</p></div></div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const el = (t,a) => { const e = document.createElementNS(SVGNS,t); for (const k in a) e.setAttribute(k,a[k]); return e; };
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  const CAT = { Deployment:"workload", ReplicaSet:"workload", StatefulSet:"workload", DaemonSet:"workload", CronJob:"workload", Job:"workload",
+    Pod:"pod", Service:"network", Ingress:"network", ConfigMap:"config", Secret:"config",
+    PersistentVolumeClaim:"storage", PersistentVolume:"storage", StorageClass:"storage", Node:"node" };
+  const catColor = c => css("--cat-"+c);
+  const FAMILY = { "controlled-by":"workload","runs-on":"node","selects":"network","serves":"network","routes-to":"network","references":"config","mounts":"config","claims":"storage","bound-to":"storage","storage-class":"storage" };
+  const REVERSE = { "controlled-by":"controls","runs-on":"hosts","selects":"selected-by","serves":"served-by","routes-to":"routed-from","references":"used-by","mounts":"mounted-by","claims":"claimed-by","bound-to":"bound-from","storage-class":"class-of" };
+  const NS_PALETTE = ["#a6e22e","#6ea8fe","#d980fb","#e3b341","#34d1bf","#f0883e","#db61a2","#7ee787","#a371f7","#4ec9b0"];
+
+  const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
+    gRegions = document.getElementById("regions"), gEdges = document.getElementById("edges"),
+    gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
+    defs = svg.querySelector("defs"), panel = document.getElementById("panel"), overlay = document.getElementById("overlay");
+
+  ["workload","network","config","storage","node"].forEach(f => {
+    const m = el("marker",{ id:"arrow-"+f, viewBox:"0 0 10 10", refX:"9", refY:"5", markerWidth:"6", markerHeight:"6", orient:"auto-start-reverse" });
+    m.appendChild(el("path",{ d:"M0,0 L10,5 L0,10 z", fill: catColor(f) })); defs.appendChild(m);
+  });
+
+  const groupKey = n => n.ns || "__cluster";
+  const short = s => s.length > 22 ? s.slice(0,21)+"…" : s;
+
+  // Live state, (re)assigned on every load.
+  let nodes = [], edges = [], byId = {}, groups = {}, regionEls = {}, nodeEls = {}, anchorFrac = {};
+  let W = svg.clientWidth||1000, H = svg.clientHeight||640, alpha = 1;
+  let selected = null, curTab = "overview";
+
+  function showOverlay(title, bodyHTML, isErr){
+    overlay.style.display = "flex";
+    overlay.className = "overlay" + (isErr ? " err" : "");
+    overlay.innerHTML = '<div class="card"><h3>'+title+'</h3>'+bodyHTML+'</div>';
+  }
+  const hideOverlay = () => { overlay.style.display = "none"; };
+
+  function load(){
+    showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
+    fetch("/api/graph", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); }))
+      .then(boot)
+      .catch(err => showOverlay("Cannot read the cluster",
+        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true));
+  }
+
+  function boot(data){
+    const meta = data.meta || {};
+    document.getElementById("clusterName").textContent = meta.context || "unknown";
+    document.getElementById("nCount").textContent = (data.nodes||[]).length;
+    document.getElementById("eCount").textContent = (data.edges||[]).length;
+    document.getElementById("nsCount").textContent = meta.namespaces || 0;
+
+    // Reset scene.
+    gRegions.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
+    byId = {}; groups = {}; regionEls = {}; nodeEls = {}; selected = null;
+
+    nodes = (data.nodes||[]).map(n => ({ ...n, cat: CAT[n.kind] || "node" }));
+    edges = (data.edges||[]).slice();
+
+    if (nodes.length === 0){
+      showOverlay("No resources found",
+        '<p>KNW connected to <code>'+esc(meta.context||"the cluster")+'</code> but found nothing to map.</p><p>Deploy something and hit Refresh.</p>', false);
+      return;
+    }
+    hideOverlay();
+
+    nodes.forEach(n => { byId[n.id] = n; });
+    nodes.forEach(n => { n.w = Math.min(210, Math.max(104, short(n.name).length*7 + 48)); n.h = n.resolved===false?46:40; n.x=0; n.y=0; n.vx=0; n.vy=0; n.fx=null; n.fy=null; });
+
+    nodes.forEach(n => { const g=groupKey(n); (groups[g]=groups[g]||[]).push(n); });
+    assignRegions();
+    buildNodeEls();
+    buildEdgeEls();
+    seed();
+    renderEmpty();
+  }
+
+  // assignRegions gives every namespace a colour and a fractional anchor, laying
+  // namespaces across a band and cluster-scoped resources along the bottom.
+  function assignRegions(){
+    const ns = Object.keys(groups).filter(g => g !== "__cluster").sort();
+    anchorFrac = {};
+    ns.forEach((g, i) => { anchorFrac[g] = { x:(i+1)/(ns.length+1), y: 0.30 + (i%2)*0.13 }; });
+    if (groups["__cluster"]) anchorFrac["__cluster"] = { x:0.5, y:0.84 };
+
+    Object.keys(groups).forEach((g, i) => {
+      const cluster = g === "__cluster";
+      const color = cluster ? css("--ns-cluster") : NS_PALETTE[Object.keys(anchorFrac).indexOf(g) % NS_PALETTE.length];
+      const box = el("rect",{ class:"region-box", rx:16, fill: color, stroke: color, "stroke-dasharray": cluster?"6 5":"none" });
+      const lbl = el("text",{ class:"region-label", fill: color });
+      lbl.textContent = cluster ? "cluster-scoped · not namespaced" : "namespace · "+g;
+      gRegions.appendChild(box); gRegions.appendChild(lbl);
+      regionEls[g] = { box, lbl, color };
+    });
+  }
+
+  function buildNodeEls(){
+    nodes.forEach(n => {
+      const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"");
+      const g = el("g",{ class: cls, "data-id": n.id });
+      g.appendChild(el("rect",{ class:"accent", x:-n.w/2, y:-n.h/2, width:4, height:n.h, rx:2, fill: catColor(n.cat) }));
+      g.appendChild(el("rect",{ class:"chip-bg", x:-n.w/2, y:-n.h/2, width:n.w, height:n.h, rx:9 }));
+      if (n.status) g.appendChild(el("circle",{ class:"status-ring", cx:n.w/2-11, cy:-n.h/2+11, r:4.5 }));
+      const kind = el("text",{ class:"kind", x:-n.w/2+12, y:n.resolved===false?-6:-3, fill: catColor(n.cat) }); kind.textContent = n.kind.toUpperCase();
+      const name = el("text",{ class:"name", x:-n.w/2+12, y:n.resolved===false?9:12 }); name.textContent = short(n.name);
+      g.appendChild(kind); g.appendChild(name);
+      if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
+      const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
+      gNodes.appendChild(g); nodeEls[n.id] = g;
+    });
+  }
+
+  function buildEdgeEls(){
+    edges.forEach(e => {
+      const fam = FAMILY[e.type] || "node", a = byId[e.from], b = byId[e.to];
+      e.cross = a && b && a.ns && b.ns && a.ns !== b.ns; e.toGhost = b && b.resolved === false;
+      const line = el("line",{ class:"edge", stroke: e.toGhost?css("--crit"):catColor(fam), "stroke-opacity":.32, "stroke-width":1.6,
+        "stroke-dasharray": e.type==="runs-on"?"4 4":(e.toGhost?"5 4":"none"), "marker-end": e.toGhost?"":"url(#arrow-"+fam+")" });
+      e._line = line; gEdges.appendChild(line);
+      const lbl = el("text",{ class:"edge-label", "text-anchor":"middle" }); lbl.textContent = e.type; e._label = lbl; gEdgeLabels.appendChild(lbl);
+    });
+  }
+
+  const anchor = g => { const a = anchorFrac[g] || {x:0.5,y:0.5}; return { x: W*a.x, y: H*a.y }; };
+  function seed(){ nodes.forEach(n => { const a=anchor(groupKey(n)); n.x=a.x+(Math.random()-.5)*160; n.y=a.y+(Math.random()-.5)*140; n.vx=0; n.vy=0; n.fx=null; n.fy=null; }); alpha = 1; }
+
+  function tick(){
+    W = svg.clientWidth||W; H = svg.clientHeight||H;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++){ const a=nodes[i],b=nodes[j]; let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||.01,d=Math.sqrt(d2); const rep=5200/d2,ux=dx/d,uy=dy/d; a.vx+=ux*rep; a.vy+=uy*rep; b.vx-=ux*rep; b.vy-=uy*rep; }
+    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||.01; const k=0.032*(d-118),ux=dx/d,uy=dy/d; a.vx+=ux*k; a.vy+=uy*k; b.vx-=ux*k; b.vy-=uy*k; });
+    nodes.forEach(n => { const a=anchor(groupKey(n)); n.vx+=(a.x-n.x)*0.02; n.vy+=(a.y-n.y)*0.02; });
+    nodes.forEach(n => { if(n.fx!=null){ n.x=n.fx; n.y=n.fy; n.vx=0; n.vy=0; return; } n.vx*=0.82; n.vy*=0.82; n.x+=n.vx*alpha; n.y+=n.vy*alpha; });
+    alpha *= 0.992; if(alpha<0.03) alpha=0.03; render();
+  }
+  function render(){
+    Object.keys(groups).forEach(g => { const ns=groups[g]; let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+      ns.forEach(n => { minx=Math.min(minx,n.x-n.w/2); maxx=Math.max(maxx,n.x+n.w/2); miny=Math.min(miny,n.y-n.h/2); maxy=Math.max(maxy,n.y+n.h/2); });
+      const pad=26,r=regionEls[g]; if(!r) return; r.box.setAttribute("x",minx-pad); r.box.setAttribute("y",miny-pad); r.box.setAttribute("width",(maxx-minx)+pad*2); r.box.setAttribute("height",(maxy-miny)+pad*2);
+      r.lbl.setAttribute("x",minx-pad+12); r.lbl.setAttribute("y",miny-pad-8); });
+    nodes.forEach(n => nodeEls[n.id].setAttribute("transform",`translate(${n.x},${n.y})`));
+    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/d,uy=dy/d;
+      const x1=a.x+ux*24,y1=a.y+uy*20,x2=b.x-ux*30,y2=b.y-uy*22; e._line.setAttribute("x1",x1); e._line.setAttribute("y1",y1); e._line.setAttribute("x2",x2); e._line.setAttribute("y2",y2);
+      e._label.setAttribute("x",(x1+x2)/2); e._label.setAttribute("y",(y1+y2)/2-3); });
+  }
+  function loop(){ tick(); requestAnimationFrame(loop); } loop();
+
+  // ---- pan/zoom ----
+  const view = { x:0, y:0, k:1 };
+  const applyView = () => gViewport.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`); applyView();
+  svg.addEventListener("wheel", ev => { ev.preventDefault(); const r=svg.getBoundingClientRect(); const mx=ev.clientX-r.left,my=ev.clientY-r.top,f=Math.exp(-ev.deltaY*0.0016);
+    const nk=Math.min(2.6,Math.max(0.3,view.k*f)); view.x=mx-(mx-view.x)*(nk/view.k); view.y=my-(my-view.y)*(nk/view.k); view.k=nk; applyView(); }, {passive:false});
+  let drag=null;
+  const world = ev => { const r=svg.getBoundingClientRect(); return { x:(ev.clientX-r.left-view.x)/view.k, y:(ev.clientY-r.top-view.y)/view.k }; };
+  svg.addEventListener("pointerdown", ev => {
+    const g = ev.target.closest && ev.target.closest(".node");
+    if (g){ const n=byId[g.getAttribute("data-id")],w=world(ev); drag={node:n,dx:n.x-w.x,dy:n.y-w.y,moved:false}; n.fx=n.x; n.fy=n.y; alpha=Math.max(alpha,.5); }
+    else { const r=svg.getBoundingClientRect(); drag={pan:true,sx:ev.clientX-r.left-view.x,sy:ev.clientY-r.top-view.y,moved:false,target:ev.target}; svg.classList.add("panning"); }
+    svg.setPointerCapture(ev.pointerId);
+  });
+  svg.addEventListener("pointermove", ev => { if(!drag) return; drag.moved=true;
+    if (drag.pan){ const r=svg.getBoundingClientRect(); view.x=ev.clientX-r.left-drag.sx; view.y=ev.clientY-r.top-drag.sy; applyView(); }
+    else { const w=world(ev); drag.node.fx=w.x+drag.dx; drag.node.fy=w.y+drag.dy; alpha=Math.max(alpha,.4); } });
+  svg.addEventListener("pointerup", () => { svg.classList.remove("panning"); if(drag&&!drag.pan&&drag.node){ drag.node.fx=null; drag.node.fy=null; }
+    if(drag&&drag.pan&&!drag.moved&&!drag.target.closest(".node")) select(null); drag=null; });
+  gNodes.addEventListener("click", ev => { const g=ev.target.closest(".node"); if(g) select(g.getAttribute("data-id")); });
+
+  // ---- selection + panel ----
+  const TABS = { overview:"Overview", relationships:"Relationships" };
+  const neighborsOf = id => { const s=new Set(); edges.forEach(e=>{ if(e.from===id)s.add(e.to); if(e.to===id)s.add(e.from); }); return s; };
+  function select(id){
+    selected=id; curTab="overview";
+    if(!id){ Object.values(nodeEls).forEach(g=>g.classList.remove("selected","dim")); edges.forEach(e=>{ e._line.setAttribute("stroke-opacity",.32); e._line.setAttribute("stroke-width",1.6); e._label.style.opacity=0; }); renderEmpty(); return; }
+    const nb=neighborsOf(id);
+    nodes.forEach(n=>{ const g=nodeEls[n.id]; g.classList.toggle("selected",n.id===id); g.classList.toggle("dim",n.id!==id&&!nb.has(n.id)); });
+    edges.forEach(e=>{ const on=e.from===id||e.to===id; e._line.setAttribute("stroke-opacity",on?1:.05); e._line.setAttribute("stroke-width",on?2.6:1.1); e._label.style.opacity=on?1:0; });
+    renderNode(byId[id]);
+  }
+  function renderEmpty(){
+    const cluster = document.getElementById("clusterName").textContent;
+    panel.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
+      '<p class="hint">Every resource KNW understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
+      '<b>Click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom, <b>Refresh</b> to re-read the cluster.</p>';
+  }
+  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
+  function renderNode(n){
+    const head = '<div><div class="p-kind" style="color:'+catColor(n.cat)+'">'+esc(n.kind)+'</div><div class="p-name">'+esc(n.name)+'</div>'+
+      '<div class="p-ns">'+(n.ns?"namespace · "+esc(n.ns):"cluster-scoped")+'</div></div>'+ badge(n);
+    const tabs = '<div class="tabs">'+Object.keys(TABS).map(t=>'<div class="tab'+(t===curTab?' active':'')+'" data-tab="'+t+'">'+TABS[t]+'</div>').join('')+'</div>';
+    panel.innerHTML = head + tabs + '<div id="tabbody"></div>';
+    panel.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { curTab=t.getAttribute("data-tab"); renderBody(n); }));
+    renderBody(n);
+  }
+  function renderBody(n){
+    panel.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-tab")===curTab));
+    const body = document.getElementById("tabbody");
+    body.innerHTML = curTab==="overview" ? overviewHTML(n) : relHTML(n);
+    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => select(r.getAttribute("data-goto"))));
+  }
+  function overviewHTML(n){
+    let h = '<div class="kv"><div><span class="k">kind</span><span class="v">'+esc(n.kind)+'</span></div>'+
+      '<div><span class="k">name</span><span class="v">'+esc(n.name)+'</span></div>'+
+      '<div><span class="k">namespace</span><span class="v">'+(n.ns?esc(n.ns):"cluster-scoped")+'</span></div>'+
+      '<div><span class="k">exists</span><span class="v">'+(n.resolved===false?"not found in cluster":"yes")+'</span></div></div>';
+    if (n.resolved===false){
+      h += '<p class="hint">This resource is referenced by another object, but KNW could not find it in the cluster. It is flagged rather than hidden.</p>';
+      return h;
+    }
+    if (n.attributes && n.attributes.length){
+      h += '<div class="sec-h">Details</div>' + n.attributes.map(a => '<div class="attr">'+esc(a)+'</div>').join('');
+    } else {
+      h += '<p class="hint">No extra detail read for this resource yet.</p>';
+    }
+    return h;
+  }
+  function relHTML(n){
+    const out=[], inc=[];
+    edges.forEach(e => { if(e.from===n.id){ const o=byId[e.to]; if(o) out.push({verb:e.type,arrow:"→",other:o,cross:e.cross}); }
+                         if(e.to===n.id){ const o=byId[e.from]; if(o) inc.push({verb:REVERSE[e.type]||e.type,arrow:"←",other:o,cross:e.cross}); } });
+    const row = r => '<div class="rel" data-goto="'+esc(r.other.id)+'"><span class="verb">'+esc(r.verb)+'</span><span class="arrow">'+r.arrow+'</span>'+
+      '<span class="rel-target"><span class="rk" style="color:'+catColor(r.other.cat)+'">'+esc(r.other.kind)+'/</span>'+esc(short(r.other.name))+'</span>'+(r.cross?'<span class="cross-tag">cross-ns</span>':'')+'</div>';
+    let h = "";
+    if (out.length) h += '<div class="sec-h">Depends on</div>'+out.map(row).join("");
+    if (inc.length) h += '<div class="sec-h">Used by</div>'+inc.map(row).join("");
+    return h || '<p class="hint">No relationships discovered.</p>';
+  }
+
+  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
+  document.getElementById("relayout").addEventListener("click", () => { seed(); });
+  document.getElementById("refresh").addEventListener("click", load);
+
+  load();
+})();
+</script>
+</body>
+</html>
