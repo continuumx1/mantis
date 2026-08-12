@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// BuildNamespaceGraph lists the resources KNW understands in a namespace and
+// BuildNamespaceGraph lists the resources Mantis understands in a namespace and
 // assembles the full relationship graph for them as a single Context whose
 // subject is the namespace. It also returns the kinds it was not permitted to
 // list, so the caller can report them.

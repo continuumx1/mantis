@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/continuumx1/knw/internal/graph"
+	"github.com/continuumx1/mantis/internal/graph"
 )
 
 // GraphDTO is the JSON payload the web UI fetches: cluster metadata plus a flat

@@ -1,4 +1,4 @@
-// Package httpx holds small HTTP helpers shared by the KNW service binaries.
+// Package httpx holds small HTTP helpers shared by the Mantis service binaries.
 package httpx
 
 import (
@@ -15,7 +15,7 @@ import (
 
 // ListenAndServe runs an HTTP server on addr until SIGINT/SIGTERM, then drains
 // in-flight requests so a rolling update or scale-down terminates cleanly. It is
-// the standard entry point for every KNW service.
+// the standard entry point for every Mantis service.
 func ListenAndServe(addr string, handler http.Handler) error {
 	server := &http.Server{
 		Addr:              addr,
@@ -53,7 +53,7 @@ func EnvOr(key, fallback string) string {
 	return fallback
 }
 
-// WriteText writes a plain-text response body. It is the standard way KNW
+// WriteText writes a plain-text response body. It is the standard way Mantis
 // services answer health/readiness probes.
 func WriteText(w http.ResponseWriter, body string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")

@@ -1,7 +1,7 @@
-# KNW backend service (knw-engine): reads the cluster, serves the graph JSON.
+# Mantis backend service (mantis-engine): reads the cluster, serves the graph JSON.
 # Multi-stage: compile a static binary, ship it on distroless nonroot.
 #
-#   docker build -f build/Dockerfile.engine -t knw-engine:dev .
+#   docker build -f build/Dockerfile.engine -t mantis-engine:dev .
 #
 # Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).
 FROM golang:1.26 AS build
@@ -12,10 +12,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/knw-engine ./cmd/knw-engine
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mantis-engine ./cmd/mantis-engine
 
 FROM gcr.io/distroless/static:nonroot
-COPY --from=build /out/knw-engine /knw-engine
+COPY --from=build /out/mantis-engine /mantis-engine
 USER nonroot:nonroot
 EXPOSE 8080
-ENTRYPOINT ["/knw-engine"]
+ENTRYPOINT ["/mantis-engine"]

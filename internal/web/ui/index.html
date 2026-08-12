@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KNW — Cluster Resource Graph</title>
+<title>Mantis — Cluster Resource Graph</title>
 
 <style>
   :root {
@@ -124,7 +124,7 @@
 <div id="app">
   <header>
     <span class="dot"></span>
-    <div class="brand"><b>KNW</b><span>Every K8s Resource Has a Story</span></div>
+    <div class="brand"><b>Mantis</b><span>Every K8s Resource Has a Story</span></div>
     <div class="chip">cluster: <b id="clusterName">…</b></div>
     <div class="spacer"></div>
     <div class="stat"><b id="nCount">0</b> resources &nbsp;·&nbsp; <b id="eCount">0</b> relationships &nbsp;·&nbsp; <b id="nsCount">0</b> namespaces &nbsp;·&nbsp; <span class="live">● live</span></div>
@@ -228,7 +228,7 @@
 
     if (nodes.length === 0){
       showOverlay("No resources found",
-        '<p>KNW connected to <code>'+esc(meta.context||"the cluster")+'</code> but found nothing to map.</p><p>Deploy something and hit Refresh.</p>', false);
+        '<p>Mantis connected to <code>'+esc(meta.context||"the cluster")+'</code> but found nothing to map.</p><p>Deploy something and hit Refresh.</p>', false);
       return;
     }
     hideOverlay();
@@ -347,7 +347,7 @@
   function renderEmpty(){
     const cluster = document.getElementById("clusterName").textContent;
     panel.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
-      '<p class="hint">Every resource KNW understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
+      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
       '<b>Click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom, <b>Refresh</b> to re-read the cluster.</p>';
   }
   const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
@@ -371,7 +371,7 @@
       '<div><span class="k">namespace</span><span class="v">'+(n.ns?esc(n.ns):"cluster-scoped")+'</span></div>'+
       '<div><span class="k">exists</span><span class="v">'+(n.resolved===false?"not found in cluster":"yes")+'</span></div></div>';
     if (n.resolved===false){
-      h += '<p class="hint">This resource is referenced by another object, but KNW could not find it in the cluster. It is flagged rather than hidden.</p>';
+      h += '<p class="hint">This resource is referenced by another object, but Mantis could not find it in the cluster. It is flagged rather than hidden.</p>';
       return h;
     }
     if (n.attributes && n.attributes.length){

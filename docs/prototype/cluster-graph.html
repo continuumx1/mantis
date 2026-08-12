@@ -1,4 +1,4 @@
-<title>KNW — Cluster Resource Graph</title>
+<title>Mantis — Cluster Resource Graph</title>
 
 <style>
   :root {
@@ -6,7 +6,7 @@
     --ground: #0a0e13; --ground-2: #0e141b; --panel: #121a23; --panel-2: #172230; --line: #223041;
     --ink: #e7eef6; --muted: #8595a6; --faint: #5a6b7d; --brand: #a6e22e;
     --cat-workload: #6ea8fe; --cat-pod: #a6e22e; --cat-network: #d980fb; --cat-config: #e3b341; --cat-storage: #34d1bf; --cat-node: #96a4b5;
-    --ns-knwdemo: #a6e22e; --ns-default: #6ea8fe; --ns-kubesystem: #d980fb; --ns-cluster: #8595a6;
+    --ns-mantisdemo: #a6e22e; --ns-default: #6ea8fe; --ns-kubesystem: #d980fb; --ns-cluster: #8595a6;
     --ok: #3fb950; --warn: #d29922; --crit: #f85149;
     --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
     --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -129,7 +129,7 @@
 <div id="app">
   <header>
     <span class="dot"></span>
-    <div class="brand"><b>KNW</b><span>Every K8s Resource Has a Story</span></div>
+    <div class="brand"><b>Mantis</b><span>Every K8s Resource Has a Story</span></div>
     <div class="chip">cluster: <b>minikube</b></div>
     <div class="spacer"></div>
     <div class="stat"><b id="nCount">0</b> resources &nbsp;·&nbsp; <b id="eCount">0</b> relationships &nbsp;·&nbsp; <b>3</b> namespaces &nbsp;·&nbsp; prototype</div>
@@ -170,12 +170,12 @@
 
   const N = (kind, name, ns, status, resolved) => ({ id: kind+"/"+name, kind, name, ns: ns||"", status: status||null, resolved: resolved!==false });
   const nodes = [
-    N("Deployment","web","knw-demo"), N("ReplicaSet","web-674d56f856","knw-demo"),
-    N("Pod","web-674d56f856-bq8mf","knw-demo","ok"), N("Pod","web-674d56f856-hgxxj","knw-demo","ok"),
-    N("Service","web","knw-demo"), N("ConfigMap","app-config","knw-demo"), N("Secret","app-secret","knw-demo"),
-    N("Deployment","data-app","knw-demo"), N("ReplicaSet","data-app-855575db7f","knw-demo"),
-    N("Pod","data-app-855575db7f-jpw7d","knw-demo","ok"), N("PersistentVolumeClaim","app-data","knw-demo"),
-    N("Deployment","broken","knw-demo"), N("ReplicaSet","broken-67f479f969","knw-demo"), N("Pod","broken-67f479f969-dxhmv","knw-demo","crit"),
+    N("Deployment","web","mantis-demo"), N("ReplicaSet","web-674d56f856","mantis-demo"),
+    N("Pod","web-674d56f856-bq8mf","mantis-demo","ok"), N("Pod","web-674d56f856-hgxxj","mantis-demo","ok"),
+    N("Service","web","mantis-demo"), N("ConfigMap","app-config","mantis-demo"), N("Secret","app-secret","mantis-demo"),
+    N("Deployment","data-app","mantis-demo"), N("ReplicaSet","data-app-855575db7f","mantis-demo"),
+    N("Pod","data-app-855575db7f-jpw7d","mantis-demo","ok"), N("PersistentVolumeClaim","app-data","mantis-demo"),
+    N("Deployment","broken","mantis-demo"), N("ReplicaSet","broken-67f479f969","mantis-demo"), N("Pod","broken-67f479f969-dxhmv","mantis-demo","crit"),
     N("Deployment","nginx","default"), N("ReplicaSet","nginx-56c45fd5ff","default"), N("Pod","nginx-56c45fd5ff-2cslb","default","ok"),
     N("Service","nginx","default"), N("Ingress","nginx","default"), N("Ingress","broken","default"), N("Service","does-not-exist","default",null,false),
     N("Deployment","coredns","kube-system"), N("ReplicaSet","coredns-5dd5756b68","kube-system"),
@@ -206,7 +206,7 @@
     E("Pod/kube-proxy-x7k2p","DaemonSet/kube-proxy","controlled-by"), E("Pod/kube-proxy-x7k2p","Node/minikube","runs-on"),
   ];
 
-  // ---- rich per-resource detail (what the KNW engine reads from the API) ----
+  // ---- rich per-resource detail (what the Mantis engine reads from the API) ----
   const DET = {
     "Pod/web-674d56f856-bq8mf": { ready:"1/1", restarts:0, ip:"10.244.0.14", node:"minikube", qos:"Burstable",
       containers:[{name:"web",image:"nginx:1.27",ready:true,req:"cpu 100m · mem 128Mi",lim:"cpu 500m · mem 256Mi"}] },
@@ -254,7 +254,7 @@
 kind: Deployment
 metadata:
   name: web
-  namespace: knw-demo
+  namespace: mantis-demo
 spec:
   replicas: 2
   strategy:
@@ -282,7 +282,7 @@ spec:
 kind: Service
 metadata:
   name: web
-  namespace: knw-demo
+  namespace: mantis-demo
 spec:
   type: ClusterIP
   clusterIP: 10.96.120.4
@@ -299,7 +299,7 @@ spec:
 kind: Pod
 metadata:
   name: broken-67f479f969-dxhmv
-  namespace: knw-demo
+  namespace: mantis-demo
 spec:
   nodeName: minikube
   containers:
@@ -318,7 +318,7 @@ status:
 kind: PersistentVolumeClaim
 metadata:
   name: app-data
-  namespace: knw-demo
+  namespace: mantis-demo
 spec:
   accessModes: [ ReadWriteOnce ]
   storageClassName: standard
@@ -342,7 +342,7 @@ status:
     PersistentVolumeClaim:"storage", PersistentVolume:"storage", StorageClass:"storage", Node:"node" };
   const FAMILY = { "controlled-by":"workload","runs-on":"node","selects":"network","serves":"network","routes-to":"network","references":"config","mounts":"config","claims":"storage","bound-to":"storage","storage-class":"storage" };
   const REVERSE = { "controlled-by":"controls","runs-on":"hosts","selects":"selected-by","serves":"served-by","routes-to":"routed-from","references":"used-by","mounts":"mounted-by","claims":"claimed-by","bound-to":"bound-from","storage-class":"class-of" };
-  const REGION = { "knw-demo":{color:"var(--ns-knwdemo)",label:"namespace · knw-demo"}, "default":{color:"var(--ns-default)",label:"namespace · default"},
+  const REGION = { "mantis-demo":{color:"var(--ns-mantisdemo)",label:"namespace · mantis-demo"}, "default":{color:"var(--ns-default)",label:"namespace · default"},
     "kube-system":{color:"var(--ns-kubesystem)",label:"namespace · kube-system"}, "__cluster":{color:"var(--ns-cluster)",label:"cluster-scoped · not namespaced"} };
   const groupKey = n => n.ns || "__cluster";
   const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -409,7 +409,7 @@ status:
 
   // ---- layout ----
   let W = svg.clientWidth||1000, H = svg.clientHeight||640;
-  const anchor = g => ({ "knw-demo":{x:W*0.26,y:H*0.34}, "default":{x:W*0.55,y:H*0.28}, "kube-system":{x:W*0.80,y:H*0.36}, "__cluster":{x:W*0.52,y:H*0.80} }[g] || {x:W/2,y:H/2});
+  const anchor = g => ({ "mantis-demo":{x:W*0.26,y:H*0.34}, "default":{x:W*0.55,y:H*0.28}, "kube-system":{x:W*0.80,y:H*0.36}, "__cluster":{x:W*0.52,y:H*0.80} }[g] || {x:W/2,y:H/2});
   function seed(){ nodes.forEach(n => { const a=anchor(groupKey(n)); n.x=a.x+(Math.random()-.5)*140; n.y=a.y+(Math.random()-.5)*120; n.vx=0; n.vy=0; n.fx=null; n.fy=null; }); }
   let alpha = 1;
   function tick(){
@@ -511,7 +511,7 @@ status:
     } else if (n.kind==="Node"){
       h += kv([["roles",d.roles||"—"],["kubernetes",d.version||"—"],["os",d.os||"—"],["capacity",d.capacity||"—"],["allocatable",d.allocatable||"—"]]);
     } else if (n.resolved===false){
-      h += kv([["exists","not found in cluster",true]]) + '<p class="hint">Referenced by an Ingress, but no such Service exists. KNW flags this rather than pretending.</p>';
+      h += kv([["exists","not found in cluster",true]]) + '<p class="hint">Referenced by an Ingress, but no such Service exists. Mantis flags this rather than pretending.</p>';
     } else if (n.kind==="ConfigMap" || n.kind==="Secret"){
       h += kv([[n.kind==="Secret"?"type":"kind", n.kind==="Secret"?(d.type||"Opaque"):"ConfigMap"],["keys",(d.keys||[]).join(", ")||"—"]]);
     } else h += '<p class="hint">No extra detail for this resource in the prototype.</p>';

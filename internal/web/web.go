@@ -1,4 +1,4 @@
-// Package web is the KNW frontend: it serves the resource-graph UI and reverse-
+// Package web is the Mantis frontend: it serves the resource-graph UI and reverse-
 // proxies /api requests to the engine backend, keeping the browser same-origin.
 package web
 
@@ -10,7 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/continuumx1/knw/internal/httpx"
+	"github.com/continuumx1/mantis/internal/httpx"
 )
 
 //go:embed ui
@@ -36,7 +36,7 @@ func NewHandler(engineURL string) (http.Handler, error) {
 		return nil, fmt.Errorf("parse engine url %q: %w", engineURL, err)
 	}
 	if target.Scheme == "" || target.Host == "" {
-		return nil, fmt.Errorf("engine url %q must include scheme and host, e.g. http://knw-engine:8080", engineURL)
+		return nil, fmt.Errorf("engine url %q must include scheme and host, e.g. http://mantis-engine:8080", engineURL)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)

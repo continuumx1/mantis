@@ -1,4 +1,4 @@
-module github.com/continuumx1/knw
+module github.com/continuumx1/mantis
 
 go 1.26.0
 

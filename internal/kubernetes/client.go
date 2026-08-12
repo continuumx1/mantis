@@ -22,7 +22,7 @@ type Client struct {
 }
 
 // NewClient builds a read-only Kubernetes client that works both inside and
-// outside a cluster. When KNW runs as a Pod it uses the mounted ServiceAccount
+// outside a cluster. When Mantis runs as a Pod it uses the mounted ServiceAccount
 // (in-cluster config); everywhere else it falls back to the standard kubeconfig
 // resolution rules. This lets the same binary run as a microservice in a target
 // cluster and as a local dev tool without a code change.

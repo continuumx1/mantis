@@ -7,7 +7,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Node is a resource participating in the graph together with what KNW has
+// Node is a resource participating in the graph together with what Mantis has
 // verified about it. A Node exists in a Context only when its existence was
 // actually checked, so a Node's presence means "verified" and Resolved reports
 // the outcome.

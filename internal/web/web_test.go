@@ -10,7 +10,7 @@ import (
 // The frontend must serve the embedded UI at / and proxy /api to the configured
 // engine, keeping the browser same-origin.
 func TestNewHandler_ServesUIAndProxiesAPI(t *testing.T) {
-	// Stand in for knw-engine: a backend that answers /api/graph.
+	// Stand in for mantis-engine: a backend that answers /api/graph.
 	engine := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/graph" {
 			w.Header().Set("Content-Type", "application/json")
@@ -32,7 +32,7 @@ func TestNewHandler_ServesUIAndProxiesAPI(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("GET / status = %d, want 200", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "<title>KNW") {
+	if !strings.Contains(rec.Body.String(), "<title>Mantis") {
 		t.Errorf("GET / did not serve the UI; body began: %.60q", rec.Body.String())
 	}
 
@@ -50,7 +50,7 @@ func TestNewHandler_ServesUIAndProxiesAPI(t *testing.T) {
 // An engine URL without a scheme and host is a configuration error and must be
 // rejected at startup rather than failing silently on the first request.
 func TestNewHandler_RejectsBadEngineURL(t *testing.T) {
-	for _, bad := range []string{"", "knw-engine:8080", "://nope"} {
+	for _, bad := range []string{"", "mantis-engine:8080", "://nope"} {
 		if _, err := NewHandler(bad); err == nil {
 			t.Errorf("NewHandler(%q) = nil error, want rejection", bad)
 		}

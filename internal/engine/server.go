@@ -1,4 +1,4 @@
-// Package engine is the KNW backend: it reads the cluster through a Kubernetes
+// Package engine is the Mantis backend: it reads the cluster through a Kubernetes
 // client and serves the resource graph as JSON. It holds no UI — the web package
 // renders the graph and proxies to this service.
 package engine
@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/continuumx1/knw/internal/graph"
-	"github.com/continuumx1/knw/internal/httpx"
-	knwkube "github.com/continuumx1/knw/internal/kubernetes"
+	"github.com/continuumx1/mantis/internal/graph"
+	"github.com/continuumx1/mantis/internal/httpx"
+	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
 )
 
 // buildTimeout bounds a single graph build so a hung API server cannot hang a
@@ -21,14 +21,14 @@ const buildTimeout = 30 * time.Second
 // Server is the backend service. It reads the cluster and serves the graph
 // projection as JSON.
 type Server struct {
-	client  *knwkube.Client
+	client  *mantiskube.Client
 	showAll bool
 }
 
 // New constructs the backend around a Kubernetes client. showAll controls
 // whether system-managed noise (service-account/Helm Secrets, the root-CA
-// ConfigMap) is included in the graph; it is wired to the KNW_SHOW_ALL env var.
-func New(client *knwkube.Client, showAll bool) *Server {
+// ConfigMap) is included in the graph; it is wired to the MANTIS_SHOW_ALL env var.
+func New(client *mantiskube.Client, showAll bool) *Server {
 	return &Server{client: client, showAll: showAll}
 }
 

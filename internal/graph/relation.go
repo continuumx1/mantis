@@ -43,7 +43,7 @@ const (
 	BoundTo RelationType = "bound-to"
 )
 
-// Certainty records how much KNW trusts a relationship. Every edge today is
+// Certainty records how much Mantis trusts a relationship. Every edge today is
 // Observed — derived directly from a Kubernetes API field — so the zero value
 // means Observed. Inferred is reserved for future edges deduced rather than
 // read, which must always be rendered as such and never presented as fact.

@@ -10,7 +10,7 @@ open docs/prototype/cluster-graph.html   # macOS
 ## What it shows
 
 An interactive, browser-based rendering of a Kubernetes cluster as a resource
-graph — the direction KNW is evolving toward: **complete** (nothing left out by
+graph — the direction Mantis is evolving toward: **complete** (nothing left out by
 hand), **visual**, and **interactive**.
 
 - Resources as nodes, coloured by kind; relationships as edges.
@@ -27,10 +27,10 @@ hand), **visual**, and **interactive**.
 ## Important
 
 The data in this file is **hand-authored** to match a demo cluster
-(`knw-demo` + `default` + `kube-system` on minikube). It is **not** wired to a
+(`mantis-demo` + `default` + `kube-system` on minikube). It is **not** wired to a
 live cluster — it exists to validate the visual/interactive direction.
 
-The real version would be `knw serve`: the existing graph engine
+The real version would be `mantis serve`: the existing graph engine
 (`internal/graph`) already produces exactly this node/edge model, plus health,
 container status, resource limits, and endpoints. A future web renderer would
 consume that model and draw this against any live cluster. This prototype is the

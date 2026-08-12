@@ -7,8 +7,8 @@ build/
 LICENSE
 NOTICE
 # Local build artifacts
-knw
-knw-api
-knw-web
+mantis
+mantis-engine
+mantis-web
 bin/
 dist/
