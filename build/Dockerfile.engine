@@ -1,0 +1,21 @@
+# KNW backend service (knw-engine): reads the cluster, serves the graph JSON.
+# Multi-stage: compile a static binary, ship it on distroless nonroot.
+#
+#   docker build -f build/Dockerfile.engine -t knw-engine:dev .
+#
+# Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).
+FROM golang:1.26 AS build
+WORKDIR /src
+
+# Cache module downloads separately from source.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/knw-engine ./cmd/knw-engine
+
+FROM gcr.io/distroless/static:nonroot
+COPY --from=build /out/knw-engine /knw-engine
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/knw-engine"]

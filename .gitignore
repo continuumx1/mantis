@@ -34,8 +34,9 @@ go.work.sum
 # Local Claude Code settings (per-user, not shared)
 .claude/settings.local.json
 
-# KNW build binary (root-anchored so it does not match the cmd/knw/ directory)
-/knw
+# KNW service binaries (root-anchored; the two services build to these names)
+/knw-engine
+/knw-web
 
 # macOS
 .DS_Store

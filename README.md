@@ -9,14 +9,14 @@
 
 <p align="center"><em>Every K8s Resource Has a Story.</em></p>
 
-KNW is an open-source Kubernetes context and investigation engine. It discovers
-the relationships between Kubernetes resources and explains them to humans, so
-you can understand not just *what* exists in a cluster, but the *context* around
-it.
+KNW is an open-source Kubernetes context and investigation engine with an
+interactive web UI. It discovers the relationships between Kubernetes resources
+and draws them as a live graph, so you can see not just *what* exists in a
+cluster, but the *context* around it.
 
 > **Status: experimental (v0.1).** KNW is early and under active development.
-> It is read-only and safe to run against any cluster, but its commands and
-> output are still evolving.
+> It is strictly read-only and safe to run against any cluster, but its
+> behaviour and interfaces are still evolving.
 
 Built and maintained by [ContinuumX1 Technologies](https://continuumx1.com).
 
@@ -34,14 +34,9 @@ questions:
 - This pod is stuck `Pending` — what is it waiting on?
 - This ingress returns 503 — does the service it points at even exist?
 
-KNW turns the raw metadata into an explained, linked view:
-
-```
-Pod/payment-api
-  controlled-by → ReplicaSet/payment-api-xxxx
-                    controlled-by → Deployment/payment-api
-  runs-on       → Node/worker-01
-```
+KNW turns the raw metadata into an explained, linked graph: every resource is a
+node, every relationship is a typed edge, and namespaces are drawn as regions.
+References that point at something which does not exist are flagged, not hidden.
 
 ## What makes it different
 
@@ -55,138 +50,105 @@ problem.
 | Prometheus / Grafana | Metrics and dashboards | Relationships, not metrics |
 | ArgoCD | "Does live match Git?" (GitOps sync) | "What's the story around this resource?" |
 
-Unlike a GitOps or dashboard tool, KNW needs only your kubeconfig, works on
-**any** resource whether or not it was deployed through a pipeline, and is
-strictly **read-only** and **local-first** — it never mutates your cluster and
-sends nothing anywhere.
+Unlike a GitOps or dashboard tool, KNW works on **any** resource whether or not
+it was deployed through a pipeline, is strictly **read-only** — it never mutates
+your cluster — and runs on **any** Kubernetes distribution (minikube, kind,
+kubeadm, RKE2, EKS, GKE, AKS, …) because it talks to the standard Kubernetes API,
+never to a distro.
 
-## Installation
+## Architecture
 
-KNW requires **Go 1.26+** and a working kubeconfig.
+KNW runs as **two independently deployable services** on top of a shared,
+interface-agnostic relationship engine.
 
-From source:
+```
+                Browser
+                   │  http (same-origin)
+                   ▼
+            ┌──────────────┐   /api proxy   ┌──────────────┐   read-only   ┌──────────────┐
+            │   knw-web    │ ─────────────► │  knw-engine  │ ────────────► │ Kubernetes   │
+            │  (frontend)  │                │  (backend)   │  client-go    │     API      │
+            │  UI + proxy  │ ◄───────────── │  graph JSON  │ ◄──────────── │              │
+            └──────────────┘                └──────────────┘               └──────────────┘
+              public / Ingress                private ClusterIP
+```
+
+- **`knw-engine` (backend)** reads the cluster and serves the resource graph as
+  JSON. It holds the read-only credentials and never renders UI. Inside a cluster
+  it authenticates with its Pod ServiceAccount; locally it uses your kubeconfig —
+  the same binary, no code change.
+- **`knw-web` (frontend)** serves the graph UI and reverse-proxies `/api` to
+  `knw-engine`. The browser only ever talks to `knw-web`, so there is no CORS and
+  the engine can stay a private `ClusterIP` reachable only from the frontend.
+
+Both services are projections of the same `graph.Context`.
+
+```
+cmd/
+  knw-engine/         backend service entry point (main.go)
+  knw-web/            frontend service entry point (main.go)
+internal/
+  graph/              relationship model — ResourceRef, typed Relation,
+                      resolvers, Context, and the whole-cluster graph builder
+  engine/             backend: graph JSON projection (dto.go) + HTTP handlers
+                      (server.go): /api/graph, /healthz, /readyz
+  web/                frontend: embedded UI + /api reverse-proxy
+    ui/               the interactive graph (single-page, no external assets)
+  kubernetes/         read-only client (in-cluster ServiceAccount OR kubeconfig)
+  httpx/              shared HTTP serving (graceful shutdown, env config)
+build/
+  Dockerfile.engine   backend image (distroless, nonroot)
+  Dockerfile.web      frontend image (distroless, nonroot)
+```
+
+## Running locally
+
+Requires **Go 1.26+** and a reachable cluster (any distribution).
 
 ```bash
 git clone https://github.com/continuumx1/knw.git
 cd knw
-go build -o knw ./cmd/knw
-./knw
+
+# Backend (engine) — reads the cluster via your kubeconfig
+KNW_ENGINE_ADDR=":8080" go run ./cmd/knw-engine
+
+# Frontend (web) — in a second terminal; serves the UI and proxies /api to the engine
+KNW_WEB_ADDR=":8081" KNW_ENGINE_URL="http://127.0.0.1:8080" go run ./cmd/knw-web
 ```
 
-Or install the binary onto your `PATH`:
+Open <http://127.0.0.1:8081> and you get the live graph of your cluster. **Click**
+a resource for its details and relationships, **drag** to arrange, **scroll** to
+zoom, **Refresh** to re-read the cluster.
+
+## Configuration
+
+Both services are configured entirely through environment variables — exactly
+what a Helm chart will template.
+
+| Service | Env var | Default | Meaning |
+|---------|---------|---------|---------|
+| `knw-engine` | `KNW_ENGINE_ADDR` | `:8080` | listen address |
+| `knw-engine` | `KNW_SHOW_ALL` | `false` | include system-managed ConfigMaps/Secrets |
+| `knw-web` | `KNW_WEB_ADDR` | `:8080` | listen address |
+| `knw-web` | `KNW_ENGINE_URL` | `http://knw-engine:8080` | engine base URL to proxy `/api` to |
+
+Endpoints:
+
+- `knw-engine`: `GET /api/graph`, `GET /healthz` (liveness), `GET /readyz` (readiness)
+- `knw-web`: `GET /` (UI), `GET /api/*` (proxied to the engine), `GET /healthz`
+
+## Container images
+
+One image per service, multi-stage, distroless, nonroot:
 
 ```bash
-go install github.com/continuumx1/knw/cmd/knw@latest
+docker build -f build/Dockerfile.engine -t knw-engine:dev .
+docker build -f build/Dockerfile.web    -t knw-web:dev .
 ```
 
-> Distribution via `apt`, Homebrew, and prebuilt release binaries is planned but
-> not yet available.
-
-## Quick start
-
-KNW uses your current kubeconfig context and its namespace.
-
-```bash
-# Show cluster connection info
-knw
-
-# Explain a single resource and what surrounds it
-knw inspect pod/payment-api
-knw inspect service/payment-api
-knw inspect ingress/payment-api
-
-# Map every resource KNW understands in a namespace
-knw map
-knw map kube-system
-knw map --all          # include system-managed ConfigMaps/Secrets
-```
-
-KNW honours your `KUBECONFIG` environment variable and standard kubeconfig
-resolution, and is strictly read-only.
-
-## Example
-
-Investigating a single pod:
-
-```
-$ knw inspect pod/knw-demo
-
-POD/knw-demo
-
-CONTEXT
-
-Origin
-  └── Directly created
-
-Owner
-  └── None
-
-References
-  └── ConfigMap/knw-demo-config
-
-Mounts
-  └── Secret/knw-demo-missing (not found)
-
-Runs on
-  └── Node/minikube
-
-Health
-  └── Phase: Pending
-  └── app: waiting (ContainerCreating), not ready, restarts: 0
-```
-
-At a glance: this pod is stuck `Pending` because it mounts a `Secret` that does
-not exist. KNW only writes `(not found)` after actually checking the API and
-confirming the resource is absent — it never guesses.
-
-Mapping a whole namespace (system-managed noise hidden by default):
-
-```
-$ knw map
-
-NAMESPACE/default
-
-WORKLOADS
-└── Deployment/nginx
-    └── ReplicaSet/nginx-56c45fd5ff
-        └── Pod/nginx-56c45fd5ff-2cslb (Running · 1/1)  (runs-on Node/minikube)
-
-NETWORKING
-└── Service/nginx
-    └── serves Pod/nginx-56c45fd5ff-2cslb (Running · 1/1)
-└── Ingress/broken
-    └── routes-to Service/does-not-exist (not found)
-
-CONFIG & STORAGE
-└── ConfigMap/nginx-config
-    └── used-by Pod/nginx-56c45fd5ff-2cslb
-└── PersistentVolumeClaim/data (Bound · 10Gi · RWO)
-    └── bound-to PersistentVolume/pvc-abc123 (10Gi · Retain)
-```
-
-Pods show live health, PVCs/PVs show size and reclaim policy, and services show
-their **real endpoints** (from EndpointSlices), not just selector matches.
-
-## Architecture
-
-The **context engine is the core product; the CLI is only its first interface.**
-Resources are modelled as a graph and kept decoupled from how they are rendered.
-
-```
-Kubernetes API
-      │
-      ▼
- kubernetes client  ──►  resolvers  ──►  Context  ──►  renderer  ──►  CLI
- (internal/kubernetes)  (internal/graph)          (internal/render) (cmd/knw)
-```
-
-- **`internal/graph`** — the engine: a kind-agnostic `ResourceRef`, a typed
-  `Relation`, per-kind resolvers that turn API objects into relationship edges,
-  and a `Context` that aggregates a subject's relations with the verified
-  existence of the nodes they point at.
-- **`internal/render`** — turns a `Context` into human-readable output.
-- **`internal/explain`** — thin wiring between the CLI and the engine.
-- **`cmd/knw`** — the command-line entry point.
+Inside a cluster, `knw-engine` uses its Pod ServiceAccount, which needs read-only
+(`get`/`list`) access to the resource kinds KNW maps. Helm packaging of the two
+Deployments, Services, and RBAC is the next step.
 
 ## Relationship model
 
@@ -206,46 +168,46 @@ Relationships are named for their **Kubernetes semantics**, not for convenience.
 
 A key principle: KNW distinguishes **facts** it read from the API from
 references it could not verify. A target that was checked and found missing is
-shown as `(not found)`; one that was never verified is shown plainly.
+shown as a "not found" node; one that exists is shown plainly. KNW never guesses.
 
 ## Current limitations
 
-- **`inspect` supports Pod, Service, and Ingress.** Other kinds are mapped by
-  `knw map` but not yet available as a `inspect` subject.
-- **No `--namespace` flag on `inspect`** — it uses the current context's namespace.
-  Only `map` takes an explicit namespace argument.
-- **No custom resources (CRDs) yet** — only the built-in kinds listed above.
+- **Whole-cluster snapshot per load.** The graph reflects the cluster at the time
+  you load or refresh it; there is no live watch/stream yet.
+- **Compact detail.** The detail panel shows the attributes the engine computes
+  today (health, storage class, endpoints, …). Richer per-resource detail is
+  planned.
+- **Built-in kinds only.** Custom resources (CRDs) are not mapped yet.
 - **No change / history / GitOps awareness** — KNW explains the current state,
-  not what changed or why it changed.
+  not what changed or why.
 
 ## Roadmap
 
 **Current**
 
 - Relationship engine with a structured `Context`
-- `knw inspect` for Pod, Service, Ingress
-- `knw map` for whole-namespace resource graphs
+- Whole-cluster graph as a two-service web application
+- Any-distribution support via standard kubeconfig / in-cluster auth
 - Verified dangling-reference detection
 
 **Planned**
 
-- More `inspect` subjects (Deployment, StatefulSet, PVC, …)
-- A consistent `--namespace` flag
-- Reverse lookups (e.g. which pods use this ConfigMap)
-- Structured/JSON output for scripting
+- Helm chart (two Deployments, two Services, read-only RBAC)
+- Richer per-resource detail in the UI
+- Namespace / kind filtering and search
+- Live updates (watch) instead of snapshot-on-refresh
 
 **Future**
 
 - Change detection and correlation (Git, GitOps, Helm)
 - Custom resource (CRD) support
-- Additional interfaces beyond the CLI
 
 Priorities evolve from real use; nothing above is a commitment.
 
 ## Development
 
 ```bash
-go build ./...     # build
+go build ./...     # build both services
 go test ./...      # run tests
 go vet ./...       # static checks
 gofmt -l .         # formatting (should print nothing)
