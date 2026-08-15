@@ -265,11 +265,12 @@ cd mantis
 MANTIS_ENGINE_ADDR=":8080" go run ./cmd/mantis-engine
 
 # Terminal 2 — frontend, serves the UI and proxies /api to the engine
-MANTIS_WEB_ADDR=":8081" MANTIS_ENGINE_URL="http://127.0.0.1:8080" go run ./cmd/mantis-web
+MANTIS_WEB_ADDR=":8081" MANTIS_ENGINE_URL="http://localhost:8080" go run ./cmd/mantis-web
 ```
 
-Open `http://127.0.0.1:8081`, sign in with `admin` / `admin`, and you get
-the live graph of whatever cluster your kubeconfig points at.
+Open `http://localhost:8081`, sign in with `admin` / `admin`, and you get
+the live graph of whatever cluster your kubeconfig points at. The ports
+above are just an example — use whatever's free on your machine.
 
 ---
 
@@ -498,3 +499,7 @@ ServiceAccount lacks `get` RBAC on that specific kind even though it had
 Mantis is in Public Preview specifically to collect feedback before its
 interfaces lock in. If something is confusing, missing, or broken, that's
 useful signal — please report it rather than working around it silently.
+
+The fastest way to reach the maintainers is the
+**[Mantis Discord](https://discord.gg/ZTB4eGfCxa)** — questions, bug
+reports, and "here's what tripped me up" are all welcome there.
