@@ -29,6 +29,7 @@ func main() {
 
 	log.Printf("mantis-web: serving UI on %s", addr)
 	log.Printf("mantis-web: proxying /api → %s", engineURL)
+	log.Printf("mantis-web: ⚠ public-preview auth active (admin/admin, see internal/web/auth.go) — not a production login, replace before any non-preview deployment")
 
 	if err := httpx.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("mantis-web: %v", err)

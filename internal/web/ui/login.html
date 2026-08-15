@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mantis — Sign In</title>
+<link rel="icon" type="image/webp" href="mantis-mascot.webp">
+<style>
+  :root {
+    --brand: #a6e22e;
+    --ink: #12181f; --muted: #5b6670; --faint: #8b95a1; --line: #e4e7eb; --field: #f4f5f7;
+    --crit: #d1373f;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: var(--font-ui); color: var(--ink); }
+
+  .screen { display: flex; min-height: 100%; }
+
+  /* ---- left: the brand panel — mascot sits on the photo, nothing added to it ---- */
+  .art {
+    flex: 1 1 44%; min-width: 340px; position: relative;
+    background: #0a0e13 url("mantis-login-bg.jpg") center/cover no-repeat;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .art-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; }
+  .art-content .mascot { width: 160px; height: auto; display: block; }
+
+  /* ---- right: the sign-in form ---- */
+  .form-side { flex: 1 1 56%; display: flex; align-items: center; justify-content: center; background: #fff; padding: 40px 24px; }
+  .form-box { width: 100%; max-width: 360px; }
+  .form-box h1 { margin: 0 0 6px; font-size: 26px; font-weight: 700; letter-spacing: -.2px; }
+  .form-box p.sub { margin: 0 0 28px; font-size: 14px; color: var(--muted); }
+
+  form { display: flex; flex-direction: column; gap: 16px; }
+  label.field { display: flex; flex-direction: column; gap: 7px; }
+  label.field span { font-size: 13px; font-weight: 600; color: var(--ink); }
+  label.field input {
+    font-family: var(--font-ui); font-size: 14px; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line); border-radius: 8px;
+    padding: 11px 13px; outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
+    width: 100%;
+  }
+  label.field input::placeholder { color: var(--faint); }
+  label.field input:focus { background: #fff; border-color: color-mix(in srgb, var(--brand) 60%, #999); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
+
+  .pw-wrap { position: relative; display: flex; }
+  .pw-wrap input { padding-right: 40px; }
+  .eye-toggle {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 0; padding: 0; cursor: pointer; color: var(--faint);
+  }
+  .eye-toggle:hover { color: var(--muted); }
+  .eye-toggle svg { width: 18px; height: 18px; }
+  .eye-toggle .eye-off { display: none; }
+  .eye-toggle.showing .eye-on { display: none; }
+  .eye-toggle.showing .eye-off { display: block; }
+
+  .error {
+    display: none; font-size: 13px; line-height: 1.5; color: var(--crit);
+    background: color-mix(in srgb, var(--crit) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--crit) 30%, transparent);
+    border-radius: 8px; padding: 9px 11px;
+  }
+  .error.show { display: block; }
+
+  button.submit {
+    margin-top: 4px; font-family: var(--font-ui); font-size: 15px; font-weight: 700;
+    color: #10150d; background: var(--brand); border: 1px solid var(--brand);
+    border-radius: 8px; padding: 12px; cursor: pointer; transition: filter .15s, transform .05s;
+  }
+  button.submit:hover { filter: brightness(1.06); }
+  button.submit:active { transform: translateY(1px); }
+  button.submit:disabled { filter: grayscale(.35) brightness(.92); cursor: default; }
+
+  .hint { margin-top: 22px; text-align: center; font-size: 12.5px; color: var(--faint); line-height: 1.6; }
+  .hint b { color: var(--muted); font-family: var(--font-mono); }
+
+  @keyframes shake { 10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);} 30%,50%,70%{transform:translateX(-4px);} 40%,60%{transform:translateX(4px);} }
+  .shake { animation: shake .4s; }
+
+  @media (max-width: 720px) {
+    .art { display: none; }
+    .form-side { flex-basis: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="screen">
+  <div class="art">
+    <div class="art-content">
+      <img class="mascot" src="mantis-mascot.webp" alt="Mantis mascot" />
+    </div>
+  </div>
+
+  <div class="form-side">
+    <div class="form-box">
+      <h1>Sign in to Mantis</h1>
+      <p class="sub">Visualize your Kubernetes cluster.</p>
+
+      <form id="loginForm" autocomplete="off">
+        <label class="field">
+          <span>Username</span>
+          <input type="text" id="username" name="username" placeholder="admin" autocomplete="username" autofocus />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <div class="pw-wrap">
+            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="eye-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">
+              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.9 10.9 0 0 1 12 5c7 0 10.5 7 10.5 7a13.5 13.5 0 0 1-3.1 4.1M6.6 6.6C3.4 8.5 1.5 12 1.5 12s3.5 7 10.5 7a10.6 10.6 0 0 0 5.4-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+            </button>
+          </div>
+        </label>
+        <div class="error" id="error"></div>
+        <button class="submit" type="submit" id="submitBtn">Sign in</button>
+      </form>
+
+      <div class="hint"><b>Mantis Public Preview</b> · Demo access<br>sign in with <b>admin</b> / <b>admin</b></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("loginForm");
+  const errorBox = document.getElementById("error");
+  const submitBtn = document.getElementById("submitBtn");
+  const userInput = document.getElementById("username");
+  const passInput = document.getElementById("password");
+  const pwToggle = document.getElementById("pwToggle");
+
+  pwToggle.addEventListener("click", () => {
+    const showing = passInput.type === "text";
+    passInput.type = showing ? "password" : "text";
+    pwToggle.classList.toggle("showing", !showing);
+    pwToggle.setAttribute("aria-pressed", String(!showing));
+    pwToggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+  });
+
+  function showError(msg){
+    errorBox.textContent = msg;
+    errorBox.classList.add("show");
+    form.classList.remove("shake");
+    void form.offsetWidth; // restart the animation
+    form.classList.add("shake");
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in…";
+
+    fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: userInput.value, password: passInput.value }),
+    })
+      .then(async (r) => {
+        if (r.ok) { window.location.href = "/"; return; }
+        const body = await r.json().catch(() => ({}));
+        showError(body.error || "Sign in failed.");
+      })
+      .catch(() => showError("Could not reach the server. Is mantis-web running?"))
+      .finally(() => { submitBtn.disabled = false; submitBtn.textContent = "Sign in"; });
+  });
+</script>
+
+</body>
+</html>
