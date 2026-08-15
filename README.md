@@ -174,13 +174,14 @@ docker build -f build/Dockerfile.engine -t mantis-engine:dev .
 docker build -f build/Dockerfile.web    -t mantis-web:dev .
 ```
 
-Deploy `mantis-engine` with a ServiceAccount that has read-only (`get`/`list`)
-RBAC on the resource kinds Mantis maps, exposed only as a `ClusterIP` —
-never publicly. Point `mantis-web` at it via `MANTIS_ENGINE_URL` and expose
-`mantis-web` however fits your cluster (Ingress, LoadBalancer, port-forward).
-
-There's no Helm chart yet, so today that means hand-writing the two
-Deployments/Services/RBAC — a chart is next on the roadmap. Full detail on
+The **[Helm chart](charts/mantis)** deploys both: `mantis-engine` with the
+read-only ClusterRole/ClusterRoleBinding it needs (exposed only as a
+`ClusterIP`, never publicly), `mantis-web` pointed at it, and everything
+that goes with them (probes, security contexts, an optional Ingress).
+There's no published image yet (Public Preview), so point the chart at a
+locally-built or locally-loaded image — see
+**[charts/mantis/README.md](charts/mantis/README.md)** for the exact
+commands, including a minikube/kind walkthrough. Full detail on the
 required permissions and the security model is in the
 **[User Guide](docs/USER_GUIDE.md)**.
 
@@ -230,9 +231,11 @@ is shown as a "not found" node; one that exists is shown plainly.
 - Any-distribution support via standard kubeconfig / in-cluster auth
 - Verified dangling-reference detection
 - Public-preview login gate
+- Helm chart (two Deployments, two Services, read-only RBAC)
 
 **Planned**
-- Helm chart (two Deployments, two Services, read-only RBAC)
+- Published container images (a registry to pull from, instead of build-it-yourself)
+- CI (build/vet/test/gofmt on every PR)
 - Real authentication (delegating to Kubernetes RBAC)
 - Richer per-resource detail in the UI
 - Live updates (watch) instead of snapshot-on-poll

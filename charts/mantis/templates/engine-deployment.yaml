@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mantis.engine.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.engine.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.engine.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mantis.engine.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mantis.engine.selectorLabels" . | nindent 8 }}
+        {{- with .Values.engine.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.engine.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "mantis.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.engine.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mantis-engine
+          image: {{ include "mantis.engine.image" . }}
+          imagePullPolicy: {{ .Values.image.engine.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.engine.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MANTIS_ENGINE_ADDR
+              value: ":8080"
+            - name: MANTIS_SHOW_ALL
+              value: {{ .Values.engine.showAll | quote }}
+          # mantis-engine's own readiness probe (GET /readyz) already
+          # confirms the Kubernetes API is reachable — see
+          # internal/engine/server.go's handleReady — so it doubles as the
+          # most meaningful check Kubernetes itself can run.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.engine.resources | nindent 12 }}
+      {{- with .Values.engine.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.engine.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.engine.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

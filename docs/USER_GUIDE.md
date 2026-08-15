@@ -176,11 +176,11 @@ whole graph: it silently omits that kind and the graph reflects only what
 the ServiceAccount could actually read. Mantis's own visibility is a
 direct, honest reflection of the permissions it was granted — nothing more.
 
-There is no Helm chart shipping yet (it's on the near-term roadmap); until
-then, deploy the two images with your own Deployment/Service/RBAC
-manifests, sized to your cluster's namespace count. See
-[Running Mantis](#running-mantis) for the container images and the exact
-environment variables each service reads.
+The [Helm chart](../charts/mantis) templates exactly this ClusterRole (see
+`charts/mantis/templates/rbac.yaml`) — every rule in it is commented with
+the specific Go call that needs it, so it doubles as a readable audit of
+what "read-only" actually means here. See
+[Running Mantis](#running-mantis) for how to install it.
 
 ---
 
@@ -241,16 +241,20 @@ docker build -f build/Dockerfile.web    -t mantis-web:dev .
 
 ### Deploying
 
-Run `mantis-engine` as a Deployment with a ServiceAccount that has
-read-only RBAC for the kinds it maps (see [RBAC](#rbac-what-the-engines-serviceaccount-needs)),
-exposed only as a `ClusterIP` Service — it should never be reachable from
-outside the cluster. Run `mantis-web` as a Deployment pointed at that
-Service via `MANTIS_ENGINE_URL`, exposed through whatever Ingress or
-LoadBalancer fits your cluster.
+```bash
+helm install mantis ./charts/mantis --namespace mantis --create-namespace
+```
 
-There's no Helm chart yet, so today that means hand-writing (or generating)
-the two Deployments, two Services, and the RBAC objects. A chart is the
-next packaging step on the roadmap.
+This installs both Deployments, both Services (`mantis-engine` always
+`ClusterIP` — never reachable from outside the cluster, only from
+`mantis-web`), the ServiceAccount, and the read-only ClusterRole/
+ClusterRoleBinding described above. There's no published image yet
+(Public Preview), so you'll need to build the two images yourself and
+point the chart at them first — see
+**[charts/mantis/README.md](../charts/mantis/README.md)** for the exact
+commands (including a minikube/kind walkthrough) and the full values
+reference (exposing via Ingress/LoadBalancer, resource limits, the
+optional NetworkPolicy, …).
 
 ### Running locally (for evaluation)
 
@@ -466,8 +470,9 @@ Endpoints:
   deployment currently sees the same graph — the one `mantis-engine`'s
   ServiceAccount can read. Per-user, RBAC-aware visibility is planned
   alongside real authentication.
-- **No Helm chart yet** — deployment today means authoring your own
-  manifests (see [Running Mantis](#running-mantis)).
+- **No published container image yet** — the Helm chart deploys cleanly,
+  but you have to build/load the images yourself until there's a registry
+  to pull from (see [Running Mantis](#running-mantis)).
 
 ## Troubleshooting
 

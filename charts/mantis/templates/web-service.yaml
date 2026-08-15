@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mantis.web.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.web.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.web.service.type }}
+  ports:
+    - port: {{ .Values.web.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mantis.web.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,138 @@
+# Default values for the Mantis Helm chart.
+# See charts/mantis/README.md for a walkthrough; every value below is
+# commented where its meaning isn't obvious from the key alone.
+
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+# There is no published Mantis image registry yet (Public Preview) — build
+# the two images yourself (see the repo README's "Running in a cluster"
+# section) and either push them somewhere your cluster can pull from, or
+# load them directly into a local cluster (e.g. `minikube image load
+# mantis-engine:dev`) and set pullPolicy to "Never" below while testing.
+image:
+  engine:
+    repository: mantis-engine
+    tag: ""              # defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  web:
+    repository: mantis-web
+    tag: ""              # defaults to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+
+# mantis-engine: the only component that talks to Kubernetes. Runs with
+# read-only RBAC (see rbac.create below) and is never exposed outside the
+# cluster — mantis-web is the only thing that talks to it.
+engine:
+  replicaCount: 1
+
+  # MANTIS_SHOW_ALL — include system-managed ConfigMaps/Secrets (e.g. the
+  # per-namespace kube-root-ca.crt ConfigMap) in the graph instead of
+  # hiding them as noise.
+  showAll: false
+
+  service:
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    # build/Dockerfile.engine's base (gcr.io/distroless/static:nonroot) sets
+    # its default user by *name* ("nonroot"), not a numeric UID — the
+    # kubelet can't verify runAsNonRoot against a name, so it refuses to
+    # start the container (CreateContainerConfigError) unless a numeric
+    # runAsUser is also given. 65532 is that image's actual nonroot UID.
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
+# mantis-web: serves the UI, holds the (Public Preview, demo-only) login
+# gate, and reverse-proxies /api to mantis-engine. This is the component
+# you expose — via Ingress, a LoadBalancer Service, or port-forward.
+web:
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: mantis.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532  # same distroless nonroot base as engine — see its comment above
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
+serviceAccount:
+  # Only mantis-engine gets a ServiceAccount — mantis-web never talks to
+  # the Kubernetes API, so it runs under the namespace's default one.
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  # Creates a ClusterRole + ClusterRoleBinding granting mantis-engine's
+  # ServiceAccount get/list on exactly the kinds it maps — no write verbs
+  # anywhere, and Secrets/Namespaces are list-only (mantis-engine never
+  # issues a Get on either; see the RBAC comments in rbac.yaml for why
+  # that's a real guarantee, not an accident). Cluster-scoped because
+  # Mantis reads across every namespace, not because it does anything
+  # namespace-scoped RBAC couldn't otherwise express per-namespace.
+  create: true
+
+networkPolicy:
+  # Off by default so it can't surprise an existing cluster's CNI setup.
+  # When enabled, restricts inbound traffic to mantis-engine's port to
+  # only pods matching mantis-web's selector — a structural version of
+  # "the engine is never reachable except through the frontend proxy"
+  # that the docs already describe.
+  enabled: false

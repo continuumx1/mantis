@@ -1,0 +1,23 @@
+{{/*
+Deliberately always ClusterIP, with no values knob to change that: the
+whole point of the two-service split (see the repo README's "How it
+works") is that mantis-engine is never reachable except through
+mantis-web's proxy. If you need to reach it directly for debugging, use
+`kubectl port-forward`, not a Service type change.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mantis.engine.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.engine.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.engine.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mantis.engine.selectorLabels" . | nindent 4 }}

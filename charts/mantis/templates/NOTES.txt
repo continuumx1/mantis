@@ -1,0 +1,40 @@
+Mantis is deployed.
+
+1. Reach the UI:
+{{- if .Values.web.ingress.enabled }}
+{{- range .Values.web.ingress.hosts }}
+   http{{ if $.Values.web.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else if eq .Values.web.service.type "LoadBalancer" }}
+   Run:
+     kubectl get svc {{ include "mantis.web.fullname" . }} -n {{ .Release.Namespace }} -w
+   and use the EXTERNAL-IP once it's assigned.
+{{- else if eq .Values.web.service.type "NodePort" }}
+   Run:
+     kubectl get svc {{ include "mantis.web.fullname" . }} -n {{ .Release.Namespace }}
+   and use <any-node-ip>:<the-listed-NodePort>.
+{{- else }}
+   No Ingress and a ClusterIP Service means nothing outside the cluster
+   can reach it yet. For local access:
+     kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "mantis.web.fullname" . }} 8081:{{ .Values.web.service.port }}
+   then open http://localhost:8081
+{{- end }}
+
+2. Sign in.
+   This is a Public Preview build: the login screen shows a demo
+   credential (admin/admin) right on the screen. That gate is not real
+   authentication — see the repo's docs/USER_GUIDE.md ("Public Preview
+   notes") before pointing this release at anything beyond your own
+   machine or team.
+
+3. Verify it's actually reading your cluster:
+     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+   Both Pods should be Running; mantis-engine's logs will name the
+   cluster context it connected to.
+
+No image registry is wired up yet for this chart (see values.yaml's
+image.* comments) — if `ImagePullBackOff` shows up, that's almost always
+it: build the two images locally and either push them somewhere your
+cluster can pull from, or load them directly (e.g.
+`minikube image load mantis-engine:dev`) and set image.*.pullPolicy to
+"Never".
