@@ -18,7 +18,14 @@ import (
 	"github.com/continuumx1/mantis/internal/web"
 )
 
+// version identifies this build (e.g. "0.1.0-preview.1") — see
+// cmd/mantis-engine/main.go's version comment; the same build-time
+// mechanism applies here.
+var version = "dev"
+
 func main() {
+	log.Printf("mantis-web: version %s", version)
+
 	addr := httpx.EnvOr("MANTIS_WEB_ADDR", ":8080")
 	engineURL := httpx.EnvOr("MANTIS_ENGINE_URL", "http://mantis-engine:8080")
 

@@ -7,20 +7,17 @@ fullnameOverride: ""
 
 imagePullSecrets: []
 
-# There is no published Mantis image registry yet (Public Preview) — build
-# the two images yourself (see the repo README's "Running in a cluster"
-# section) and either push them somewhere your cluster can pull from, or
-# load them directly into a local cluster (e.g. `minikube image load
-# mantis-engine:dev`) and set pullPolicy to "Never" below while testing.
+# Both services publish from one Docker Hub repo (cx1tech/mantis),
+# distinguished by a tag suffix — cx1tech/mantis:0.1.0-preview.1-engine and
+# ...-web — following the repo's preview.N / rc.N / stable tagging
+# strategy. image.tag defaults to .Chart.AppVersion; override it (or the
+# whole image.repository, for a private mirror/fork) as needed. Building
+# your own images instead is still one `docker build` away — see
+# build/Dockerfile.engine and build/Dockerfile.web.
 image:
-  engine:
-    repository: mantis-engine
-    tag: ""              # defaults to .Chart.AppVersion
-    pullPolicy: IfNotPresent
-  web:
-    repository: mantis-web
-    tag: ""              # defaults to .Chart.AppVersion
-    pullPolicy: IfNotPresent
+  repository: cx1tech/mantis
+  tag: ""              # defaults to .Chart.AppVersion; becomes "<tag>-engine" / "<tag>-web"
+  pullPolicy: IfNotPresent
 
 # mantis-engine: the only component that talks to Kubernetes. Runs with
 # read-only RBAC (see rbac.create below) and is never exposed outside the

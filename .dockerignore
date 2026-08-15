@@ -1,8 +1,12 @@
-# Keep the build context small and reproducible.
+# Keep the build context small, reproducible, and free of anything that
+# isn't Go source the two Dockerfiles actually need to compile a binary.
 .git
 .gitignore
+.dockerignore
+.claude/
 docs/
 build/
+charts/
 *.md
 LICENSE
 NOTICE

@@ -167,23 +167,34 @@ Endpoints:
 
 ## Running in a cluster
 
-Each service builds from its own multi-stage, distroless, nonroot Dockerfile:
+```bash
+helm install mantis ./charts/mantis --namespace mantis --create-namespace
+```
+
+The **[Helm chart](charts/mantis)** deploys both services: `mantis-engine`
+with the read-only ClusterRole/ClusterRoleBinding it needs (exposed only
+as a `ClusterIP`, never publicly), `mantis-web` pointed at it, and
+everything that goes with them (probes, security contexts, an optional
+Ingress). Images pull straight from
+[`cx1tech/mantis`](https://hub.docker.com/r/cx1tech/mantis) on Docker Hub
+by default — multi-arch (`linux/amd64` + `linux/arm64`), built from a
+distroless nonroot base, no local build required. See
+**[charts/mantis/README.md](charts/mantis/README.md)** for exposing it
+(Ingress/LoadBalancer/port-forward) and the full values reference. Full
+detail on the required permissions and the security model is in the
+**[User Guide](docs/USER_GUIDE.md)**.
+
+Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
+iterations, then `0.1.0-rc.1`, then `0.1.0` for stable.
+
+Building from source is still one command away if you're working on
+Mantis itself — each service has its own multi-stage, distroless,
+nonroot Dockerfile:
 
 ```bash
 docker build -f build/Dockerfile.engine -t mantis-engine:dev .
 docker build -f build/Dockerfile.web    -t mantis-web:dev .
 ```
-
-The **[Helm chart](charts/mantis)** deploys both: `mantis-engine` with the
-read-only ClusterRole/ClusterRoleBinding it needs (exposed only as a
-`ClusterIP`, never publicly), `mantis-web` pointed at it, and everything
-that goes with them (probes, security contexts, an optional Ingress).
-There's no published image yet (Public Preview), so point the chart at a
-locally-built or locally-loaded image — see
-**[charts/mantis/README.md](charts/mantis/README.md)** for the exact
-commands, including a minikube/kind walkthrough. Full detail on the
-required permissions and the security model is in the
-**[User Guide](docs/USER_GUIDE.md)**.
 
 ## Relationship model
 
@@ -232,9 +243,9 @@ is shown as a "not found" node; one that exists is shown plainly.
 - Verified dangling-reference detection
 - Public-preview login gate
 - Helm chart (two Deployments, two Services, read-only RBAC)
+- Published multi-arch images on Docker Hub (`cx1tech/mantis`)
 
 **Planned**
-- Published container images (a registry to pull from, instead of build-it-yourself)
 - CI (build/vet/test/gofmt on every PR)
 - Real authentication (delegating to Kubernetes RBAC)
 - Richer per-resource detail in the UI

@@ -31,7 +31,7 @@ spec:
       containers:
         - name: mantis-web
           image: {{ include "mantis.web.image" . }}
-          imagePullPolicy: {{ .Values.image.web.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.web.securityContext | nindent 12 }}
           ports:
