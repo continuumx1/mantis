@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/continuumx1/knw/internal/graph"
+	"github.com/continuumx1/mantis/internal/graph"
 )
 
 // GraphDTO is the JSON payload the web UI fetches: cluster metadata plus a flat
@@ -17,14 +17,21 @@ type GraphDTO struct {
 }
 
 // MetaDTO carries the cluster identity and headline counts shown in the header.
+// NamespaceList is every namespace in the cluster (sorted), so the UI can draw a
+// region for each one — including namespaces that are empty or hold only hidden
+// resources — and Namespaces counts them, keeping header and canvas consistent.
 type MetaDTO struct {
-	Context    string   `json:"context"`
-	Server     string   `json:"server"`
-	Version    string   `json:"version"`
-	Namespaces int      `json:"namespaces"`
-	NodeCount  int      `json:"nodeCount"`
-	EdgeCount  int      `json:"edgeCount"`
-	Skipped    []string `json:"skipped,omitempty"`
+	Context       string   `json:"context"`
+	Server        string   `json:"server"`
+	Version       string   `json:"version"`
+	Namespaces    int      `json:"namespaces"`
+	NamespaceList []string `json:"namespaceList,omitempty"`
+	NodeCount     int      `json:"nodeCount"`
+	EdgeCount     int      `json:"edgeCount"`
+	Skipped       []string `json:"skipped,omitempty"`
+	// NodeAutoscaler names the cluster-level node autoscaler in use ("Karpenter",
+	// "cluster-autoscaler") or is empty when none is detected.
+	NodeAutoscaler string `json:"nodeAutoscaler,omitempty"`
 }
 
 // NodeDTO is one resource in the graph. ID is namespace-qualified so resources

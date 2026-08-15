@@ -41,9 +41,14 @@ const (
 	// BoundTo means the source PersistentVolumeClaim is bound to the target
 	// PersistentVolume.
 	BoundTo RelationType = "bound-to"
+
+	// Scales means the source autoscaler (HPA, VPA) drives the replica count or
+	// resource requests of the target workload, as declared by its
+	// scaleTargetRef / targetRef.
+	Scales RelationType = "scales"
 )
 
-// Certainty records how much KNW trusts a relationship. Every edge today is
+// Certainty records how much Mantis trusts a relationship. Every edge today is
 // Observed — derived directly from a Kubernetes API field — so the zero value
 // means Observed. Inferred is reserved for future edges deduced rather than
 // read, which must always be rendered as such and never presented as fact.

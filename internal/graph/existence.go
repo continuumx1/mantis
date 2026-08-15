@@ -12,9 +12,9 @@ import (
 // VerifyExistence checks whether each referenced resource actually exists in the
 // cluster and returns a map from ResourceRef to existence.
 //
-// Only kinds KNW knows how to look up are included in the result. A ref of an
+// Only kinds Mantis knows how to look up are included in the result. A ref of an
 // unknown kind is deliberately absent from the map rather than reported as
-// missing: KNW annotates a reference as "not found" only when it has actually
+// missing: Mantis annotates a reference as "not found" only when it has actually
 // checked and confirmed absence, never by assumption. This keeps a discovered
 // fact (the reference exists in a spec) separate from a verified fact (the
 // target does or does not exist).
@@ -45,7 +45,7 @@ func VerifyExistence(
 	return result, nil
 }
 
-// getExists reports whether ref exists. checkable is false for kinds KNW cannot
+// getExists reports whether ref exists. checkable is false for kinds Mantis cannot
 // look up, in which case exists is meaningless and the caller must not treat the
 // resource as missing.
 func getExists(

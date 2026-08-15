@@ -8,10 +8,11 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 )
 
-// BuildNamespaceGraph lists the resources KNW understands in a namespace and
+// BuildNamespaceGraph lists the resources Mantis understands in a namespace and
 // assembles the full relationship graph for them as a single Context whose
 // subject is the namespace. It also returns the kinds it was not permitted to
 // list, so the caller can report them.
@@ -30,6 +31,7 @@ import (
 func BuildNamespaceGraph(
 	ctx context.Context,
 	clientset kubernetes.Interface,
+	dyn dynamic.Interface,
 	namespace string,
 	showAll bool,
 ) (*Context, []string, error) {
@@ -66,7 +68,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			d := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("Deployment", d.Name, namespace), d.OwnerReferences, namespace)...)
+			dRef := ref("Deployment", d.Name, namespace)
+			attrs[dRef] = deploymentAttributes(d)
+			relations = append(relations, ownerEdges(dRef, d.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -77,7 +81,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			rs := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("ReplicaSet", rs.Name, namespace), rs.OwnerReferences, namespace)...)
+			rsRef := ref("ReplicaSet", rs.Name, namespace)
+			attrs[rsRef] = replicaSetAttributes(rs)
+			relations = append(relations, ownerEdges(rsRef, rs.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -88,7 +94,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			sts := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("StatefulSet", sts.Name, namespace), sts.OwnerReferences, namespace)...)
+			stsRef := ref("StatefulSet", sts.Name, namespace)
+			attrs[stsRef] = statefulSetAttributes(sts)
+			relations = append(relations, ownerEdges(stsRef, sts.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -99,7 +107,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			ds := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("DaemonSet", ds.Name, namespace), ds.OwnerReferences, namespace)...)
+			dsRef := ref("DaemonSet", ds.Name, namespace)
+			attrs[dsRef] = daemonSetAttributes(ds)
+			relations = append(relations, ownerEdges(dsRef, ds.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -110,7 +120,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			j := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("Job", j.Name, namespace), j.OwnerReferences, namespace)...)
+			jRef := ref("Job", j.Name, namespace)
+			attrs[jRef] = jobAttributes(j)
+			relations = append(relations, ownerEdges(jRef, j.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -121,7 +133,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			cj := &list.Items[i]
-			relations = append(relations, ownerEdges(ref("CronJob", cj.Name, namespace), cj.OwnerReferences, namespace)...)
+			cjRef := ref("CronJob", cj.Name, namespace)
+			attrs[cjRef] = cronJobAttributes(cj)
+			relations = append(relations, ownerEdges(cjRef, cj.OwnerReferences, namespace)...)
 		}
 	}
 
@@ -136,7 +150,7 @@ func BuildNamespaceGraph(
 		for i := range podItems {
 			p := &podItems[i]
 			podRef := ref("Pod", p.Name, namespace)
-			attrs[podRef] = []string{podHealthNote(p)}
+			attrs[podRef] = podAttributes(p)
 			relations = append(relations, ownerEdges(podRef, p.OwnerReferences, namespace)...)
 			if p.Spec.NodeName != "" {
 				relations = append(relations, Relation{From: podRef, Type: RunsOn, To: ResourceRef{Kind: "Node", Name: p.Spec.NodeName}})
@@ -164,6 +178,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			s := &list.Items[i]
 			svcRef := ref("Service", s.Name, namespace)
+			attrs[svcRef] = serviceAttributes(s, sliceItems)
 			relations = append(relations, selectsRelations(svcRef, s.Spec.Selector, podItems)...)
 			relations = append(relations, servesFromSlices(svcRef, sliceItems)...)
 		}
@@ -204,8 +219,19 @@ func BuildNamespaceGraph(
 		}
 	} else {
 		for i := range list.Items {
-			secretRef := ref("Secret", list.Items[i].Name, namespace)
-			if !showAll && isSystemSecret(&list.Items[i]) {
+			s := &list.Items[i]
+			// The List call itself returns full Secret objects — Kubernetes has no
+			// "metadata only" projection for typed List — so the values genuinely
+			// pass through this process's memory for a moment. Wiping Data and
+			// StringData immediately, before anything else touches this slice,
+			// turns "we only ever read Name and Type" from an implicit habit this
+			// function happens to follow into a real guarantee: nothing added here
+			// or downstream — a future attribute builder, an error message, a
+			// debug log — can serialize a value that has already been zeroed out.
+			s.Data = nil
+			s.StringData = nil
+			secretRef := ref("Secret", s.Name, namespace)
+			if !showAll && isSystemSecret(s) {
 				hidden[secretRef] = struct{}{}
 			}
 		}
@@ -226,6 +252,60 @@ func BuildNamespaceGraph(
 		}
 	}
 
+	// ResourceQuota and LimitRange capture the namespace-level requests/limits
+	// governance (how much the namespace may consume, and the defaults applied to
+	// pods that omit their own requests/limits).
+	if list, err := clientset.CoreV1().ResourceQuotas(namespace).List(ctx, opts); err != nil {
+		if !forbidden("resourcequotas", err) {
+			return nil, nil, fmt.Errorf("list resourcequotas: %w", err)
+		}
+	} else {
+		for i := range list.Items {
+			rq := &list.Items[i]
+			attrs[ref("ResourceQuota", rq.Name, namespace)] = resourceQuotaAttributes(rq)
+		}
+	}
+
+	if list, err := clientset.CoreV1().LimitRanges(namespace).List(ctx, opts); err != nil {
+		if !forbidden("limitranges", err) {
+			return nil, nil, fmt.Errorf("list limitranges: %w", err)
+		}
+	} else {
+		for i := range list.Items {
+			lr := &list.Items[i]
+			attrs[ref("LimitRange", lr.Name, namespace)] = limitRangeAttributes(lr)
+		}
+	}
+
+	// HorizontalPodAutoscalers scale a workload's replica count; the scales edge
+	// points from the HPA to the Deployment/StatefulSet it targets.
+	if list, err := clientset.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, opts); err != nil {
+		if !forbidden("horizontalpodautoscalers", err) {
+			return nil, nil, fmt.Errorf("list horizontalpodautoscalers: %w", err)
+		}
+	} else {
+		for i := range list.Items {
+			hpa := &list.Items[i]
+			hpaRef := ref("HorizontalPodAutoscaler", hpa.Name, namespace)
+			attrs[hpaRef] = hpaAttributes(hpa)
+			target := hpa.Spec.ScaleTargetRef
+			relations = append(relations, Relation{
+				From: hpaRef,
+				Type: Scales,
+				To:   ResourceRef{Kind: target.Kind, Name: target.Name, Namespace: namespace},
+			})
+		}
+	}
+
+	// VerticalPodAutoscalers (a CRD, so read via the dynamic client and skipped
+	// when the CRD is not installed) tune a workload's resource requests.
+	vpaAttrs, vpaRelations := collectVPAs(ctx, dyn, namespace)
+	for r, a := range vpaAttrs {
+		nodeSet[r] = struct{}{}
+		attrs[r] = a
+	}
+	relations = append(relations, vpaRelations...)
+
 	// Cluster-scoped resources, listed so runs-on and bound-to targets resolve.
 	if list, err := clientset.CoreV1().Nodes().List(ctx, opts); err != nil {
 		if !forbidden("nodes", err) {
@@ -233,7 +313,8 @@ func BuildNamespaceGraph(
 		}
 	} else {
 		for i := range list.Items {
-			ref("Node", list.Items[i].Name, "")
+			node := &list.Items[i]
+			attrs[ref("Node", node.Name, "")] = nodeAttributes(node)
 		}
 	}
 

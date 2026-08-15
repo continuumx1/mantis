@@ -1,8 +1,8 @@
-# KNW frontend service (knw-web): serves the UI, proxies /api to knw-engine.
+# Mantis frontend service (mantis-web): serves the UI, proxies /api to mantis-engine.
 # The UI is embedded in the binary at compile time (go:embed), so the runtime
 # image carries no separate assets.
 #
-#   docker build -f build/Dockerfile.web -t knw-web:dev .
+#   docker build -f build/Dockerfile.web -t mantis-web:dev .
 #
 # Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).
 FROM golang:1.26 AS build
@@ -12,10 +12,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/knw-web ./cmd/knw-web
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mantis-web ./cmd/mantis-web
 
 FROM gcr.io/distroless/static:nonroot
-COPY --from=build /out/knw-web /knw-web
+COPY --from=build /out/mantis-web /mantis-web
 USER nonroot:nonroot
 EXPOSE 8080
-ENTRYPOINT ["/knw-web"]
+ENTRYPOINT ["/mantis-web"]

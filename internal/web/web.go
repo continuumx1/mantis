@@ -1,4 +1,4 @@
-// Package web is the KNW frontend: it serves the resource-graph UI and reverse-
+// Package web is the Mantis frontend: it serves the resource-graph UI and reverse-
 // proxies /api requests to the engine backend, keeping the browser same-origin.
 package web
 
@@ -10,7 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/continuumx1/knw/internal/httpx"
+	"github.com/continuumx1/mantis/internal/httpx"
 )
 
 //go:embed ui
@@ -30,13 +30,18 @@ func StaticHandler() (http.Handler, error) {
 // proxies every /api/ request to the engine at engineURL. Keeping the browser
 // same-origin means no CORS, and the engine never has to face the browser — it
 // can stay a private ClusterIP reachable only from this service.
+//
+// Everything except the login page, logout, and the liveness probe sits behind
+// a public-preview login gate (see auth.go) — a hardcoded admin/admin and an
+// in-memory session, not a real auth story, but enough to stand a login screen
+// up in front of the graph.
 func NewHandler(engineURL string) (http.Handler, error) {
 	target, err := url.Parse(engineURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse engine url %q: %w", engineURL, err)
 	}
 	if target.Scheme == "" || target.Host == "" {
-		return nil, fmt.Errorf("engine url %q must include scheme and host, e.g. http://knw-engine:8080", engineURL)
+		return nil, fmt.Errorf("engine url %q must include scheme and host, e.g. http://mantis-engine:8080", engineURL)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
@@ -49,11 +54,43 @@ func NewHandler(engineURL string) (http.Handler, error) {
 		return nil, err
 	}
 
+	loginPage, err := uiFiles.ReadFile("ui/login.html")
+	if err != nil {
+		return nil, fmt.Errorf("read login page: %w", err)
+	}
+	favicon, err := uiFiles.ReadFile("ui/mantis-mascot.webp")
+	if err != nil {
+		return nil, fmt.Errorf("read favicon: %w", err)
+	}
+
+	sess := newSessions()
+
 	mux := http.NewServeMux()
 	mux.Handle("/api/", proxy)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteText(w, "ok")
 	})
+	// Browsers probe /favicon.ico unconditionally, before ever reading the
+	// page's <link rel="icon">. Answering it directly (with the mascot PNG —
+	// browsers don't care that the bytes aren't literally .ico) avoids a
+	// spurious 404 on first load, logged in or not.
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/webp")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(favicon)
+	})
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(loginPage)
+		case http.MethodPost:
+			sess.handleLogin(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/logout", sess.handleLogout)
 	mux.Handle("/", static)
-	return mux, nil
+	return sess.gate(mux), nil
 }
