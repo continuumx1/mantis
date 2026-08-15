@@ -1,0 +1,14 @@
+# Keep the build context small and reproducible.
+.git
+.gitignore
+docs/
+build/
+*.md
+LICENSE
+NOTICE
+# Local build artifacts
+mantis
+mantis-engine
+mantis-web
+bin/
+dist/

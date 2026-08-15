@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mantis — Cluster Resource Graph</title>
+<link rel="icon" type="image/webp" href="mantis-mascot.webp">
+<script>
+  // Set the saved theme before first paint — a toggle applied later (after the
+  // rest of the page loads) would show a flash of the wrong theme first.
+  //
+  // sessionStorage, not localStorage: Mantis opens in dark by default, full
+  // stop — a toggle to light only holds for the current tab (surviving a
+  // reload/nav within it, so it doesn't feel like the toggle "didn't work"),
+  // never carrying over into a new tab or the next time the app is opened.
+  try {
+    if (sessionStorage.getItem("mantis-theme") === "light") document.documentElement.setAttribute("data-theme", "light");
+  } catch (e) { /* sessionStorage unavailable (private mode, etc.) — default theme is fine */ }
+</script>
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #0a0e13; --ground-2: #0e141b; --panel: #121a23; --panel-2: #172230; --line: #223041; --dot: #223041;
+    --ink: #e7eef6; --muted: #8595a6; --faint: #5a6b7d; --brand: #a6e22e;
+    --cat-workload: #6ea8fe; --cat-pod: #a6e22e; --cat-network: #d980fb; --cat-config: #e3b341; --cat-storage: #34d1bf; --cat-node: #96a4b5; --cat-autoscale: #f0883e;
+    --ns-cluster: #8595a6;
+    --ok: #3fb950; --warn: #d29922; --crit: #f85149;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  /* Light theme — a manual, per-tab toggle (see #themeToggle and the
+     sessionStorage note up top), not prefers-color-scheme: Mantis opens dark
+     by default regardless of OS setting; this is what a toggle-to-light
+     session looks like. Every rule below already reads these tokens, so
+     redefining them here is the whole theme swap. */
+  :root[data-theme="light"] {
+    color-scheme: light;
+    /* Two rounds of toning down now — first from pure white (#ffffff panels on
+       #f5f7fa), which still read as flashy, to a soft gray; this pushes further
+       still, roughly halfway between white and a mid gray rather than just off-
+       white, since a full-bright canvas filling most of the screen is a lot of
+       sustained brightness even at "soft gray". */
+    --ground: #c9cdd4; --ground-2: #c0c4cc; --panel: #d6d9de; --panel-2: #cbcfd5; --line: #b0b6bf; --dot: #7c8794;
+    --ink: #161b22; --muted: #4b5563; --faint: #838f9d; --brand: #4f8a1c;
+    --cat-workload: #2f6fe0; --cat-pod: #4f8a1c; --cat-network: #a23fd1; --cat-config: #a06400; --cat-storage: #0a8f7c; --cat-node: #5b6670; --cat-autoscale: #b85c17;
+    --ns-cluster: #5b6670;
+    --ok: #1a7f37; --warn: #8a6200; --crit: #cf222e;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-ui); overflow: hidden; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* Header — three loose groups instead of one dense line: identity+search on
+     the left, cluster/stats/status/actions on the right, a flexible spacer
+     between. Vertical dividers (not "·" text) separate the right-hand groups
+     so the eye can parse them without reading every character. */
+  header { display: flex; align-items: center; gap: 18px; padding: 13px 22px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
+
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
+  .brand .mascot { height: 34px; width: auto; display: block; flex: none; }
+  .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--ink); }
+
+  .spacer { flex: 1 1 auto; min-width: 16px; }
+
+  .cluster-chip { display: flex; align-items: baseline; gap: 7px; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; flex: none; }
+  .cluster-chip .cluster-label { color: var(--faint); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
+  .cluster-chip b { color: var(--ink); font-weight: 600; } /* identity text, not an accent — brand green is reserved for interactive/active states */
+
+  .hdr-divider { width: 1px; height: 18px; background: var(--line); flex: none; }
+
+  .stat-group { display: flex; align-items: center; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--faint); white-space: nowrap; flex: none; }
+  .stat-item { display: flex; align-items: baseline; gap: 5px; }
+  .stat-item b { color: var(--muted); font-weight: 600; }
+  .autoscale-badge { display: inline-flex; align-items: baseline; gap: 5px; }
+  .autoscale-badge b { color: var(--cat-autoscale); font-weight: 600; }
+
+  .icon-btn { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none;
+    color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .icon-btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .icon-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .i-sun { display: none; }
+  :root[data-theme="light"] .icon-btn .i-moon { display: none; }
+  :root[data-theme="light"] .icon-btn .i-sun { display: block; }
+
+  main { position: relative; flex: 1; min-height: 0; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+    /* --dot is its own token, not --line: in light mode --line is close enough
+       to --ground that the dotted grid all but disappeared (read as a flat
+       white canvas); --dot is tuned per theme to stay visible-but-quiet against
+       its own background instead of inheriting a border color's contrast. */
+    background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--dot) 0.6px, transparent 0.6px);
+    background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
+  #canvas.panning { cursor: grabbing; }
+
+  /* Namespaces are regions, not walls: a whisper of tint and a thin edge, never
+     competing with the resources inside them. Empty namespaces are dashed and
+     fainter still — present as context, not as something to look at. */
+  .region-box { fill-opacity: 0.032; stroke-width: 1; stroke-opacity: .32; }
+  .region-box.empty { fill-opacity: 0.016; stroke-dasharray: 3 4; stroke-opacity: .18; }
+  .region-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; opacity: .62; }
+
+  .edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
+  .edge-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; opacity: 0; transition: opacity .18s; pointer-events: none; }
+
+  .node { cursor: pointer; }
+  .node .chip-bg { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .18s, filter .18s; }
+  .node .kind { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .6px; text-transform: uppercase; }
+  .node .name { font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink); }
+  .node .sub  { font-family: var(--font-mono); font-size: 8px; fill: var(--crit); letter-spacing: .5px; }
+  .node .ready { font-family: var(--font-mono); font-size: 9px; font-weight: 600; text-anchor: end; }
+  .node:hover .chip-bg { stroke: color-mix(in srgb, var(--brand) 55%, var(--line)); }
+  .node.selected .chip-bg { stroke: var(--brand); stroke-width: 1.6; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--brand) 45%, transparent)); }
+  .node.dim { opacity: .22; }
+  .node.ghost .chip-bg { stroke: var(--crit); stroke-dasharray: 4 3; fill: color-mix(in srgb, var(--crit) 8%, var(--panel-2)); }
+  .node.ghost .name { fill: var(--muted); }
+
+  .status-ring { fill: none; stroke-width: 2; }
+  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
+  .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
+  @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
+
+  /* The toggle button is pinned at the same absolute spot — 10px in from the
+     panel's own bottom-left corner — in both states, via position:absolute
+     rather than normal document flow. Collapsed or expanded, .legend's own box
+     keeps the same left/bottom anchor, so the button never actually moves:
+     clicking it to open, then clicking again to close, needs no mouse
+     movement at all. */
+  .legend { position: absolute; left: 16px; bottom: 16px; z-index: 4; width: 240px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 44px; font-size: 11.5px;
+    transition: width .15s, height .15s, padding .15s; }
+  /* Collapsed, the box shrinks to just the button's own footprint and stops
+     painting its own background/border — it used to keep a rounded-square
+     border/background underneath the toggle's circular chrome, so square
+     corners peeked out past the circle. Only the button paints now. */
+  .legend.collapsed { width: 46px; height: 46px; padding: 0; border: 0; background: none; }
+  .legend-toggle { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    color: var(--muted); background: none; border: 0; cursor: pointer; padding: 0; transition: color .15s, background .15s; }
+  .legend.collapsed .legend-toggle { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); }
+  .legend-toggle:hover { color: var(--brand); }
+  .legend-toggle svg { width: 15px; height: 15px; }
+  /* Collapsed shows an info glyph ("there's a legend here"); expanded swaps to
+     a chevron ("click to collapse") — reusing the info icon for both states
+     read as if the button didn't know what it currently did. */
+  .legend-toggle .i-close { display: none; }
+  .legend:not(.collapsed) .legend-toggle .i-info { display: none; }
+  .legend:not(.collapsed) .legend-toggle .i-close { display: block; }
+  .legend.collapsed .legend-body { display: none; }
+  .legend h4 { margin: 0 0 8px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; color: var(--muted); font-family: var(--font-mono); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .legend .ln { width: 16px; border-top-width: 2px; border-top-style: solid; flex: none; }
+  .legend .divider { height: 1px; background: var(--line); margin: 10px 0; }
+
+  .panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 320px; z-index: 6; background: color-mix(in srgb, var(--panel) 95%, transparent); backdrop-filter: blur(8px);
+    border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    transition: transform .25s ease, opacity .25s ease; }
+  .panel .hint { color: var(--faint); font-size: 13px; line-height: 1.55; margin-top: 4px; }
+  .panel .hint b { color: var(--muted); }
+  .p-kind { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  .p-name { font-family: var(--font-mono); font-size: 15px; word-break: break-all; line-height: 1.35; color: var(--ink); }
+  .p-ns { font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; border-radius: 20px; border: 1px solid; width: fit-content; }
+  .badge::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; }
+  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+  .tab { padding: 7px 11px; font-size: 11px; font-family: var(--font-mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--brand); border-color: var(--brand); }
+
+  .kv { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .kv > div { display: flex; gap: 8px; }
+  .kv .k { color: var(--faint); min-width: 84px; font-family: var(--font-mono); }
+  .kv .v { color: var(--muted); font-family: var(--font-mono); word-break: break-all; }
+
+  .sec-h { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; margin: 10px 0 4px; }
+
+  /* Detail list — clean two-column rows instead of bordered boxes. */
+  .detail { display: flex; flex-direction: column; }
+  .drow { display: grid; grid-template-columns: 40% 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent); align-items: baseline; }
+  .drow:last-child { border-bottom: 0; }
+  .dk { color: var(--faint); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .3px; text-transform: lowercase; word-break: break-word; }
+  .dv { color: var(--ink); font-family: var(--font-mono); font-size: 11.5px; word-break: break-word; line-height: 1.45; }
+  .dstat { display: inline-block; font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 4px; }
+
+  .yaml-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .yaml-head .sec-h { margin: 0; }
+  .copy-btn { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .copy-btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .copy-btn.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+  .yaml { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre; max-height: 62vh; overflow-y: auto; }
+  .notice { border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; white-space: pre-line; }
+  .yaml-actions { display: flex; gap: 6px; align-items: center; }
+
+  /* Manifest block with Copy/Expand floating on its top-right border. */
+  .yaml-wrap { position: relative; }
+  .yaml-wrap .yaml { padding-top: 40px; }
+  .yaml-tools { position: absolute; top: 7px; right: 9px; z-index: 2; display: flex; gap: 6px; }
+  .yaml-tools .copy-btn { background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(4px); }
+
+  /* Expanded YAML reader — a large modal for comfortable reading of long/wide manifests. */
+  .ymodal-overlay { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 24px;
+    background: color-mix(in srgb, var(--ground) 74%, transparent); backdrop-filter: blur(3px); }
+  .ymodal-overlay.open { display: flex; }
+  .ymodal { width: min(1080px, 84vw); height: 84vh; display: flex; flex-direction: column; padding: 14px 14px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+  .ymodal-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .ymodal-title { font-family: var(--font-mono); font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1 1 auto; min-width: 60px; }
+  .ymodal-title b { color: var(--faint); font-weight: 400; }
+  .ymodal-pre { flex: 1; max-height: none; margin: 0; font-size: 12px; }
+  .ymodal-close { font-family: var(--font-mono); font-size: 13px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; }
+  .ymodal-close:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
+
+  /* Find-in-YAML — a small in-modal search, useful once a manifest is more than
+     a screenful. Matches highlight inline; the current match gets its own
+     stronger color so stepping through with Enter/↑↓ is easy to track. */
+  .ymodal-search { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; position: relative; }
+  .ymodal-search .search-ico { position: static; transform: none; }
+  .ymodal-search input { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; width: 160px; outline: none; transition: border-color .15s, width .15s; }
+  .ymodal-search input:focus { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); width: 200px; }
+  .ymodal-search input::placeholder { color: var(--faint); }
+  .ymodal-kbd { flex: none; }
+  .ymodal-match-count { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); min-width: 34px; text-align: center; }
+  .ymodal-nav { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 6px; width: 24px; height: 24px; cursor: pointer; }
+  .ymodal-nav:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .yaml mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; border-radius: 2px; }
+  .yaml mark.cur { background: var(--brand); color: var(--ground); }
+
+  /* Search — live type-ahead over resources, ⌘K to jump to it from anywhere. */
+  /* The kbd hint used to be an absolutely-positioned overlay on top of the
+     input's own right edge, reserved by padding-right — but the chip's actual
+     rendered width was wider than the padding reserved for it, so long enough
+     typed text ran underneath it. It's a plain flex sibling now, in its own
+     box outside the input entirely, so there is no padding/width arithmetic
+     that has to stay in sync for it to never overlap. */
+  .search-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
+  .search { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px 6px 28px; width: 176px; outline: none; transition: border-color .15s, width .2s; }
+  .search::placeholder { color: var(--faint); }
+  .search:focus { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); width: 216px; }
+  .search-ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 12px; pointer-events: none; }
+  .search-kbd { position: static; flex: none; font-family: var(--font-mono); font-size: 10px; letter-spacing: .3px;
+    color: var(--faint); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; pointer-events: none; }
+  .search-results { position: absolute; top: calc(100% + 5px); left: 0; width: 300px; max-height: 340px; overflow-y: auto; z-index: 9;
+    background: color-mix(in srgb, var(--panel) 97%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 9px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.4); display: none; padding: 4px; }
+  .search-results.open { display: block; }
+  .sresult { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; cursor: pointer; font-family: var(--font-mono); font-size: 12px; }
+  .sresult:hover, .sresult.active { background: var(--panel-2); }
+  .sresult .sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .sresult .sr-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sresult .sr-kind { color: var(--faint); font-size: 10px; flex: none; }
+  .sresult .sr-ns { color: var(--faint); font-size: 10px; margin-left: auto; flex: none; }
+  .search-empty { padding: 10px; color: var(--faint); font-family: var(--font-mono); font-size: 11px; }
+
+  /* Panel is a drawer: hidden by default (main.md item 2) — it exists only
+     while a resource is selected, and closing it (✕, Escape, or clicking empty
+     canvas) clears the selection too. There is deliberately no "hide but keep
+     selected" state anymore: select → drawer, clear → full topology. */
+  .panel-collapse { position: absolute; top: 12px; right: 12px; z-index: 2; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .panel-collapse:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
+  .panel-resizer { position: absolute; top: 0; left: -4px; width: 9px; height: 100%; cursor: ew-resize; z-index: 3; }
+  .panel-resizer::after { content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%); width: 3px; height: 42px; border-radius: 3px; background: var(--line); transition: background .15s; }
+  .panel-resizer:hover::after, .panel.resizing .panel-resizer::after { background: var(--brand); }
+  .panel-content { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 4px; }
+  .panel.collapsed { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+  .panel.resizing { transition: none; user-select: none; }
+
+  .rel { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-family: var(--font-mono); font-size: 12px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+  .rel:hover .rel-target { color: var(--brand); }
+  .rel .verb { color: var(--muted); } .rel .arrow { color: var(--faint); } .rel-target { color: var(--ink); }
+  .rel .cross-tag { color: var(--warn); font-size: 9px; margin-left: auto; } .rel .rk { font-size: 9px; }
+
+  .controls { position: absolute; top: 14px; left: 16px; z-index: 4; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  /* Sync — a status pill, not a settings dropdown. It's the *only* status
+     indicator in the app now (there used to be a second, redundant "live" text
+     in the header — removed): it answers "is this live, and if not, since
+     when?" at a glance, with cadence a click away. States: on (green, auto-sync
+     healthy), warn (amber, a request is running slow), err (red, the last
+     request failed — stale data is still on screen, so this has to be visible,
+     not just a toast that fades). */
+  .sync-wrap { position: relative; }
+  .sync-pill { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .3px;
+    color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer;
+    transition: color .15s, border-color .15s; }
+  .sync-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+  .sync-pill.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+  .sync-pill.on .dot { animation: pulse 1.8s ease-in-out infinite; }
+  .sync-pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
+  .sync-pill.err { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
+  .sync-pill.err .dot { animation: pulse 1.3s ease-in-out infinite; }
+  .sync-pill:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+  .sync-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 9; min-width: 190px; padding: 6px; display: none;
+    background: color-mix(in srgb, var(--panel) 97%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 12px 36px rgba(0,0,0,.35); }
+  .sync-menu.open { display: block; }
+  .sync-menu-title { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; padding: 6px 8px 4px; }
+  .sync-status { font-family: var(--font-mono); font-size: 11px; color: var(--faint); padding: 0 8px 6px; }
+  .sync-warn { display: none; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--crit);
+    background: color-mix(in srgb, var(--crit) 10%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 30%, transparent);
+    border-radius: 7px; padding: 6px 8px; margin: 0 2px 6px; }
+  .sync-warn.show { display: flex; }
+  .sync-menu-divider { height: 1px; background: var(--line); margin: 2px 2px 6px; }
+  .sync-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    background: none; border: 0; border-radius: 6px; padding: 7px 8px; cursor: pointer; }
+  .sync-opt:hover { background: var(--panel-2); color: var(--ink); }
+  .sync-opt::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; box-sizing: border-box; }
+  .sync-opt.active { color: var(--ink); }
+  .sync-opt.active::before { border-color: var(--ok); background: var(--ok); }
+
+  .overlay { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: color-mix(in srgb, var(--ground) 80%, transparent); backdrop-filter: blur(2px); }
+  .overlay .card { max-width: 460px; padding: 22px 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .overlay h3 { margin: 0 0 8px; font-family: var(--font-mono); font-size: 15px; color: var(--ink); }
+  .overlay p { margin: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .overlay code { font-family: var(--font-mono); color: var(--brand); }
+  .overlay.err h3 { color: var(--crit); }
+
+  /* Non-blocking notice for failures during silent sync. */
+  .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 7;
+    display: none; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
+    padding: 9px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--crit) 45%, var(--line));
+    background: color-mix(in srgb, var(--crit) 14%, var(--panel)); color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    opacity: 0; transition: opacity .25s, transform .25s; }
+  .toast.show { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast .tdot { width: 8px; height: 8px; border-radius: 50%; background: var(--crit); flex: none; animation: pulse 1.6s ease-in-out infinite; }
+
+  @media (max-width: 780px) { .panel { width: auto; left: 14px; top: auto; height: 46%; } .legend { display: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="brand">
+      <img class="mascot" src="mantis-mascot.webp" alt="Mantis mascot" />
+      <span class="brand-name">mantis</span>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-ico">⌕</span>
+      <input class="search" id="search" type="text" placeholder="Search resources…" autocomplete="off" spellcheck="false" />
+      <kbd class="search-kbd">Ctrl F</kbd>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="cluster-chip"><span class="cluster-label">cluster</span><b id="clusterName">…</b></div>
+
+    <div class="hdr-divider"></div>
+
+    <div class="stat-group">
+      <div class="stat-item"><b id="nCount">0</b><span>resources</span></div>
+      <div class="stat-item"><b id="eCount">0</b><span>relationships</span></div>
+      <div class="stat-item"><b id="nsCount">0</b><span>namespaces</span></div>
+      <span id="autoscalerChip"></span>
+    </div>
+
+    <div class="hdr-divider"></div>
+
+    <button class="icon-btn" id="themeToggle" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+
+    <button class="btn" id="signOut" title="Sign out">Sign out</button>
+  </header>
+
+  <main>
+    <div class="controls">
+      <button class="btn" id="reset">Reset view</button>
+      <button class="btn" id="relayout">Re-layout</button>
+      <div class="sync-wrap">
+        <button class="sync-pill on" id="syncPill" aria-haspopup="true" aria-expanded="false">
+          <span class="dot"></span><span id="syncPillLabel">LIVE</span>
+        </button>
+        <div class="sync-menu" id="syncMenu">
+          <div class="sync-menu-title">Sync</div>
+          <div class="sync-status" id="syncStatusLine">Last synced —</div>
+          <div class="sync-warn" id="syncWarnLine">⚠ Connection lost — showing data from <span id="syncWarnTime">—</span>, retrying…</div>
+          <div class="sync-menu-divider"></div>
+          <button class="sync-opt" data-val="3000">3 sec</button>
+          <button class="sync-opt" data-val="10000">10 sec</button>
+          <button class="sync-opt" data-val="30000">30 sec</button>
+          <button class="sync-opt active" data-val="60000">1 min</button>
+          <button class="sync-opt" data-val="300000">5 min</button>
+          <button class="sync-opt" data-val="manual">Manual</button>
+        </div>
+      </div>
+      <button class="btn" id="syncNow" style="display:none">Sync now</button>
+    </div>
+
+    <svg id="canvas"><defs></defs>
+      <g id="viewport"><g id="regions"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
+    </svg>
+
+    <div class="legend collapsed" id="legend">
+      <div class="legend-body">
+        <h4>Resource</h4>
+        <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
+        <div class="row"><span class="sw" style="background:var(--cat-pod)"></span>Pod</div>
+        <div class="row"><span class="sw" style="background:var(--cat-network)"></span>Service / Ingress</div>
+        <div class="row"><span class="sw" style="background:var(--cat-config)"></span>Config / Secret</div>
+        <div class="row"><span class="sw" style="background:var(--cat-storage)"></span>Storage</div>
+        <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
+        <div class="row"><span class="sw" style="background:var(--cat-autoscale)"></span>Autoscaler (HPA / VPA / NodePool)</div>
+        <div class="divider"></div>
+        <h4>Reading the map</h4>
+        <div class="row"><span class="ln" style="border-color:var(--cat-node)"></span>relationship (edge)</div>
+        <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
+        <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
+      </div>
+      <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
+        <svg class="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.75" fill="currentColor" stroke="none"/></svg>
+        <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <aside class="panel collapsed" id="panel">
+      <div class="panel-resizer" id="panelResizer" title="Drag to resize"></div>
+      <button class="panel-collapse" id="panelCollapse" title="Clear focus (Esc)" aria-label="Clear focus">✕</button>
+      <div class="panel-content" id="panelContent"></div>
+    </aside>
+    <div class="ymodal-overlay" id="ymodalOverlay">
+      <div class="ymodal">
+        <div class="ymodal-head">
+          <div class="ymodal-title" id="ymodalTitle"></div>
+          <div class="ymodal-search">
+            <span class="search-ico">⌕</span>
+            <input id="ymodalSearch" type="text" placeholder="Find in YAML…" autocomplete="off" spellcheck="false" />
+            <kbd class="search-kbd ymodal-kbd">Ctrl F</kbd>
+            <span class="ymodal-match-count" id="ymodalMatchCount"></span>
+            <button class="ymodal-nav" id="ymodalPrev" title="Previous match (Shift+Enter)" aria-label="Previous match">↑</button>
+            <button class="ymodal-nav" id="ymodalNext" title="Next match (Enter)" aria-label="Next match">↓</button>
+          </div>
+          <div class="yaml-actions">
+            <button class="copy-btn" id="ymodalCopy">Copy</button>
+            <button class="ymodal-close" id="ymodalClose" title="Close (Esc)" aria-label="Close">✕</button>
+          </div>
+        </div>
+        <pre class="yaml ymodal-pre" id="ymodalPre"></pre>
+      </div>
+    </div>
+    <div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
+    <div class="overlay" id="overlay"><div class="card"><h3>Connecting to your cluster…</h3><p>Reading resources and relationships.</p></div></div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const el = (t,a) => { const e = document.createElementNS(SVGNS,t); for (const k in a) e.setAttribute(k,a[k]); return e; };
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  const CAT = { Deployment:"workload", ReplicaSet:"workload", StatefulSet:"workload", DaemonSet:"workload", CronJob:"workload", Job:"workload",
+    Pod:"pod", Service:"network", Ingress:"network", ConfigMap:"config", Secret:"config", ResourceQuota:"config", LimitRange:"config",
+    PersistentVolumeClaim:"storage", PersistentVolume:"storage", StorageClass:"storage", Node:"node",
+    HorizontalPodAutoscaler:"autoscale", VerticalPodAutoscaler:"autoscale", NodePool:"autoscale" };
+  const catColor = c => css("--cat-"+c);
+  const FAMILY = { "controlled-by":"workload","runs-on":"node","selects":"network","serves":"network","routes-to":"network","references":"config","mounts":"config","claims":"storage","bound-to":"storage","storage-class":"storage","scales":"autoscale" };
+  const REVERSE = { "controlled-by":"controls","runs-on":"hosts","selects":"selected-by","serves":"served-by","routes-to":"routed-from","references":"used-by","mounts":"mounted-by","claims":"claimed-by","bound-to":"bound-from","storage-class":"class-of","scales":"scaled-by" };
+  // Namespace region colors aren't CSS custom properties — there can be more
+  // namespaces than named tokens, so they're an index-picked palette instead.
+  // That means, unlike everything styled via var(--x), they won't repaint
+  // themselves on a theme switch; nsPalette() picks the set with the right
+  // contrast for the current background, and recolorForTheme() (below) is what
+  // actually re-picks it for already-drawn regions.
+  const NS_PALETTE_DARK  = ["#a6e22e","#6ea8fe","#d980fb","#e3b341","#34d1bf","#f0883e","#db61a2","#7ee787","#a371f7","#4ec9b0"];
+  const NS_PALETTE_LIGHT = ["#4f8a1c","#2f6fe0","#a23fd1","#a06400","#0a8f7c","#b85c17","#c23f82","#1f8f4e","#7a4fd1","#0f8f82"];
+  const nsPalette = () => document.documentElement.getAttribute("data-theme") === "light" ? NS_PALETTE_LIGHT : NS_PALETTE_DARK;
+
+  // Layout: a simple, calm force sim — repulsion spreads nodes apart, links pull
+  // related resources together, and a gentle per-namespace anchor keeps each
+  // namespace loosely in its own area. Kept deliberately simple so it stays
+  // stable and readable.
+
+  const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
+    gRegions = document.getElementById("regions"), gEdges = document.getElementById("edges"),
+    gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
+    defs = svg.querySelector("defs"), panel = document.getElementById("panel"),
+    panelContent = document.getElementById("panelContent"),
+    overlay = document.getElementById("overlay"), toast = document.getElementById("toast");
+
+  // Arrow markers bake catColor(f) in as a literal fill at creation time (SVG
+  // <marker> defs can't hold a live var() the way inline styles can), so a
+  // theme switch needs these rebuilt — see recolorForTheme().
+  function buildArrowMarkers(){
+    defs.querySelectorAll("marker[id^='arrow-']").forEach(m => m.remove());
+    ["workload","network","config","storage","node","autoscale"].forEach(f => {
+      const m = el("marker",{ id:"arrow-"+f, viewBox:"0 0 10 10", refX:"9", refY:"5", markerWidth:"6", markerHeight:"6", orient:"auto-start-reverse" });
+      m.appendChild(el("path",{ d:"M0,0 L10,5 L0,10 z", fill: catColor(f) })); defs.appendChild(m);
+    });
+  }
+  buildArrowMarkers();
+
+  const groupKey = n => n.ns || "__cluster";
+  const short = s => s.length > 22 ? s.slice(0,21)+"…" : s;
+
+  // Live state, reconciled on every load/refresh. anchorPos persists across
+  // refreshes so a settled layout does not jump when new data arrives.
+  let nodes = [], edges = [], byId = {}, groups = {}, regionEls = {}, nodeEls = {}, anchorPos = {};
+  let namespaceList = [];
+  let W = svg.clientWidth||1000, H = svg.clientHeight||640, alpha = 1;
+  let selected = null, curTab = "summary", yamlToken = 0;
+  let autoTimer = null, everLoaded = false;
+  let lastGraphData = null; // last successful /api/graph payload, kept so a theme switch can recolor without a re-fetch
+
+  // ---- overlay (blocking, first connect only) + toast (non-blocking failures) ----
+  function showOverlay(title, bodyHTML, isErr){
+    overlay.style.display = "flex";
+    overlay.className = "overlay" + (isErr ? " err" : "");
+    overlay.innerHTML = '<div class="card"><h3>'+title+'</h3>'+bodyHTML+'</div>';
+  }
+  const hideOverlay = () => { overlay.style.display = "none"; };
+  function showToast(msg){ document.getElementById("toastMsg").textContent = msg; toast.classList.add("show"); }
+  const hideToast = () => toast.classList.remove("show");
+
+  // ---- connection status — feeds the sync pill (see updateSyncPill below),
+  // which is now the app's only status indicator. "Live" on its own never says
+  // how current the data actually is, so every successful fetch stamps
+  // lastSyncedAt, and the pill/popover surface it as "Xs ago" rather than
+  // making the user guess. ----
+  let connState = "live"; // "live" | "syncing" | "error"
+  let lastSyncedAt = null; // Date of the last successful fetch, or null before the first one
+  function timeAgo(date){
+    if (!date) return "never";
+    const s = Math.max(0, Math.round((Date.now()-date.getTime())/1000));
+    if (s < 5) return "just now";
+    if (s < 60) return s+"s ago";
+    const m = Math.round(s/60);
+    if (m < 60) return m+"m ago";
+    return Math.round(m/60)+"h ago";
+  }
+  // setConn is called from updateSyncPill's declaration site too (it's defined
+  // further down, alongside the sync pill it drives) — safe, since setConn is
+  // only ever invoked later, from firstLoad/sync, by which point the whole
+  // script has finished initializing.
+  function setConn(state){
+    connState = state;
+    if (state === "live") lastSyncedAt = new Date();
+    updateSyncPill();
+  }
+
+  // ---- data fetching ----
+  function fetchGraph(){
+    return fetch("/api/graph", { cache: "no-store" })
+      .then(r => {
+        if (r.status === 401) { window.location.href = "/login"; throw new Error("session expired"); }
+        return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); });
+      });
+  }
+  // firstLoad shows the blocking overlay — the only time the user waits.
+  function firstLoad(){
+    showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
+    fetchGraph()
+      .then(data => { hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
+      .catch(err => showOverlay("Cannot read the cluster",
+        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true));
+  }
+  // sync is silent: no overlay, positions and selection preserved. The pill only
+  // turns amber if a request is slow (latency), red on failure — a routine fast
+  // sync is invisible.
+  function sync(){
+    if (!everLoaded) { firstLoad(); return; }
+    const slow = setTimeout(() => setConn("syncing"), 1500);
+    fetchGraph()
+      .then(data => { clearTimeout(slow); hideOverlay(); hideToast(); applyData(data, false); setConn("live"); })
+      .catch(err => { clearTimeout(slow); setConn("error"); showToast("Lost contact with the engine — showing last snapshot, retrying…"); });
+  }
+
+  // applyData reconciles the scene with a fresh payload. Existing nodes keep their
+  // position (no jarring re-layout on sync); new nodes seed near their region
+  // anchor and animate in; removed nodes disappear. Selection + view preserved.
+  function applyData(data, first){
+    lastGraphData = data;
+    W = svg.clientWidth||W; H = svg.clientHeight||H;
+    const meta = data.meta || {};
+    namespaceList = meta.namespaceList || [];
+
+    const prevPos = {};
+    nodes.forEach(n => { prevPos[n.id] = { x:n.x, y:n.y, vx:n.vx, vy:n.vy }; });
+    const prevSelected = selected;
+
+    gRegions.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
+    byId = {}; groups = {}; regionEls = {}; nodeEls = {};
+
+    nodes = (data.nodes || []).map(n => ({ ...n, cat: CAT[n.kind] || "node" }));
+    edges = (data.edges || []).slice();
+    nodes.forEach(n => { byId[n.id] = n; n.w = Math.min(210, Math.max(104, short(n.name).length*7 + 48)); n.h = n.resolved===false?46:40; });
+
+    // Groups from nodes, plus an (empty) group for every namespace the cluster has.
+    nodes.forEach(n => { const g = groupKey(n); (groups[g] = groups[g] || []).push(n); });
+    namespaceList.forEach(ns => { if (!groups[ns]) groups[ns] = []; });
+
+    assignRegions(); // (re)assigns anchors for NEW groups, keeps settled ones, builds region els
+
+    nodes.forEach(n => {
+      const p = prevPos[n.id];
+      if (p){ n.x=p.x; n.y=p.y; n.vx=p.vx; n.vy=p.vy; n.fx=null; n.fy=null; }
+      else { seedNode(n); }
+    });
+
+    buildNodeEls();
+    buildEdgeEls();
+
+    document.getElementById("clusterName").textContent = meta.context || "unknown";
+    document.getElementById("nCount").textContent = nodes.length;
+    document.getElementById("eCount").textContent = edges.length;
+    document.getElementById("nsCount").textContent = meta.namespaces != null ? meta.namespaces : namespaceList.length;
+    document.getElementById("autoscalerChip").innerHTML = meta.nodeAutoscaler
+      ? '<span class="autoscale-badge">autoscaler <b>'+esc(meta.nodeAutoscaler)+'</b></span>'
+      : '';
+
+    const hasNew = nodes.some(n => !prevPos[n.id]);
+    alpha = first ? 1 : (hasNew ? 0.4 : 0.05);
+
+    if (prevSelected && byId[prevSelected]) select(prevSelected, { silent: true });
+    else { selected = null; renderEmpty(); }
+  }
+
+  const anchor = g => anchorPos[g] || { x: W/2, y: H/2 };
+  function seedNode(n){ const a = anchor(groupKey(n)); n.x = a.x + (Math.random()-.5)*120; n.y = a.y + (Math.random()-.5)*100; n.vx=0; n.vy=0; n.fx=null; n.fy=null; }
+
+  // assignRegions gives every region (namespace or cluster-scoped, incl. empty) a
+  // colour + anchor and creates its box/label. Existing anchors are preserved so
+  // the layout is stable across syncs; only new regions get a default position.
+  // Namespace grid slots — fixed-size cells claimed once and never reassigned.
+  // The previous version spread every namespace evenly across "current total
+  // count", which meant a namespace's position was really an answer to "where
+  // is slot 2 of 4?" — and the moment a 5th namespace showed up, that became
+  // "slot 2 of 5", a *different* point on screen, while the already-settled
+  // namespaces stayed exactly where "slot 2 of 4" used to be. A brand-new
+  // (often empty, undraggable) namespace could land squarely on top of one
+  // that already existed. Claiming the next free grid cell — independent of
+  // how many namespaces exist in total — means a namespace's spot never moves
+  // once given, so a new one can only ever land in genuinely open space.
+  // Sized generously — a namespace holding a dozen-plus resources (kube-system
+  // in a typical cluster) grows well past one cell, so neighbors need enough
+  // clearance that its overflow doesn't reach them.
+  const REGION_COLS = 3, REGION_COL_W = 330, REGION_ROW_H = 270, REGION_X0 = 180, REGION_Y0 = 140;
+  function assignRegions(){
+    const ns = Object.keys(groups).filter(g => g !== "__cluster").sort();
+    Object.keys(anchorPos).forEach(g => { if (!groups[g]) delete anchorPos[g]; });
+    let slot = Object.keys(anchorPos).length;
+    ns.forEach(g => {
+      if (anchorPos[g]) return;
+      const col = slot % REGION_COLS, row = Math.floor(slot / REGION_COLS);
+      anchorPos[g] = { x: REGION_X0 + col*REGION_COL_W, y: REGION_Y0 + row*REGION_ROW_H };
+      slot++;
+    });
+    // Cluster-scoped resources (Nodes, etc.) get their own reserved row below
+    // every namespace row claimed so far, rather than a fixed screen fraction
+    // (the old H*0.86) — on a tall namespace grid, that fixed spot could end up
+    // inside a namespace row instead of below it.
+    if (groups["__cluster"] && !anchorPos["__cluster"]){
+      const namespaceRows = Math.ceil(Object.keys(anchorPos).length / REGION_COLS) || 1;
+      anchorPos["__cluster"] = { x: REGION_X0 + REGION_COL_W, y: REGION_Y0 + namespaceRows*REGION_ROW_H };
+    }
+
+    Object.keys(groups).forEach(g => {
+      const cluster = g === "__cluster";
+      const empty = groups[g].length === 0;
+      const palette = nsPalette();
+      const color = cluster ? css("--ns-cluster") : palette[Math.max(0, ns.indexOf(g)) % palette.length];
+      const box = el("rect",{ class:"region-box" + (empty ? " empty" : ""), rx:16, fill: color, stroke: color, "stroke-dasharray": (cluster && !empty)?"6 5":"none" });
+      const lbl = el("text",{ class:"region-label", fill: color });
+      lbl.textContent = cluster ? "cluster-scoped · not namespaced" : ("namespace · " + g + (empty ? "  ·  empty" : ""));
+      gRegions.appendChild(box); gRegions.appendChild(lbl);
+      regionEls[g] = { box, lbl, color };
+    });
+  }
+
+  function buildNodeEls(){
+    nodes.forEach(n => {
+      const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"");
+      const g = el("g",{ class: cls, "data-id": n.id });
+      g.appendChild(el("rect",{ class:"accent", x:-n.w/2, y:-n.h/2, width:4, height:n.h, rx:2, fill: catColor(n.cat) }));
+      g.appendChild(el("rect",{ class:"chip-bg", x:-n.w/2, y:-n.h/2, width:n.w, height:n.h, rx:9 }));
+      if (n.status) g.appendChild(el("circle",{ class:"status-ring", cx:n.w/2-11, cy:-n.h/2+11, r:4.5 }));
+      const kind = el("text",{ class:"kind", x:-n.w/2+12, y:n.resolved===false?-6:-3, fill: catColor(n.cat) }); kind.textContent = n.kind.toUpperCase();
+      const name = el("text",{ class:"name", x:-n.w/2+12, y:n.resolved===false?9:12 }); name.textContent = short(n.name);
+      g.appendChild(kind); g.appendChild(name);
+      if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
+      const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
+      gNodes.appendChild(g); nodeEls[n.id] = g;
+    });
+  }
+
+  function buildEdgeEls(){
+    edges.forEach(e => {
+      const fam = FAMILY[e.type] || "node", a = byId[e.from], b = byId[e.to];
+      e.cross = a && b && a.ns && b.ns && a.ns !== b.ns; e.toGhost = b && b.resolved === false;
+      const line = el("line",{ class:"edge", stroke: e.toGhost?css("--crit"):catColor(fam), "stroke-opacity":.32, "stroke-width":1.6,
+        "stroke-dasharray": e.type==="runs-on"?"4 4":(e.toGhost?"5 4":"none"), "marker-end": e.toGhost?"":"url(#arrow-"+fam+")" });
+      e._line = line; gEdges.appendChild(line);
+      const lbl = el("text",{ class:"edge-label", "text-anchor":"middle" }); lbl.textContent = e.type; e._label = lbl; gEdgeLabels.appendChild(lbl);
+    });
+  }
+
+  // tick — the exact simulation from docs/prototype/cluster-graph.html, no
+  // additions: plain repulsion, plain edge springs, plain per-region anchor
+  // pull. Nothing here treats cluster-scoped resources specially.
+  function tick(){
+    W = svg.clientWidth||W; H = svg.clientHeight||H;
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++){ const a=nodes[i],b=nodes[j]; let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||.01,d=Math.sqrt(d2); const rep=5200/d2,ux=dx/d,uy=dy/d; a.vx+=ux*rep; a.vy+=uy*rep; b.vx-=ux*rep; b.vy-=uy*rep; }
+    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||.01; const k=0.032*(d-118),ux=dx/d,uy=dy/d; a.vx+=ux*k; a.vy+=uy*k; b.vx-=ux*k; b.vy-=uy*k; });
+    nodes.forEach(n => { const a=anchor(groupKey(n)); n.vx+=(a.x-n.x)*0.02; n.vy+=(a.y-n.y)*0.02; });
+    nodes.forEach(n => { if(n.fx!=null){ n.x=n.fx; n.y=n.fy; n.vx=0; n.vy=0; return; } n.vx*=0.82; n.vy*=0.82; n.x+=n.vx*alpha; n.y+=n.vy*alpha; });
+    alpha *= 0.992; if(alpha<0.03) alpha=0.03; render();
+  }
+  function render(){
+    Object.keys(groups).forEach(g => {
+      const ns = groups[g], r = regionEls[g]; if (!r) return;
+      let minx, miny, maxx, maxy;
+      if (ns.length === 0){ const a = anchor(g), bw = 168, bh = 74; minx=a.x-bw/2; maxx=a.x+bw/2; miny=a.y-bh/2; maxy=a.y+bh/2; }
+      else { minx=1e9; miny=1e9; maxx=-1e9; maxy=-1e9; ns.forEach(n => { minx=Math.min(minx,n.x-n.w/2); maxx=Math.max(maxx,n.x+n.w/2); miny=Math.min(miny,n.y-n.h/2); maxy=Math.max(maxy,n.y+n.h/2); }); }
+      const pad=26;
+      r.box.setAttribute("x",minx-pad); r.box.setAttribute("y",miny-pad); r.box.setAttribute("width",(maxx-minx)+pad*2); r.box.setAttribute("height",(maxy-miny)+pad*2);
+      r.lbl.setAttribute("x",minx-pad+12); r.lbl.setAttribute("y",miny-pad-8);
+    });
+    nodes.forEach(n => nodeEls[n.id].setAttribute("transform",`translate(${n.x},${n.y})`));
+    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/d,uy=dy/d;
+      const x1=a.x+ux*24,y1=a.y+uy*20,x2=b.x-ux*30,y2=b.y-uy*22; e._line.setAttribute("x1",x1); e._line.setAttribute("y1",y1); e._line.setAttribute("x2",x2); e._line.setAttribute("y2",y2);
+      e._label.setAttribute("x",(x1+x2)/2); e._label.setAttribute("y",(y1+y2)/2-3); });
+  }
+  function loop(){ tick(); requestAnimationFrame(loop); } loop();
+
+  // ---- pan/zoom ----
+  const view = { x:0, y:0, k:1 };
+  const applyView = () => gViewport.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`); applyView();
+  svg.addEventListener("wheel", ev => { ev.preventDefault(); const r=svg.getBoundingClientRect(); const mx=ev.clientX-r.left,my=ev.clientY-r.top,f=Math.exp(-ev.deltaY*0.0016);
+    const nk=Math.min(2.6,Math.max(0.3,view.k*f)); view.x=mx-(mx-view.x)*(nk/view.k); view.y=my-(my-view.y)*(nk/view.k); view.k=nk; applyView(); }, {passive:false});
+  let drag=null;
+  const world = ev => { const r=svg.getBoundingClientRect(); return { x:(ev.clientX-r.left-view.x)/view.k, y:(ev.clientY-r.top-view.y)/view.k }; };
+  svg.addEventListener("pointerdown", ev => {
+    const g = ev.target.closest && ev.target.closest(".node");
+    if (g){ const n=byId[g.getAttribute("data-id")],w=world(ev); drag={node:n,dx:n.x-w.x,dy:n.y-w.y,moved:false}; n.fx=n.x; n.fy=n.y; alpha=Math.max(alpha,.35); }
+    else { const r=svg.getBoundingClientRect(); drag={pan:true,sx:ev.clientX-r.left-view.x,sy:ev.clientY-r.top-view.y,moved:false,target:ev.target}; svg.classList.add("panning"); }
+    svg.setPointerCapture(ev.pointerId);
+  });
+  svg.addEventListener("pointermove", ev => { if(!drag) return; drag.moved=true;
+    if (drag.pan){ const r=svg.getBoundingClientRect(); view.x=ev.clientX-r.left-drag.sx; view.y=ev.clientY-r.top-drag.sy; applyView(); }
+    else { const w=world(ev); drag.node.fx=w.x+drag.dx; drag.node.fy=w.y+drag.dy; alpha=Math.max(alpha,.3); } });
+  svg.addEventListener("pointerup", () => { svg.classList.remove("panning"); if(drag&&!drag.pan&&drag.node){ drag.node.fx=null; drag.node.fy=null; }
+    if(drag&&drag.pan&&!drag.moved&&!drag.target.closest(".node")) select(null); drag=null; });
+  gNodes.addEventListener("click", ev => { const g=ev.target.closest(".node"); if(g) select(g.getAttribute("data-id")); });
+
+  // ---- selection, focus/trace + drawer ----
+  const TABS = { summary:"Summary", relationships:"Relationships", yaml:"YAML" };
+  // traceFrom walks outward from a resource, breadth-first, up to maxDepth hops,
+  // and returns how far each reached node is (0 = the resource itself). This is
+  // what "select something → understand everything around it" runs on: depth 1
+  // is what it directly touches, depth 2 is one step further out — e.g. a Pod's
+  // owning Deployment through its ReplicaSet. Capped at 2 hops on purpose: this
+  // is a focus tool, not "highlight the whole cluster" — an unbounded walk would
+  // light up half the graph through a busy Node or Service.
+  function traceFrom(id, maxDepth){
+    maxDepth = maxDepth == null ? 2 : maxDepth;
+    const depth = new Map([[id, 0]]);
+    let frontier = [id];
+    for (let d = 0; d < maxDepth && frontier.length; d++){
+      const next = [];
+      frontier.forEach(cur => {
+        edges.forEach(e => {
+          const other = e.from === cur ? e.to : (e.to === cur ? e.from : null);
+          if (other && !depth.has(other)) { depth.set(other, d + 1); next.push(other); }
+        });
+      });
+      frontier = next;
+    }
+    return depth;
+  }
+  // select(id) is Mantis's signature interaction: clicking a resource traces its
+  // neighborhood, dims everything else, and opens the drawer on it. select(null)
+  // is the way back out — same action whether it comes from the drawer's ✕,
+  // Escape, or clicking empty canvas — clearing focus and returning to the full,
+  // calm topology.
+  // select(id, opts.silent) — opts.silent is set only by applyData's post-sync
+  // re-selection (see below), which exists purely to keep node/edge highlight
+  // classes correct after every sync rebuilds the DOM from scratch. Without the
+  // silent flag, that call was indistinguishable from a real click: it reset
+  // curTab to Summary and re-rendered the whole drawer — including refetching
+  // and reloading the YAML tab — on every single sync tick. The graph itself
+  // (node health, edges, positions) still updates live regardless; only the
+  // drawer's snapshot now holds still until the user actually interacts with
+  // it, same as everything else in Mantis staying calm between syncs.
+  function select(id, opts){
+    opts = opts || {};
+    const isNewSelection = id !== selected;
+    if (isNewSelection) curTab = "summary";
+    selected = id;
+    if (!id){
+      Object.values(nodeEls).forEach(g => g.classList.remove("selected","dim"));
+      edges.forEach(e => { e._line.setAttribute("stroke-opacity",.32); e._line.setAttribute("stroke-width",1.6); e._label.style.opacity=0; });
+      showPanel(false);
+      return;
+    }
+    showPanel(true);
+    const trace = traceFrom(id);
+    nodes.forEach(n => { const g=nodeEls[n.id]; g.classList.toggle("selected", n.id===id); g.classList.toggle("dim", !trace.has(n.id)); });
+    edges.forEach(e => {
+      const da = trace.get(e.from), db = trace.get(e.to);
+      const inTrace = da !== undefined && db !== undefined;
+      const direct = inTrace && (da === 0 || db === 0); // touches the selected resource itself
+      e._line.setAttribute("stroke-opacity", direct ? 1 : (inTrace ? .55 : .05));
+      e._line.setAttribute("stroke-width", direct ? 2.6 : (inTrace ? 1.8 : 1.1));
+      e._label.style.opacity = direct ? 1 : 0; // labels only on the direct edges — the wider trace stays legible, not noisy
+    });
+    if (isNewSelection || !opts.silent) renderNode(byId[id]);
+  }
+  function renderEmpty(){
+    const cluster = document.getElementById("clusterName").textContent;
+    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
+      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
+      '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom. <b>Auto-sync</b> keeps the map live.</p>';
+  }
+  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
+  function renderNode(n){
+    const head = '<div><div class="p-kind" style="color:'+catColor(n.cat)+'">'+esc(n.kind)+'</div><div class="p-name">'+esc(n.name)+'</div>'+
+      '<div class="p-ns">'+(n.ns?"namespace · "+esc(n.ns):"cluster-scoped")+'</div></div>'+ badge(n);
+    const tabs = '<div class="tabs">'+Object.keys(TABS).map(t=>'<div class="tab'+(t===curTab?' active':'')+'" data-tab="'+t+'">'+TABS[t]+'</div>').join('')+'</div>';
+    panelContent.innerHTML = head + tabs + '<div id="tabbody"></div>';
+    panelContent.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { curTab=t.getAttribute("data-tab"); renderBody(n); }));
+    renderBody(n);
+  }
+  function renderBody(n){
+    panelContent.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-tab")===curTab));
+    const body = document.getElementById("tabbody");
+    if (curTab==="yaml"){ renderYaml(n, body); return; }
+    body.innerHTML = curTab==="summary" ? overviewHTML(n) : relHTML(n);
+    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => select(r.getAttribute("data-goto"))));
+  }
+  // renderYaml lazily fetches a resource's manifest only when the YAML tab is
+  // opened. A monotonic token guards against a slow fetch landing after the user
+  // has clicked a different node. A 403 (Secrets, or RBAC) is shown as a notice
+  // rather than an error, since it is an expected, explained outcome.
+  function renderYaml(n, body){
+    if (n.resolved===false){ body.innerHTML = '<p class="hint">This resource was referenced but not found in the cluster, so there is no manifest to show.</p>'; return; }
+    body.innerHTML = '<p class="hint">Loading manifest…</p>';
+    const params = new URLSearchParams({ kind:n.kind, name:n.name });
+    if (n.ns) params.set("ns", n.ns);
+    const token = ++yamlToken;
+    fetch("/api/resource?"+params.toString())
+      .then(async r => ({ ok:r.ok, status:r.status, text:await r.text() }))
+      .then(res => {
+        if (token !== yamlToken) return; // superseded by a newer selection
+        if (res.ok) {
+          body.innerHTML = '<div class="yaml-wrap"><div class="yaml-tools">'+
+            '<button class="copy-btn" id="expandYaml" title="Open a large reader">⤢ Expand</button>'+
+            '<button class="copy-btn" id="copyYaml">Copy</button></div><pre class="yaml">'+esc(res.text)+'</pre></div>';
+          wireCopy(document.getElementById("copyYaml"), res.text);
+          const ex = document.getElementById("expandYaml");
+          if (ex) ex.addEventListener("click", () => openYamlModal(res.text, n));
+        }
+        else if (res.status === 403) body.innerHTML = '<div class="notice">'+esc(res.text)+'</div>';
+        else body.innerHTML = '<div class="notice">Could not load manifest — '+esc(res.text||("HTTP "+res.status))+'</div>';
+      })
+      .catch(e => { if (token === yamlToken) body.innerHTML = '<div class="notice">Could not load manifest — '+esc(String(e))+'</div>'; });
+  }
+  // doCopy writes text to the clipboard and flashes the button, with a textarea
+  // fallback for browsers without the async clipboard API.
+  async function doCopy(btn, text){
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(text);
+      else { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+      btn.textContent = "Copied ✓"; btn.classList.add("done");
+      setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+    } catch { btn.textContent = "Copy failed"; setTimeout(() => btn.textContent = "Copy", 1600); }
+  }
+  // wireCopy binds the copy action to a freshly-rendered inline Copy button.
+  function wireCopy(btn, text){ if (btn) btn.addEventListener("click", () => doCopy(btn, text)); }
+
+  // ---- expanded YAML reader ----
+  const ymodalOverlay = document.getElementById("ymodalOverlay"), ymodalPre = document.getElementById("ymodalPre"),
+        ymodalTitle = document.getElementById("ymodalTitle"), ymodalCopy = document.getElementById("ymodalCopy"),
+        ymodalClose = document.getElementById("ymodalClose"), ymodalSearch = document.getElementById("ymodalSearch"),
+        ymodalMatchCount = document.getElementById("ymodalMatchCount"), ymodalPrevBtn = document.getElementById("ymodalPrev"),
+        ymodalNextBtn = document.getElementById("ymodalNext");
+  let ymodalRawText = "", ymodalMatches = [], ymodalMatchIdx = -1;
+
+  // renderYamlSearch re-renders the <pre> with every match wrapped in <mark>,
+  // the current one in a distinct color, and scrolls it into view. Matching is
+  // done against the raw text (not the escaped HTML) so it can't be confused by
+  // entity sequences, then the highlighted markup is rebuilt segment by segment.
+  function renderYamlSearch(){
+    const q = ymodalSearch.value;
+    if (!q){ ymodalPre.innerHTML = esc(ymodalRawText); ymodalMatchCount.textContent = ""; ymodalMatches = []; ymodalMatchIdx = -1; return; }
+    const rawLower = ymodalRawText.toLowerCase(), qLower = q.toLowerCase();
+    const offsets = [];
+    for (let i = rawLower.indexOf(qLower); i !== -1; i = rawLower.indexOf(qLower, i + q.length)) offsets.push(i);
+    ymodalMatches = offsets;
+    if (!offsets.length){ ymodalPre.innerHTML = esc(ymodalRawText); ymodalMatchCount.textContent = "0/0"; ymodalMatchIdx = -1; return; }
+    if (ymodalMatchIdx < 0 || ymodalMatchIdx >= offsets.length) ymodalMatchIdx = 0;
+    let html = "", last = 0;
+    offsets.forEach((off, i) => {
+      html += esc(ymodalRawText.slice(last, off));
+      html += '<mark'+(i===ymodalMatchIdx?' class="cur"':'')+'>'+esc(ymodalRawText.slice(off, off+q.length))+'</mark>';
+      last = off + q.length;
+    });
+    html += esc(ymodalRawText.slice(last));
+    ymodalPre.innerHTML = html;
+    ymodalMatchCount.textContent = (ymodalMatchIdx+1)+"/"+offsets.length;
+    const cur = ymodalPre.querySelector("mark.cur");
+    if (cur) cur.scrollIntoView({ block: "center" });
+  }
+  function ymodalStep(dir){
+    if (!ymodalMatches.length) return;
+    ymodalMatchIdx = (ymodalMatchIdx + dir + ymodalMatches.length) % ymodalMatches.length;
+    renderYamlSearch();
+  }
+  ymodalSearch.addEventListener("input", () => { ymodalMatchIdx = 0; renderYamlSearch(); });
+  ymodalSearch.addEventListener("keydown", ev => {
+    if (ev.key === "Enter"){ ev.preventDefault(); ymodalStep(ev.shiftKey ? -1 : 1); }
+    else if (ev.key === "Escape"){
+      // First Escape clears the search (and keeps the modal open); a second
+      // Escape — now with nothing to clear — falls through to the global
+      // handler below and closes the modal, same "back out one layer" logic
+      // as everywhere else in Mantis.
+      if (ymodalSearch.value){ ev.stopPropagation(); ymodalSearch.value = ""; renderYamlSearch(); }
+      else ymodalSearch.blur();
+    }
+  });
+  ymodalPrevBtn.addEventListener("click", () => ymodalStep(-1));
+  ymodalNextBtn.addEventListener("click", () => ymodalStep(1));
+
+  function openYamlModal(text, n){
+    ymodalRawText = text;
+    ymodalSearch.value = ""; ymodalMatches = []; ymodalMatchIdx = -1;
+    ymodalPre.innerHTML = esc(text);
+    ymodalMatchCount.textContent = "";
+    ymodalTitle.innerHTML = '<b>'+esc(n.kind)+' · </b>'+esc(n.name)+(n.ns?' <b>· '+esc(n.ns)+'</b>':'');
+    ymodalCopy.textContent = "Copy"; ymodalCopy.classList.remove("done");
+    ymodalCopy.onclick = () => doCopy(ymodalCopy, text); // onclick replaces any prior binding
+    ymodalOverlay.classList.add("open");
+  }
+  function closeYamlModal(){ ymodalOverlay.classList.remove("open"); ymodalPre.textContent = ""; ymodalRawText = ""; }
+  ymodalClose.addEventListener("click", closeYamlModal);
+  ymodalOverlay.addEventListener("click", ev => { if (ev.target === ymodalOverlay) closeYamlModal(); });
+
+  // ---- global keyboard: Escape backs out one layer at a time, Ctrl+F jumps to
+  // search from anywhere — the same physical key on every OS (this is a real
+  // Ctrl, not ⌘ on Mac), so the shortcut never changes depending on who's
+  // using it. It's context-aware: with the YAML reader open it focuses that
+  // modal's find box (every search bar gets the same shortcut), otherwise the
+  // main resource search. Escape's own priority — modal, then search, then
+  // focus — matches what's actually on top of the screen at each point. ----
+  document.addEventListener("keydown", ev => {
+    if (ev.ctrlKey && ev.key.toLowerCase() === "f"){
+      ev.preventDefault();
+      const target = ymodalOverlay.classList.contains("open") ? ymodalSearch : searchInput;
+      target.focus(); target.select();
+      return;
+    }
+    if (ev.key !== "Escape") return;
+    if (ymodalOverlay.classList.contains("open")) { closeYamlModal(); return; }
+    if (searchResults.classList.contains("open")) { closeSearch(); searchInput.blur(); return; }
+    if (selected) select(null);
+  });
+  // splitAttr parses an attribute line into a key/value pair on its first ": ".
+  // Lines with no colon (e.g. a Pod's "Running · 1/1" health note) have no key
+  // and render as a standalone status pill.
+  function splitAttr(a){
+    const i = a.indexOf(": ");
+    if (i < 0) return { k:null, v:a };
+    return { k:a.slice(0,i), v:a.slice(i+2) };
+  }
+  function overviewHTML(n){
+    if (n.resolved===false){
+      return '<div class="dstat">not found in cluster</div>'+
+        '<p class="hint">This resource is referenced by another object, but Mantis could not find it in the cluster. It is flagged rather than hidden.</p>';
+    }
+    if (!n.attributes || !n.attributes.length){
+      return '<p class="hint">No extra detail read for this resource yet.</p>';
+    }
+    const parts = n.attributes.map(splitAttr);
+    let h = "";
+    const stats = parts.filter(p => p.k===null);
+    const rows = parts.filter(p => p.k!==null);
+    if (stats.length) h += stats.map(p => '<div class="dstat">'+esc(p.v)+'</div>').join("");
+    if (rows.length) h += '<div class="sec-h">Details</div><div class="detail">'+
+      rows.map(p => '<div class="drow"><span class="dk">'+esc(p.k)+'</span><span class="dv">'+esc(p.v)+'</span></div>').join("")+'</div>';
+    return h;
+  }
+  function relHTML(n){
+    const out=[], inc=[];
+    edges.forEach(e => { if(e.from===n.id){ const o=byId[e.to]; if(o) out.push({verb:e.type,arrow:"→",other:o,cross:e.cross}); }
+                         if(e.to===n.id){ const o=byId[e.from]; if(o) inc.push({verb:REVERSE[e.type]||e.type,arrow:"←",other:o,cross:e.cross}); } });
+    const row = r => '<div class="rel" data-goto="'+esc(r.other.id)+'"><span class="verb">'+esc(r.verb)+'</span><span class="arrow">'+r.arrow+'</span>'+
+      '<span class="rel-target"><span class="rk" style="color:'+catColor(r.other.cat)+'">'+esc(r.other.kind)+'/</span>'+esc(short(r.other.name))+'</span>'+(r.cross?'<span class="cross-tag">cross-ns</span>':'')+'</div>';
+    let h = "";
+    if (out.length) h += '<div class="sec-h">Depends on</div>'+out.map(row).join("");
+    if (inc.length) h += '<div class="sec-h">Used by</div>'+inc.map(row).join("");
+    return h || '<p class="hint">No relationships discovered.</p>';
+  }
+
+  // ---- controls ----
+  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
+  document.getElementById("relayout").addEventListener("click", () => {
+    gRegions.innerHTML = ""; regionEls = {}; anchorPos = {}; assignRegions(); nodes.forEach(seedNode); alpha = 1;
+  });
+  document.getElementById("signOut").addEventListener("click", () => {
+    fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; });
+  });
+
+  // ---- theme toggle ----
+  // Most of the app repaints itself for free — everything styled via var(--x)
+  // in the stylesheet updates the instant the attribute below flips. The graph
+  // canvas is the exception: node/edge/arrow colors are resolved once into
+  // literal values when drawn (see catColor()), so recolorForTheme() rebuilds
+  // just those pieces from the data already in hand — no re-fetch needed.
+  const THEME_KEY = "mantis-theme";
+  const themeToggle = document.getElementById("themeToggle");
+  function applyTheme(theme){
+    if (theme === "light") document.documentElement.setAttribute("data-theme", "light");
+    else document.documentElement.removeAttribute("data-theme");
+    const isLight = theme === "light";
+    themeToggle.setAttribute("aria-pressed", String(isLight));
+    const label = isLight ? "Switch to dark theme" : "Switch to light theme";
+    themeToggle.title = label;
+    themeToggle.setAttribute("aria-label", label);
+  }
+  function recolorForTheme(){
+    buildArrowMarkers();
+    if (lastGraphData) applyData(lastGraphData, false);
+  }
+  applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+  themeToggle.addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    try { sessionStorage.setItem(THEME_KEY, next); } catch (e) { /* private mode, etc. — theme just won't persist */ }
+    applyTheme(next);
+    recolorForTheme();
+  });
+
+  // ---- legend collapse ----
+  const legend = document.getElementById("legend"), legendToggle = document.getElementById("legendToggle");
+  legendToggle.addEventListener("click", () => {
+    const collapsed = legend.classList.toggle("collapsed");
+    const label = collapsed ? "Legend" : "Close legend";
+    legendToggle.title = label; legendToggle.setAttribute("aria-label", label);
+  });
+
+  // ---- fly-to-node ----
+  // animateView eases the camera to a target pan/zoom over a short duration,
+  // rather than snapping — this is the one place a "fly" reads as purposeful
+  // rather than decorative: it's how the user actually finds their way to a
+  // search result on a canvas that can be zoomed and dragged anywhere.
+  let viewAnimId = null;
+  function animateView(tx, ty, tk, duration){
+    if (viewAnimId) cancelAnimationFrame(viewAnimId);
+    const sx=view.x, sy=view.y, sk=view.k, start=performance.now();
+    duration = duration || 480;
+    function step(now){
+      const t = Math.min(1, (now-start)/duration);
+      const eased = 1 - Math.pow(1-t, 3); // ease-out cubic — fast start, gentle settle
+      view.x = sx + (tx-sx)*eased; view.y = sy + (ty-sy)*eased; view.k = sk + (tk-sk)*eased;
+      applyView();
+      viewAnimId = t < 1 ? requestAnimationFrame(step) : null;
+    }
+    viewAnimId = requestAnimationFrame(step);
+  }
+  // centerOn flies the camera so a node lands in the visible area, offset left
+  // by the drawer's width so the selection is not hidden behind it.
+  function centerOn(n){
+    if (!n) return;
+    const tk = view.k < 0.85 ? 1 : view.k;
+    const pw = panel.classList.contains("collapsed") ? 0 : (panel.offsetWidth + 28);
+    animateView((W - pw)/2 - n.x*tk, H/2 - n.y*tk, tk);
+  }
+
+  // ---- live search ----
+  const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
+  let searchMatches = [], searchActive = -1;
+  // matchNodes ranks resources by how the query hits them: a name prefix beats a
+  // name substring, which beats a kind/namespace hit. Empty query → no results.
+  function matchNodes(q){
+    q = q.trim().toLowerCase();
+    if (!q) return [];
+    const scored = [];
+    for (const n of nodes){
+      const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
+      let score = -1;
+      if (name.startsWith(q)) score = 0;
+      else if (name.includes(q)) score = 1;
+      else if (kind.includes(q)) score = 2;
+      else if (ns.includes(q)) score = 3;
+      if (score >= 0) scored.push({ n, score });
+    }
+    scored.sort((a,b) => a.score-b.score || a.n.name.localeCompare(b.n.name));
+    return scored.slice(0,12).map(s => s.n);
+  }
+  function renderSearch(){
+    if (!searchMatches.length){
+      searchResults.innerHTML = searchInput.value.trim()
+        ? '<div class="search-empty">No matching resource.</div>' : "";
+      searchResults.classList.toggle("open", !!searchInput.value.trim());
+      return;
+    }
+    searchResults.innerHTML = searchMatches.map((n,i) =>
+      '<div class="sresult'+(i===searchActive?' active':'')+'" data-id="'+esc(n.id)+'">'+
+        '<span class="sw" style="background:'+catColor(n.cat)+'"></span>'+
+        '<span class="sr-name">'+esc(n.name)+'</span>'+
+        '<span class="sr-kind">'+esc(n.kind)+'</span>'+
+        '<span class="sr-ns">'+(n.ns?esc(n.ns):"cluster")+'</span>'+
+      '</div>').join("");
+    searchResults.classList.add("open");
+    searchResults.querySelectorAll(".sresult").forEach(el =>
+      el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
+  }
+  function pickSearch(id){
+    select(id); // opens the drawer itself
+    centerOn(byId[id]);
+    closeSearch();
+  }
+  function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
+  searchInput.addEventListener("input", () => { searchMatches = matchNodes(searchInput.value); searchActive = searchMatches.length ? 0 : -1; renderSearch(); });
+  searchInput.addEventListener("keydown", ev => {
+    if (ev.key === "ArrowDown"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive+1)%searchMatches.length; renderSearch(); } }
+    else if (ev.key === "ArrowUp"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive-1+searchMatches.length)%searchMatches.length; renderSearch(); } }
+    else if (ev.key === "Enter"){ if(searchActive>=0 && searchMatches[searchActive]) pickSearch(searchMatches[searchActive].id); }
+    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; closeSearch(); searchInput.blur(); }
+  });
+  document.addEventListener("click", ev => { if(!ev.target.closest(".search-wrap")) closeSearch(); });
+
+  // ---- drawer open/close + resize ----
+  const panelCollapse = document.getElementById("panelCollapse"), panelResizer = document.getElementById("panelResizer");
+  function showPanel(show){ panel.classList.toggle("collapsed", !show); }
+  panelCollapse.addEventListener("click", () => select(null)); // the ✕ clears focus, it doesn't just hide the drawer
+
+  // Drag the left edge to widen the panel (helpful for horizontally long YAML).
+  let resizing = null;
+  panelResizer.addEventListener("pointerdown", ev => {
+    resizing = { startX: ev.clientX, startW: panel.offsetWidth };
+    panel.classList.add("resizing"); panelResizer.setPointerCapture(ev.pointerId); ev.preventDefault();
+  });
+  panelResizer.addEventListener("pointermove", ev => {
+    if (!resizing) return;
+    const w = resizing.startW + (resizing.startX - ev.clientX); // drag left → wider
+    panel.style.width = Math.max(300, Math.min(window.innerWidth - 80, w)) + "px";
+  });
+  const endResize = () => { if(resizing){ resizing=null; panel.classList.remove("resizing"); } };
+  panelResizer.addEventListener("pointerup", endResize);
+  panelResizer.addEventListener("pointercancel", endResize);
+
+  // Sync control: a single status pill, not a settings dropdown and not a
+  // second status readout duplicating it elsewhere. It answers two questions
+  // at a glance: is Mantis set to keep refreshing (and how often — a bare
+  // "LIVE" label didn't say whether that meant 3 seconds or 5 minutes), and —
+  // the part neither label could tell you — did the last attempt actually
+  // succeed, and when. The dot's color is connection health (green/amber/red);
+  // the label is the cadence itself (3s/10s/30s/1m/5m) while auto-sync is
+  // healthy, or SYNCING/OFFLINE/MANUAL when something more important than the
+  // cadence needs saying; the popover always shows "last synced" too, so "how
+  // current is this?" never has to be guessed either way.
+  const SYNC_LABELS = { "3000":"3s", "10000":"10s", "30000":"30s", "60000":"1m", "300000":"5m" };
+  const syncPill = document.getElementById("syncPill"), syncPillLabel = document.getElementById("syncPillLabel"),
+        syncMenu = document.getElementById("syncMenu"), syncStatusLine = document.getElementById("syncStatusLine"),
+        syncWarnLine = document.getElementById("syncWarnLine"), syncWarnTime = document.getElementById("syncWarnTime");
+  let syncMode = "60000"; // last value passed to setSync — "manual" or an interval in ms
+
+  function updateSyncPill(){
+    syncPill.classList.remove("on","warn","err");
+    // A failed fetch always shows on the pill itself, even in manual mode —
+    // "the data on screen might be stale" is worth surfacing regardless of
+    // whether the user chose manual or auto-sync just happens to be between
+    // ticks; it should never be something only visible if you open the popover.
+    if (connState === "error"){
+      syncPill.classList.add("err"); syncPillLabel.textContent = "OFFLINE";
+    } else if (syncMode === "manual"){
+      syncPillLabel.textContent = "MANUAL";
+    } else if (connState === "syncing"){
+      syncPill.classList.add("warn"); syncPillLabel.textContent = "SYNCING";
+    } else {
+      syncPill.classList.add("on"); syncPillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE";
+    }
+    syncStatusLine.textContent = "Last synced " + timeAgo(lastSyncedAt);
+    const stale = connState === "error";
+    syncWarnLine.classList.toggle("show", stale);
+    if (stale) syncWarnTime.textContent = timeAgo(lastSyncedAt);
+    syncPill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
+  }
+  setInterval(updateSyncPill, 5000); // keeps "Last synced Xs ago" accurate between events, not just at them
+
+  function setSync(val, immediate){
+    if (immediate === undefined) immediate = true;
+    if (autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+    syncMode = val;
+    const btn = document.getElementById("syncNow");
+    syncMenu.querySelectorAll(".sync-opt").forEach(o => o.classList.toggle("active", o.getAttribute("data-val")===val));
+    if (val === "manual"){ btn.style.display = ""; updateSyncPill(); return; }
+    const ms = parseInt(val,10) || 60000;
+    btn.style.display = "none";
+    autoTimer = setInterval(sync, ms);
+    updateSyncPill();
+    if (immediate) sync();
+  }
+  syncPill.addEventListener("click", ev => {
+    ev.stopPropagation();
+    const open = syncMenu.classList.toggle("open");
+    syncPill.setAttribute("aria-expanded", String(open));
+    if (open) updateSyncPill(); // refresh "last synced" the moment it's looked at
+  });
+  syncMenu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => {
+    setSync(o.getAttribute("data-val"), true);
+    syncMenu.classList.remove("open"); syncPill.setAttribute("aria-expanded","false");
+  }));
+  document.addEventListener("click", ev => { if (!ev.target.closest(".sync-wrap")) { syncMenu.classList.remove("open"); syncPill.setAttribute("aria-expanded","false"); } });
+  document.getElementById("syncNow").addEventListener("click", () => sync());
+
+  firstLoad();
+  setSync("60000", false); // default 1m auto, no immediate (firstLoad already fetching)
+})();
+</script>
+</body>
+</html>
