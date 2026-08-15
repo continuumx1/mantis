@@ -5,9 +5,9 @@
   <img src="docs/images/mantis-title-black.PNG" alt="Mantis" width="320">
 </p>
 
-<h1 align="center">Mantis — Know the story of your kubernetes resources</h1>
+<h1 align="center">Mantis — Visual Kubernetes topology and observability platform</h1>
 
-<p align="center"><em>Every K8s Resource Has a Story.</em></p>
+<p align="center"><em>Connect all the dots in your cluster</em></p>
 
 Mantis is an open-source Kubernetes context and investigation engine with an
 interactive web UI. It discovers the relationships between Kubernetes resources
