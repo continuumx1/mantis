@@ -2,7 +2,7 @@
   <img src="docs/images/mantis-muscot.webp" alt="Mantis mascot" width="220">
 </p>
 <p align="center">
-  <img src="docs/images/mantis-title-black.PNG" alt="Mantis" width="320">
+  <img src="docs/images/mantis-title-white.PNG" alt="Mantis" width="320">
 </p>
 
 <h1 align="center">Mantis — Visual Kubernetes Topology, No Guesswork</h1>
