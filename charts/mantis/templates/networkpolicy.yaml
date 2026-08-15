@@ -1,0 +1,31 @@
+{{/*
+Structural version of "mantis-engine is never reachable except through
+mantis-web" — see engine-service.yaml's comment for why that Service is
+always ClusterIP. This makes it a network-level guarantee too, not just a
+consequence of nobody creating another Service. Off by default (see
+values.yaml) so it can't surprise a cluster with an unexpected CNI/policy
+setup; turn it on once you've confirmed your CNI enforces NetworkPolicy.
+*/}}
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mantis.engine.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.engine.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mantis.engine.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mantis.web.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

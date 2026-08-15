@@ -1,0 +1,116 @@
+{{/*
+This ClusterRole grants exactly what internal/graph and internal/engine
+issue calls for — every rule below traces back to a real List or Get call
+in the Go source, not a generic "just in case" grant. No write verb
+(create/update/patch/delete) appears anywhere: Mantis is structurally
+read-only, and this RBAC is the enforcement of that at the API server, not
+just a claim in the docs.
+
+Two deliberate least-privilege choices worth calling out:
+  - secrets and namespaces are "list" only, never "get". The code never
+    issues a Get for either kind (a Secret's contents are refused before
+    any API call is made — see internal/engine/resource.go — and
+    namespaces are only ever enumerated, never fetched by name), so "get"
+    would be an unused, unnecessary grant.
+  - the autoscaling.k8s.io and karpenter.sh rules cover CRDs (VPA,
+    Karpenter NodePool) that may not be installed in your cluster. That's
+    fine — Mantis treats a missing CRD as "not present" and continues
+    (see internal/graph/crd.go), so granting RBAC for a CRD you don't have
+    installed is harmless, not a footgun.
+*/}}
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mantis.engine.fullname" . }}
+  labels:
+    {{- include "mantis.engine.labels" . | nindent 4 }}
+rules:
+  # Core kinds Mantis reads and, for most of them, can also fetch a single
+  # manifest for (GET /api/resource) — see internal/engine/resource.go's
+  # kindGVR table.
+  - apiGroups: [""]
+    resources:
+      - pods
+      - services
+      - configmaps
+      - persistentvolumeclaims
+      - persistentvolumes
+      - resourcequotas
+      - limitranges
+      - nodes
+    verbs: ["get", "list"]
+  # Enumerated only — see the note above.
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - secrets
+    verbs: ["list"]
+
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list"]
+
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list"]
+
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list"]
+
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list"]
+
+  # EndpointSlices resolve which Pods a Service actually serves; only ever
+  # listed, never fetched by name.
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["list"]
+
+  # VerticalPodAutoscaler — optional CRD, read via the dynamic client.
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources:
+      - verticalpodautoscalers
+    verbs: ["get", "list"]
+
+  # Karpenter NodePool — optional CRD, same API group across the v1 and
+  # v1beta1 versions the code tries.
+  - apiGroups: ["karpenter.sh"]
+    resources:
+      - nodepools
+    verbs: ["get", "list"]
+
+  # mantis-engine reports the cluster's Kubernetes version in the graph
+  # header via Discovery().ServerVersion(), which hits this non-resource
+  # URL. Most clusters allow this by default for any authenticated
+  # ServiceAccount (system:discovery), but grant it explicitly rather than
+  # depend on a default binding a hardened cluster might have removed.
+  - nonResourceURLs: ["/version"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mantis.engine.fullname" . }}
+  labels:
+    {{- include "mantis.engine.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mantis.engine.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mantis.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
