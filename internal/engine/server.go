@@ -7,7 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/continuumx1/mantis/internal/graph"
 	"github.com/continuumx1/mantis/internal/httpx"
@@ -37,6 +40,7 @@ func New(client *mantiskube.Client, showAll bool) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/graph", s.handleGraph)
+	mux.HandleFunc("/api/resource", s.handleResource)
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/readyz", s.handleReady)
 	return mux
@@ -49,18 +53,31 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), buildTimeout)
 	defer cancel()
 
-	gctx, skipped, err := graph.BuildClusterGraph(ctx, s.client.Clientset, s.showAll)
+	gctx, skipped, err := graph.BuildClusterGraph(ctx, s.client.Clientset, s.client.Dynamic, s.showAll)
 	if err != nil {
 		http.Error(w, "cluster read failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
 	meta := MetaDTO{
-		Context: s.client.Context,
-		Server:  s.client.Server,
-		Skipped: skipped,
+		Context:        s.client.Context,
+		Server:         s.client.Server,
+		Skipped:        skipped,
+		NodeAutoscaler: graph.DetectNodeAutoscaler(ctx, s.client.Dynamic, s.client.Clientset),
 	}
 	meta.Namespaces = countNamespaces(gctx)
+	// Prefer the authoritative namespace list from the API so the UI can show a
+	// region for every namespace (even empty ones), with the count following it.
+	// If the list call fails, fall back to counting namespaces seen on nodes.
+	if nsList, err := s.client.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
+		names := make([]string, 0, len(nsList.Items))
+		for i := range nsList.Items {
+			names = append(names, nsList.Items[i].Name)
+		}
+		sort.Strings(names)
+		meta.NamespaceList = names
+		meta.Namespaces = len(names)
+	}
 	if v, err := s.client.Clientset.Discovery().ServerVersion(); err == nil {
 		meta.Version = v.GitVersion
 	}
@@ -91,13 +108,18 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 }
 
 // countNamespaces counts distinct namespaces represented among the graph's
-// nodes, which is what the header's "N namespaces" reflects.
+// visible nodes, which is what the header's "N namespaces" reflects. Hidden
+// nodes (system-managed noise, e.g. the kube-root-ca.crt ConfigMap every
+// namespace carries) are skipped so the count matches the namespace regions the
+// UI actually draws — a namespace whose only resources are hidden gets no region
+// and must not inflate the count.
 func countNamespaces(gctx *graph.Context) int {
 	seen := map[string]struct{}{}
 	for _, n := range gctx.Nodes() {
-		if n.Ref.Namespace != "" {
-			seen[n.Ref.Namespace] = struct{}{}
+		if n.Hidden || n.Ref.Namespace == "" {
+			continue
 		}
+		seen[n.Ref.Namespace] = struct{}{}
 	}
 	return len(seen)
 }

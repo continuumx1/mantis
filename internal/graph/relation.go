@@ -41,6 +41,11 @@ const (
 	// BoundTo means the source PersistentVolumeClaim is bound to the target
 	// PersistentVolume.
 	BoundTo RelationType = "bound-to"
+
+	// Scales means the source autoscaler (HPA, VPA) drives the replica count or
+	// resource requests of the target workload, as declared by its
+	// scaleTargetRef / targetRef.
+	Scales RelationType = "scales"
 )
 
 // Certainty records how much Mantis trusts a relationship. Every edge today is

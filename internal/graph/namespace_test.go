@@ -109,7 +109,7 @@ func namespaceFixtures() []runtime.Object {
 func TestBuildNamespaceGraph(t *testing.T) {
 	clientset := fake.NewSimpleClientset(namespaceFixtures()...)
 
-	c, skipped, err := BuildNamespaceGraph(context.Background(), clientset, "default", false)
+	c, skipped, err := BuildNamespaceGraph(context.Background(), clientset, nil, "default", false)
 	if err != nil {
 		t.Fatalf("BuildNamespaceGraph returned error: %v", err)
 	}
@@ -141,8 +141,9 @@ func TestBuildNamespaceGraph(t *testing.T) {
 	}
 
 	// Attributes.
-	if got := c.Attributes(podRef); !reflect.DeepEqual(got, []string{"Running · 1/1"}) {
-		t.Errorf("pod attributes = %v, want [Running · 1/1]", got)
+	wantPodAttrs := []string{"Running · 1/1", "requests: none", "limits: none", "probes: none"}
+	if got := c.Attributes(podRef); !reflect.DeepEqual(got, wantPodAttrs) {
+		t.Errorf("pod attributes = %v, want %v", got, wantPodAttrs)
 	}
 	if got := c.Attributes(pvcRef); !reflect.DeepEqual(got, []string{"Bound", "1Gi", "RWO"}) {
 		t.Errorf("pvc attributes = %v, want [Bound 1Gi RWO]", got)
@@ -165,7 +166,7 @@ func TestBuildNamespaceGraph(t *testing.T) {
 func TestBuildNamespaceGraph_ShowAll(t *testing.T) {
 	clientset := fake.NewSimpleClientset(namespaceFixtures()...)
 
-	c, _, err := BuildNamespaceGraph(context.Background(), clientset, "default", true)
+	c, _, err := BuildNamespaceGraph(context.Background(), clientset, nil, "default", true)
 	if err != nil {
 		t.Fatalf("BuildNamespaceGraph returned error: %v", err)
 	}
@@ -182,7 +183,7 @@ func TestBuildNamespaceGraph_SkipsForbidden(t *testing.T) {
 		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "", errors.New("forbidden"))
 	})
 
-	c, skipped, err := BuildNamespaceGraph(context.Background(), clientset, "default", false)
+	c, skipped, err := BuildNamespaceGraph(context.Background(), clientset, nil, "default", false)
 	if err != nil {
 		t.Fatalf("BuildNamespaceGraph returned error: %v", err)
 	}

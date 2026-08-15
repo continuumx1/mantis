@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -28,6 +29,7 @@ import (
 func BuildClusterGraph(
 	ctx context.Context,
 	clientset kubernetes.Interface,
+	dyn dynamic.Interface,
 	showAll bool,
 ) (*Context, []string, error) {
 	nsList, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
@@ -42,7 +44,7 @@ func BuildClusterGraph(
 	for i := range nsList.Items {
 		namespace := nsList.Items[i].Name
 
-		nsCtx, skipped, err := BuildNamespaceGraph(ctx, clientset, namespace, showAll)
+		nsCtx, skipped, err := BuildNamespaceGraph(ctx, clientset, dyn, namespace, showAll)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -54,6 +56,12 @@ func BuildClusterGraph(
 		for _, n := range nsCtx.Nodes() {
 			mergeNode(merged, n)
 		}
+	}
+
+	// Karpenter NodePools are cluster-scoped, so list them once here (best-effort
+	// via the dynamic client) rather than per namespace.
+	for r, a := range collectNodePools(ctx, dyn) {
+		mergeNode(merged, Node{Ref: r, Resolved: true, Attributes: a})
 	}
 
 	nodes := make([]Node, 0, len(merged))
