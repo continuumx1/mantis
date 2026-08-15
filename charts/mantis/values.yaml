@@ -1,34 +1,24 @@
-# Default values for the Mantis Helm chart.
-# See charts/mantis/README.md for a walkthrough; every value below is
-# commented where its meaning isn't obvious from the key alone.
+# Default values for the Mantis Helm chart. See charts/mantis/README.md for
+# a full walkthrough and values reference.
 
 nameOverride: ""
 fullnameOverride: ""
 
 imagePullSecrets: []
 
-# Both services publish from one Docker Hub repo (cx1tech/mantis),
-# distinguished by a tag suffix — cx1tech/mantis:0.1.0-preview.1-engine and
-# ...-web — following the repo's preview.N / rc.N / stable tagging
-# strategy. image.tag defaults to .Chart.AppVersion; override it (or the
-# whole image.repository, for a private mirror/fork) as needed. Building
-# your own images instead is still one `docker build` away — see
-# build/Dockerfile.engine and build/Dockerfile.web.
+# Both services share one Docker Hub repo, split by a "-engine"/"-web" tag
+# suffix (e.g. cx1tech/mantis:0.1.0-preview.2-engine). tag defaults to
+# .Chart.AppVersion.
 image:
   repository: cx1tech/mantis
-  tag: ""              # defaults to .Chart.AppVersion; becomes "<tag>-engine" / "<tag>-web"
+  tag: ""
   pullPolicy: IfNotPresent
 
-# mantis-engine: the only component that talks to Kubernetes. Runs with
-# read-only RBAC (see rbac.create below) and is never exposed outside the
-# cluster — mantis-web is the only thing that talks to it.
+# mantis-engine: the only component that talks to Kubernetes (read-only
+# RBAC, see rbac.create below). Never exposed outside the cluster.
 engine:
   replicaCount: 1
-
-  # MANTIS_SHOW_ALL — include system-managed ConfigMaps/Secrets (e.g. the
-  # per-namespace kube-root-ca.crt ConfigMap) in the graph instead of
-  # hiding them as noise.
-  showAll: false
+  showAll: false   # MANTIS_SHOW_ALL — include system-managed ConfigMaps/Secrets
 
   service:
     port: 8080
@@ -48,12 +38,7 @@ engine:
 
   podSecurityContext:
     runAsNonRoot: true
-    # build/Dockerfile.engine's base (gcr.io/distroless/static:nonroot) sets
-    # its default user by *name* ("nonroot"), not a numeric UID — the
-    # kubelet can't verify runAsNonRoot against a name, so it refuses to
-    # start the container (CreateContainerConfigError) unless a numeric
-    # runAsUser is also given. 65532 is that image's actual nonroot UID.
-    runAsUser: 65532
+    runAsUser: 65532   # distroless's nonroot UID — required; kubelet can't verify a named user
     runAsGroup: 65532
     seccompProfile:
       type: RuntimeDefault
@@ -63,9 +48,8 @@ engine:
     capabilities:
       drop: ["ALL"]
 
-# mantis-web: serves the UI, holds the (Public Preview, demo-only) login
-# gate, and reverse-proxies /api to mantis-engine. This is the component
-# you expose — via Ingress, a LoadBalancer Service, or port-forward.
+# mantis-web: serves the UI + login, proxies /api to mantis-engine. This is
+# the one you expose (Ingress / LoadBalancer / port-forward).
 web:
   replicaCount: 1
 
@@ -99,7 +83,7 @@ web:
 
   podSecurityContext:
     runAsNonRoot: true
-    runAsUser: 65532  # same distroless nonroot base as engine — see its comment above
+    runAsUser: 65532   # same distroless base as engine
     runAsGroup: 65532
     seccompProfile:
       type: RuntimeDefault
@@ -110,26 +94,12 @@ web:
       drop: ["ALL"]
 
 serviceAccount:
-  # Only mantis-engine gets a ServiceAccount — mantis-web never talks to
-  # the Kubernetes API, so it runs under the namespace's default one.
-  create: true
+  create: true   # only mantis-engine uses this; mantis-web needs no Kubernetes access
   name: ""
   annotations: {}
 
 rbac:
-  # Creates a ClusterRole + ClusterRoleBinding granting mantis-engine's
-  # ServiceAccount get/list on exactly the kinds it maps — no write verbs
-  # anywhere, and Secrets/Namespaces are list-only (mantis-engine never
-  # issues a Get on either; see the RBAC comments in rbac.yaml for why
-  # that's a real guarantee, not an accident). Cluster-scoped because
-  # Mantis reads across every namespace, not because it does anything
-  # namespace-scoped RBAC couldn't otherwise express per-namespace.
-  create: true
+  create: true   # read-only ClusterRole/ClusterRoleBinding for mantis-engine (see templates/rbac.yaml)
 
 networkPolicy:
-  # Off by default so it can't surprise an existing cluster's CNI setup.
-  # When enabled, restricts inbound traffic to mantis-engine's port to
-  # only pods matching mantis-web's selector — a structural version of
-  # "the engine is never reachable except through the frontend proxy"
-  # that the docs already describe.
-  enabled: false
+  enabled: false   # restrict mantis-engine's inbound traffic to mantis-web only
