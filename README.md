@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/images/mantis-logo.png" alt="Mantis mascot" width="420">
+  <img src="docs/images/mantis-muscot.webp" alt="Mantis mascot" width="220">
 </p>
 <p align="center">
-  <img src="docs/images/mantis-logo-text.png" alt="Mantis" width="220">
+  <img src="docs/images/mantis-title-black.PNG" alt="Mantis" width="320">
 </p>
 
 <h1 align="center">Mantis — Know the story of your kubernetes resources</h1>
@@ -14,9 +14,13 @@ interactive web UI. It discovers the relationships between Kubernetes resources
 and draws them as a live graph, so you can see not just *what* exists in a
 cluster, but the *context* around it.
 
-> **Status: experimental (v0.1).** Mantis is early and under active development.
-> It is strictly read-only and safe to run against any cluster, but its
-> behaviour and interfaces are still evolving.
+> **Status: Public Preview.** Mantis is functional and strictly read-only —
+> safe to point at a real cluster — but its login flow, UI, and interfaces
+> are still evolving ahead of a stable release.
+
+📖 **New to Mantis?** Read the [User Guide](docs/USER_GUIDE.md) for the full
+picture: how Mantis works end-to-end inside Kubernetes, its security and
+permissions model, and how to use every part of the UI.
 
 Built and maintained by [ContinuumX1 Technologies](https://continuumx1.com).
 
@@ -177,7 +181,9 @@ shown as a "not found" node; one that exists is shown plainly. Mantis never gues
 - **Compact detail.** The detail panel shows the attributes the engine computes
   today (health, storage class, endpoints, …). Richer per-resource detail is
   planned.
-- **Built-in kinds only.** Custom resources (CRDs) are not mapped yet.
+- **Built-in kinds, plus two specific CRDs.** VerticalPodAutoscaler and
+  Karpenter's NodePool are understood specifically (best-effort, only if
+  installed); other custom resources are not mapped into the graph yet.
 - **No change / history / GitOps awareness** — Mantis explains the current state,
   not what changed or why.
 
