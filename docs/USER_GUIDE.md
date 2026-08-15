@@ -248,12 +248,11 @@ helm install mantis ./charts/mantis --namespace mantis --create-namespace
 This installs both Deployments, both Services (`mantis-engine` always
 `ClusterIP` — never reachable from outside the cluster, only from
 `mantis-web`), the ServiceAccount, and the read-only ClusterRole/
-ClusterRoleBinding described above. There's no published image yet
-(Public Preview), so you'll need to build the two images yourself and
-point the chart at them first — see
-**[charts/mantis/README.md](../charts/mantis/README.md)** for the exact
-commands (including a minikube/kind walkthrough) and the full values
-reference (exposing via Ingress/LoadBalancer, resource limits, the
+ClusterRoleBinding described above. It pulls multi-arch images straight
+from Docker Hub (`cx1tech/mantis`) by default — no build required. See
+**[charts/mantis/README.md](../charts/mantis/README.md)** for exposing it
+(Ingress/LoadBalancer/port-forward), using your own build instead, and the
+full values reference (resource limits, the
 optional NetworkPolicy, …).
 
 ### Running locally (for evaluation)
@@ -470,9 +469,6 @@ Endpoints:
   deployment currently sees the same graph — the one `mantis-engine`'s
   ServiceAccount can read. Per-user, RBAC-aware visibility is planned
   alongside real authentication.
-- **No published container image yet** — the Helm chart deploys cleanly,
-  but you have to build/load the images yourself until there's a registry
-  to pull from (see [Running Mantis](#running-mantis)).
 
 ## Troubleshooting
 

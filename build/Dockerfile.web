@@ -1,20 +1,41 @@
 # Mantis frontend service (mantis-web): serves the UI, proxies /api to mantis-engine.
 # The UI is embedded in the binary at compile time (go:embed), so the runtime
-# image carries no separate assets.
+# image carries no separate assets. Multi-stage: compile a static binary,
+# ship it on distroless nonroot — no shell, no package manager, no libc.
 #
 #   docker build -f build/Dockerfile.web -t mantis-web:dev .
 #
+# Multi-arch (what the published cx1tech/mantis images actually use):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     --build-arg VERSION=0.1.0-preview.1 \
+#     -f build/Dockerfile.web -t cx1tech/mantis:0.1.0-preview.1-web --push .
+#
 # Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).
-FROM golang:1.26 AS build
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mantis-web ./cmd/mantis-web
 
-FROM gcr.io/distroless/static:nonroot
+# TARGETOS/TARGETARCH are set automatically by buildx per --platform.
+ARG TARGETOS
+ARG TARGETARCH
+# VERSION is baked into the binary — see cmd/mantis-web/main.go and the same
+# note in Dockerfile.engine.
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION}" \
+    -o /out/mantis-web ./cmd/mantis-web
+
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="mantis-web" \
+      org.opencontainers.image.description="Mantis frontend: serves the graph UI and proxies /api to mantis-engine." \
+      org.opencontainers.image.source="https://github.com/continuumx1/mantis" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.version="${VERSION}"
 COPY --from=build /out/mantis-web /mantis-web
 USER nonroot:nonroot
 EXPOSE 8080

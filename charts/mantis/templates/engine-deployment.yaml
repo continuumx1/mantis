@@ -32,7 +32,7 @@ spec:
       containers:
         - name: mantis-engine
           image: {{ include "mantis.engine.image" . }}
-          imagePullPolicy: {{ .Values.image.engine.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.engine.securityContext | nindent 12 }}
           ports:

@@ -1,10 +1,17 @@
 # Mantis backend service (mantis-engine): reads the cluster, serves the graph JSON.
-# Multi-stage: compile a static binary, ship it on distroless nonroot.
+# Multi-stage: compile a static binary, ship it on distroless nonroot — no
+# shell, no package manager, no libc even (CGO disabled), so there is
+# nothing in the runtime image beyond the one binary it runs.
 #
 #   docker build -f build/Dockerfile.engine -t mantis-engine:dev .
 #
+# Multi-arch (what the published cx1tech/mantis images actually use):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     --build-arg VERSION=0.1.0-preview.1 \
+#     -f build/Dockerfile.engine -t cx1tech/mantis:0.1.0-preview.1-engine --push .
+#
 # Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).
-FROM golang:1.26 AS build
+FROM golang:1.26-bookworm AS build
 WORKDIR /src
 
 # Cache module downloads separately from source.
@@ -12,9 +19,28 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mantis-engine ./cmd/mantis-engine
 
-FROM gcr.io/distroless/static:nonroot
+# TARGETOS/TARGETARCH are set automatically by buildx per --platform, so one
+# `docker buildx build --platform linux/amd64,linux/arm64` cross-compiles
+# both without emulating the Go toolchain itself.
+ARG TARGETOS
+ARG TARGETARCH
+# VERSION is baked into the binary so a running Pod's own logs (see
+# cmd/mantis-engine/main.go) name the exact build it is, independent of
+# whatever the Deployment spec says. Defaults to "dev" for a plain
+# `docker build` with no --build-arg, matching `go run`/`go build` locally.
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION}" \
+    -o /out/mantis-engine ./cmd/mantis-engine
+
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="mantis-engine" \
+      org.opencontainers.image.description="Mantis backend: reads a Kubernetes cluster read-only and serves its resource graph as JSON." \
+      org.opencontainers.image.source="https://github.com/continuumx1/mantis" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.version="${VERSION}"
 COPY --from=build /out/mantis-engine /mantis-engine
 USER nonroot:nonroot
 EXPOSE 8080

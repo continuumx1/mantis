@@ -12,10 +12,29 @@ it works; this file is just the chart's own usage notes.
 > Fine for your own machine or team; don't expose it further without
 > reading `docs/USER_GUIDE.md`'s "Public Preview notes" first.
 
-## There's no published image yet
+Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
+iterations, then `0.1.0-rc.1` for a release candidate, then `0.1.0` for
+stable — this chart's `appVersion` tracks whichever is current. Check
+[Docker Hub](https://hub.docker.com/r/cx1tech/mantis/tags) for exactly
+what's published if you want to pin an older or newer tag explicitly via
+`--set image.tag=...`.
 
-Build the two images from the repo root, then make them reachable by
-whatever cluster you're installing into:
+## Install
+
+Published images pull straight from Docker Hub by default — nothing to
+build:
+
+```bash
+helm install mantis ./charts/mantis --namespace mantis --create-namespace
+```
+
+Then follow the printed NOTES — they tell you exactly how to reach the UI
+based on whatever `web.service.type`/`web.ingress.enabled` you chose.
+
+### Using your own build instead
+
+Building from source (see the repo root's `build/Dockerfile.engine` /
+`Dockerfile.web`) is still one command away, if you're testing a change:
 
 ```bash
 docker build -f build/Dockerfile.engine -t mantis-engine:dev .
@@ -23,27 +42,14 @@ docker build -f build/Dockerfile.web    -t mantis-web:dev    .
 ```
 
 - **minikube:** `minikube image load mantis-engine:dev && minikube image load mantis-web:dev`,
-  then set `pullPolicy: Never` (see below) so it never tries to pull from
-  a registry.
-- **kind:** `kind load docker-image mantis-engine:dev mantis-web:dev`, same `pullPolicy: Never`.
-- **A real cluster:** push both images to a registry it can reach (GHCR,
-  ECR, your own), and set `image.engine.repository`/`image.web.repository`
-  to the pushed path.
-
-## Install
-
-```bash
-helm install mantis ./charts/mantis \
-  --namespace mantis --create-namespace \
-  --set image.engine.pullPolicy=Never \
-  --set image.web.pullPolicy=Never
-```
-
-(Drop the two `pullPolicy` overrides once you're pulling from a real
-registry instead of a locally-loaded image.)
-
-Then follow the printed NOTES — they tell you exactly how to reach the UI
-based on whatever `web.service.type`/`web.ingress.enabled` you chose.
+  then `--set image.pullPolicy=Never` so it never tries Docker Hub instead.
+- **kind:** `kind load docker-image mantis-engine:dev mantis-web:dev`, same `--set image.pullPolicy=Never`.
+- **A real cluster:** push to a registry it can reach and
+  `--set image.repository=<your-registry>/mantis-yourbuild` (note: your
+  build then needs its own `-engine`/`-web` tag suffixes too, matching how
+  `image.tag` is templated — see `values.yaml`'s comment — or override
+  `image.engine.repository`-style if you'd rather fork the chart's image
+  templating to two separate repos).
 
 ### Expose it
 
@@ -69,8 +75,8 @@ helm upgrade mantis ./charts/mantis -n mantis \
 
 | Key | Default | Meaning |
 |---|---|---|
-| `image.engine.repository` / `image.web.repository` | `mantis-engine` / `mantis-web` | Image names — set to a full registry path once you're pushing images |
-| `image.engine.tag` / `image.web.tag` | chart `appVersion` | Image tag |
+| `image.repository` | `cx1tech/mantis` | Shared repo for both images — see `values.yaml`'s comment for the `-engine`/`-web` tag-suffix scheme |
+| `image.tag` | chart `appVersion` (e.g. `0.1.0-preview.1`) | Version tag, before the `-engine`/`-web` suffix is appended |
 | `engine.showAll` | `false` | Include system-managed ConfigMaps/Secrets in the graph (`MANTIS_SHOW_ALL`) |
 | `web.service.type` | `ClusterIP` | How `mantis-web` is exposed — `ClusterIP`/`NodePort`/`LoadBalancer` |
 | `web.ingress.enabled` | `false` | Create an Ingress for `mantis-web` |

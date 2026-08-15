@@ -32,9 +32,10 @@ Mantis is deployed.
    Both Pods should be Running; mantis-engine's logs will name the
    cluster context it connected to.
 
-No image registry is wired up yet for this chart (see values.yaml's
-image.* comments) — if `ImagePullBackOff` shows up, that's almost always
-it: build the two images locally and either push them somewhere your
-cluster can pull from, or load them directly (e.g.
-`minikube image load mantis-engine:dev`) and set image.*.pullPolicy to
+By default this pulls {{ include "mantis.engine.image" . }} and
+{{ include "mantis.web.image" . }} straight from Docker Hub — no local
+build needed. If you're running your own build instead (see
+build/Dockerfile.engine and build/Dockerfile.web), point image.repository
+at it, or load it directly into a local cluster (e.g.
+`minikube image load mantis-engine:dev`) and set image.pullPolicy to
 "Never".
