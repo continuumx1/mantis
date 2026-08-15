@@ -76,7 +76,7 @@ helm upgrade mantis ./charts/mantis -n mantis \
 | Key | Default | Meaning |
 |---|---|---|
 | `image.repository` | `cx1tech/mantis` | Shared repo for both images — see `values.yaml`'s comment for the `-engine`/`-web` tag-suffix scheme |
-| `image.tag` | chart `appVersion` (e.g. `0.1.0-preview.1`) | Version tag, before the `-engine`/`-web` suffix is appended |
+| `image.tag` | chart `appVersion` (currently `0.1.0-preview.2`) | Version tag, before the `-engine`/`-web` suffix is appended |
 | `engine.showAll` | `false` | Include system-managed ConfigMaps/Secrets in the graph (`MANTIS_SHOW_ALL`) |
 | `web.service.type` | `ClusterIP` | How `mantis-web` is exposed — `ClusterIP`/`NodePort`/`LoadBalancer` |
 | `web.ingress.enabled` | `false` | Create an Ingress for `mantis-web` |
