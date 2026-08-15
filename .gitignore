@@ -33,6 +33,7 @@ go.work.sum
 
 # Local Claude Code settings (per-user, not shared)
 .claude/settings.local.json
+.claude
 
 # Mantis service binaries (root-anchored; the two services build to these names)
 /mantis-engine
