@@ -168,6 +168,11 @@ Endpoints:
 ## Running in a cluster
 
 ```bash
+# No clone needed — the chart is published too:
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
+  --version 0.2.0 --namespace mantis --create-namespace
+
+# or, from a checkout of this repo:
 helm install mantis ./charts/mantis --namespace mantis --create-namespace
 ```
 
@@ -180,9 +185,9 @@ Ingress). Images pull straight from
 by default — multi-arch (`linux/amd64` + `linux/arm64`), built from a
 distroless nonroot base, no local build required. See
 **[charts/mantis/README.md](charts/mantis/README.md)** for exposing it
-(Ingress/LoadBalancer/port-forward) and the full values reference. Full
-detail on the required permissions and the security model is in the
-**[User Guide](docs/USER_GUIDE.md)**.
+(Ingress/LoadBalancer/port-forward), available chart versions, and the
+full values reference. Full detail on the required permissions and the
+security model is in the **[User Guide](docs/USER_GUIDE.md)**.
 
 Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
 iterations, then `0.1.0-rc.1`, then `0.1.0` for stable.

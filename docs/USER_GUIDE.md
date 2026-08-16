@@ -242,6 +242,11 @@ docker build -f build/Dockerfile.web    -t mantis-web:dev .
 ### Deploying
 
 ```bash
+# No clone needed — the chart is published too:
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
+  --version 0.2.0 --namespace mantis --create-namespace
+
+# or, from a checkout of this repo:
 helm install mantis ./charts/mantis --namespace mantis --create-namespace
 ```
 
@@ -251,8 +256,8 @@ This installs both Deployments, both Services (`mantis-engine` always
 ClusterRoleBinding described above. It pulls multi-arch images straight
 from Docker Hub (`cx1tech/mantis`) by default — no build required. See
 **[charts/mantis/README.md](../charts/mantis/README.md)** for exposing it
-(Ingress/LoadBalancer/port-forward), using your own build instead, and the
-full values reference (resource limits, the
+(Ingress/LoadBalancer/port-forward), available chart versions, using your
+own build instead, and the full values reference (resource limits, the
 optional NetworkPolicy, …).
 
 ### Running locally (for evaluation)
