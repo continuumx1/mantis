@@ -39,5 +39,9 @@ go.work.sum
 /mantis-engine
 /mantis-web
 
+# Packaged Helm chart artifacts (`helm package` output) — build/release
+# products, not source; publish them to the OCI registry, don't commit them.
+charts/**/*.tgz
+
 # macOS
 .DS_Store

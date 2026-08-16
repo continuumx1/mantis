@@ -82,8 +82,10 @@ app.kubernetes.io/component: web
 
 {{/*
 Image references. Both services publish from one repository, distinguished
-by a "-engine" / "-web" tag suffix (e.g. cx1tech/mantis:0.1.0-preview.1-engine)
-— see values.yaml's image.* comment for why.
+by a "-engine" / "-web" tag suffix (e.g. cx1tech/mantis:0.1.0-preview.2-engine).
+values.yaml pins image.tag directly (see its comment); the `default
+.Chart.AppVersion` here is just a safety net if someone overrides
+image.tag to "", not the primary mechanism.
 */}}
 {{- define "mantis.engine.image" -}}
 {{- printf "%s:%s-engine" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}

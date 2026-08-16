@@ -2,7 +2,7 @@ apiVersion: v2
 name: mantis
 description: Visual Kubernetes topology and relationship graph — read-only, any distribution.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "0.1.0-preview.2"
 home: https://github.com/continuumx1/mantis
 sources:
