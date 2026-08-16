@@ -7,11 +7,14 @@ fullnameOverride: ""
 imagePullSecrets: []
 
 # Both services share one Docker Hub repo, split by a "-engine"/"-web" tag
-# suffix (e.g. cx1tech/mantis:0.1.0-preview.2-engine). tag defaults to
-# .Chart.AppVersion.
+# suffix (e.g. cx1tech/mantis:0.1.0-preview.2-engine). tag is pinned here on
+# purpose, not left to default off .Chart.AppVersion: this chart version
+# (0.2.0) is meant to deploy exactly this image, full stop. Chart 0.1.0
+# pins 0.1.0-preview.1 the same way — see charts/mantis/README.md's
+# version table for how to reach it.
 image:
   repository: cx1tech/mantis
-  tag: ""
+  tag: "0.1.0-preview.2"
   pullPolicy: IfNotPresent
 
 # mantis-engine: the only component that talks to Kubernetes (read-only

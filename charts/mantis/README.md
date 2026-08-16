@@ -12,12 +12,28 @@ it works; this file is just the chart's own usage notes.
 > Fine for your own machine or team; don't expose it further without
 > reading `docs/USER_GUIDE.md`'s "Public Preview notes" first.
 
-Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
-iterations, then `0.1.0-rc.1` for a release candidate, then `0.1.0` for
-stable — this chart's `appVersion` tracks whichever is current. Check
-[Docker Hub](https://hub.docker.com/r/cx1tech/mantis/tags) for exactly
-what's published if you want to pin an older or newer tag explicitly via
-`--set image.tag=...`.
+## Versions
+
+The chart's own `version` (Helm's version, in `Chart.yaml`) bumps every
+time the chart is pinned to a new image; `image.tag` in `values.yaml` is a
+hardcoded literal to match, not computed — each chart version deploys one
+exact, known-good image, deliberately, not "whatever's currently latest."
+
+| Chart `version` | `appVersion` / image tag | Notes |
+|---|---|---|
+| `0.2.0` (current) | `0.1.0-preview.2` | 0 known vulnerabilities (Docker Scout) |
+| `0.1.0` | `0.1.0-preview.1` | superseded — had unpatched CVEs in `golang.org/x/net`/`x/sys`/`x/text`, fixed in `preview.2` |
+
+To install an older chart version instead of whatever's checked out
+locally: `git checkout v0.1.0-preview.1 -- charts/mantis` pulls just that
+historical chart directory into your working tree (see `git tag -l` for
+what's available), or package it standalone with
+`helm package charts/mantis` from that checkout and
+`helm install mantis ./mantis-0.1.0.tgz`. Overriding just the tag on the
+current chart also works for a quick look —
+`--set image.tag=0.1.0-preview.1` — but you'd be running preview.1's image
+under preview.2's templates, which is fine for a quick comparison, not for
+reproducing that release exactly.
 
 ## Install
 
