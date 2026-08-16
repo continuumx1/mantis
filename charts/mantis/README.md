@@ -19,33 +19,47 @@ time the chart is pinned to a new image; `image.tag` in `values.yaml` is a
 hardcoded literal to match, not computed — each chart version deploys one
 exact, known-good image, deliberately, not "whatever's currently latest."
 
-| Chart `version` | `appVersion` / image tag | Notes |
-|---|---|---|
-| `0.2.0` (current) | `0.1.0-preview.2` | 0 known vulnerabilities (Docker Scout) |
-| `0.1.0` | `0.1.0-preview.1` | superseded — had unpatched CVEs in `golang.org/x/net`/`x/sys`/`x/text`, fixed in `preview.2` |
+| Chart `version` | `appVersion` / image tag | Git tag | Notes |
+|---|---|---|---|
+| `0.2.0` (current) | `0.1.0-preview.2` | `v0.2.0` | 0 known vulnerabilities (Docker Scout) |
+| `0.1.0` | `0.1.0-preview.1` | `v0.1.0-preview.1` | superseded — had unpatched CVEs in `golang.org/x/net`/`x/sys`/`x/text`, fixed in `preview.2` |
 
-To install an older chart version instead of whatever's checked out
-locally: `git checkout v0.1.0-preview.1 -- charts/mantis` pulls just that
-historical chart directory into your working tree (see `git tag -l` for
-what's available), or package it standalone with
-`helm package charts/mantis` from that checkout and
-`helm install mantis ./mantis-0.1.0.tgz`. Overriding just the tag on the
-current chart also works for a quick look —
-`--set image.tag=0.1.0-preview.1` — but you'd be running preview.1's image
-under preview.2's templates, which is fine for a quick comparison, not for
-reproducing that release exactly.
+Both versions are published as OCI artifacts — install either by number,
+no clone needed:
+
+```bash
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis --version 0.2.0
+# or, to reproduce the earlier release exactly:
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis --version 0.1.0
+```
+
+To instead get an older chart's *source* (e.g. to modify it), the git tags
+above check out the exact commit each version was built from:
+`git checkout v0.1.0-preview.1 -- charts/mantis`. Overriding just the tag
+on the current chart also works for a quick look —
+`--set image.tag=0.1.0-preview.1` — but that runs preview.1's image under
+preview.2's templates, fine for a quick comparison, not for reproducing
+that release exactly.
 
 ## Install
 
-Published images pull straight from Docker Hub by default — nothing to
-build:
+The chart itself is published too — no clone required:
+
+```bash
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
+  --version 0.2.0 --namespace mantis --create-namespace
+```
+
+Or, from a checkout of this repo:
 
 ```bash
 helm install mantis ./charts/mantis --namespace mantis --create-namespace
 ```
 
-Then follow the printed NOTES — they tell you exactly how to reach the UI
-based on whatever `web.service.type`/`web.ingress.enabled` you chose.
+Either way, images pull straight from Docker Hub by default — nothing to
+build. Then follow the printed NOTES — they tell you exactly how to reach
+the UI based on whatever `web.service.type`/`web.ingress.enabled` you
+chose.
 
 ### Using your own build instead
 
@@ -92,7 +106,7 @@ helm upgrade mantis ./charts/mantis -n mantis \
 | Key | Default | Meaning |
 |---|---|---|
 | `image.repository` | `cx1tech/mantis` | Shared repo for both images — see `values.yaml`'s comment for the `-engine`/`-web` tag-suffix scheme |
-| `image.tag` | chart `appVersion` (currently `0.1.0-preview.2`) | Version tag, before the `-engine`/`-web` suffix is appended |
+| `image.tag` | hardcoded literal (currently `0.1.0-preview.2`, see Versions above) | Version tag, before the `-engine`/`-web` suffix is appended |
 | `engine.showAll` | `false` | Include system-managed ConfigMaps/Secrets in the graph (`MANTIS_SHOW_ALL`) |
 | `web.service.type` | `ClusterIP` | How `mantis-web` is exposed — `ClusterIP`/`NodePort`/`LoadBalancer` |
 | `web.ingress.enabled` | `false` | Create an Ingress for `mantis-web` |
