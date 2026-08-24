@@ -344,6 +344,17 @@
   .overlay code { font-family: var(--font-mono); color: var(--brand); }
   .overlay.err h3 { color: var(--crit); }
 
+  /* Live progress shown in the connecting overlay (and, via the same data,
+     the sync pill's popover) while the background sync is still filling in —
+     namespacesTotal is a real, known-upfront count; the resource/relationship
+     numbers are running totals with deliberately no "/N" denominator, since
+     how much lives in namespaces not yet reached is genuinely unknown until
+     the sync gets there (see internal/engine/sync.go's SyncProgress). */
+  .sync-progress { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    display: flex; flex-direction: column; gap: 5px; font-family: var(--font-mono); font-size: 12px; text-align: left; }
+  .sync-progress .sp-row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+  .sync-progress .sp-row b { color: var(--ink); font-weight: 600; }
+
   /* Non-blocking notice for failures during silent sync. */
   .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 7;
     display: none; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
@@ -535,6 +546,8 @@
   let selected = null, curTab = "summary", yamlToken = 0;
   let autoTimer = null, everLoaded = false;
   let lastGraphData = null; // last successful /api/graph payload, kept so a theme switch can recolor without a re-fetch
+  let lastSyncProgress = null; // most recent /api/sync/status payload (see pollSyncStatus, below the sync pill)
+  let onSyncProgress = null; // set by firstLoad while its overlay is up, so pollSyncStatus can refresh it live; null otherwise
 
   // ---- overlay (blocking, first connect only) + toast (non-blocking failures) ----
   function showOverlay(title, bodyHTML, isErr){
@@ -580,13 +593,37 @@
         return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); });
       });
   }
-  // firstLoad shows the blocking overlay — the only time the user waits.
+  // fetchSyncStatus reads the background sync loop's own progress (see
+  // internal/engine/sync.go's SyncProgress) — used by both the connecting
+  // overlay (below) and the sync pill's popover (see pollSyncStatus).
+  function fetchSyncStatus(){
+    return fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject());
+  }
+  // overlayProgressHTML renders SyncProgress as the connecting overlay's
+  // extra detail block. namespacesTotal being falsy means the very first
+  // status poll hasn't landed yet — show nothing rather than "0/0".
+  function overlayProgressHTML(p){
+    if (!p || !p.namespacesTotal) return "";
+    return '<div class="sync-progress">'+
+      '<div class="sp-row"><span>Namespaces</span><b>'+p.namespacesDone+' / '+p.namespacesTotal+'</b></div>'+
+      '<div class="sp-row"><span>Resources found so far</span><b>'+(p.resourcesSoFar||0)+'</b></div>'+
+      '<div class="sp-row"><span>Relationships so far</span><b>'+(p.relationshipsSoFar||0)+'</b></div>'+
+      '</div>';
+  }
+  // firstLoad shows the blocking overlay — the only time the user waits, and
+  // typically brief now: /api/graph answers as soon as the *first* namespace
+  // is ready (see internal/engine/server.go's handleGraph), not the whole
+  // cluster. While it's up, onSyncProgress (driven by pollSyncStatus's own
+  // steady poll, below) refreshes it with real progress instead of a static
+  // "reading resources" message sitting there unchanged.
   function firstLoad(){
     showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
+    onSyncProgress = p => showOverlay("Connecting to your cluster…",
+      "<p>Reading resources and relationships.</p>" + overlayProgressHTML(p), false);
     fetchGraph()
-      .then(data => { hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
-      .catch(err => showOverlay("Cannot read the cluster",
-        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true));
+      .then(data => { onSyncProgress = null; hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
+      .catch(err => { onSyncProgress = null; showOverlay("Cannot read the cluster",
+        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true); });
   }
   // sync is silent: no overlay, positions and selection preserved. The pill only
   // turns amber if a request is slow (latency), red on failure — a routine fast
@@ -1220,8 +1257,19 @@
         syncWarnLine = document.getElementById("syncWarnLine"), syncWarnTime = document.getElementById("syncWarnTime");
   let syncMode = "60000"; // last value passed to setSync — "manual" or an interval in ms
 
+  // formatSyncProgress renders SyncProgress as one line for the pill's
+  // popover — same numbers as overlayProgressHTML's block, just inline.
+  function formatSyncProgress(p){
+    return "Namespaces "+p.namespacesDone+"/"+p.namespacesTotal+" · "+
+      (p.resourcesSoFar||0)+" resources · "+(p.relationshipsSoFar||0)+" relationships";
+  }
   function updateSyncPill(){
     syncPill.classList.remove("on","warn","err");
+    // backgroundSyncing reflects the engine's *actual* sync loop (see
+    // pollSyncStatus below) — a real signal, not the latency-based guess
+    // connState === "syncing" already was (a single request running long).
+    // Either one earns the pill's amber "working on it" treatment.
+    const backgroundSyncing = !!(lastSyncProgress && lastSyncProgress.running);
     // A failed fetch always shows on the pill itself, even in manual mode —
     // "the data on screen might be stale" is worth surfacing regardless of
     // whether the user chose manual or auto-sync just happens to be between
@@ -1230,18 +1278,37 @@
       syncPill.classList.add("err"); syncPillLabel.textContent = "OFFLINE";
     } else if (syncMode === "manual"){
       syncPillLabel.textContent = "MANUAL";
-    } else if (connState === "syncing"){
+    } else if (connState === "syncing" || backgroundSyncing){
       syncPill.classList.add("warn"); syncPillLabel.textContent = "SYNCING";
     } else {
       syncPill.classList.add("on"); syncPillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE";
     }
-    syncStatusLine.textContent = "Last synced " + timeAgo(lastSyncedAt);
+    syncStatusLine.textContent = backgroundSyncing
+      ? formatSyncProgress(lastSyncProgress)
+      : "Last synced " + timeAgo(lastSyncedAt);
     const stale = connState === "error";
     syncWarnLine.classList.toggle("show", stale);
     if (stale) syncWarnTime.textContent = timeAgo(lastSyncedAt);
     syncPill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
   }
   setInterval(updateSyncPill, 5000); // keeps "Last synced Xs ago" accurate between events, not just at them
+
+  // pollSyncStatus keeps lastSyncProgress fresh independent of the graph's
+  // own poll cadence (including "Manual") — the background sync runs on its
+  // own schedule regardless of how often the browser refetches /api/graph,
+  // so this is what lets the pill and the connecting overlay reflect it in
+  // something close to real time. A plain fetch every second is negligible
+  // load — /api/sync/status is a cache read, no cluster call — and never
+  // touches the canvas/render loop, so nothing here can freeze it.
+  function pollSyncStatus(){
+    fetchSyncStatus().then(p => {
+      lastSyncProgress = p;
+      updateSyncPill();
+      if (onSyncProgress) onSyncProgress(p);
+    }).catch(() => {});
+  }
+  setInterval(pollSyncStatus, 1000);
+  pollSyncStatus();
 
   function setSync(val, immediate){
     if (immediate === undefined) immediate = true;
