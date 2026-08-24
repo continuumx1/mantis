@@ -1096,7 +1096,18 @@
 
   // ---- live search ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
-  let searchMatches = [], searchActive = -1;
+  // SEARCH_RESULT_CAP replaces what used to be a hard 12-result limit with no
+  // way to see past it. 200 is generous rather than unlimited on purpose —
+  // rendering it is trivial (a few hundred DOM nodes on a keystroke costs
+  // nothing a browser notices) but an actually-unbounded list on a very large
+  // cluster would turn one broad query (e.g. a namespace name matching
+  // hundreds of resources) into thousands of unscrollable rows for no benefit
+  // over just narrowing the query. The dropdown (.search-results) already
+  // scrolls past its fixed height — see its max-height/overflow-y in the
+  // stylesheet — so raising the cap is what actually makes that scrolling
+  // matter instead of every search fitting inside 12 rows already.
+  const SEARCH_RESULT_CAP = 200;
+  let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
   // matchNodes ranks resources by how the query hits them: a name prefix beats
   // an exact kind match (typing "node" should surface actual Node objects),
   // which beats a name substring, which beats a partial kind/namespace hit.
@@ -1107,9 +1118,13 @@
   // cluster running any of them, real Node objects (which only ever match by
   // kind, never by name) lost every single one of those ties and vanished
   // off the end of the result list entirely. Empty query → no results.
+  // matchNodes returns { matches, total }: matches is capped at
+  // SEARCH_RESULT_CAP for rendering, total is every match found (uncapped),
+  // so renderSearch can say how many more there are instead of the list just
+  // silently stopping.
   function matchNodes(q){
     q = q.trim().toLowerCase();
-    if (!q) return [];
+    if (!q) return { matches: [], total: 0 };
     const scored = [];
     for (const n of nodes){
       const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
@@ -1122,7 +1137,7 @@
       if (score >= 0) scored.push({ n, score });
     }
     scored.sort((a,b) => a.score-b.score || a.n.name.localeCompare(b.n.name));
-    return scored.slice(0,12).map(s => s.n);
+    return { matches: scored.slice(0,SEARCH_RESULT_CAP).map(s => s.n), total: scored.length };
   }
   function renderSearch(){
     if (!searchMatches.length){
@@ -1137,7 +1152,10 @@
         '<span class="sr-name">'+esc(n.name)+'</span>'+
         '<span class="sr-kind">'+esc(n.kind)+'</span>'+
         '<span class="sr-ns">'+(n.ns?esc(n.ns):"cluster")+'</span>'+
-      '</div>').join("");
+      '</div>').join("") +
+      (searchMatchTotal > searchMatches.length
+        ? '<div class="search-empty">+'+(searchMatchTotal-searchMatches.length)+' more — refine your search</div>'
+        : "");
     searchResults.classList.add("open");
     searchResults.querySelectorAll(".sresult").forEach(el =>
       el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
@@ -1148,12 +1166,17 @@
     closeSearch();
   }
   function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
-  searchInput.addEventListener("input", () => { searchMatches = matchNodes(searchInput.value); searchActive = searchMatches.length ? 0 : -1; renderSearch(); });
+  searchInput.addEventListener("input", () => {
+    const r = matchNodes(searchInput.value);
+    searchMatches = r.matches; searchMatchTotal = r.total;
+    searchActive = searchMatches.length ? 0 : -1;
+    renderSearch();
+  });
   searchInput.addEventListener("keydown", ev => {
     if (ev.key === "ArrowDown"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive+1)%searchMatches.length; renderSearch(); } }
     else if (ev.key === "ArrowUp"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive-1+searchMatches.length)%searchMatches.length; renderSearch(); } }
     else if (ev.key === "Enter"){ if(searchActive>=0 && searchMatches[searchActive]) pickSearch(searchMatches[searchActive].id); }
-    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; closeSearch(); searchInput.blur(); }
+    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; searchMatchTotal=0; closeSearch(); searchInput.blur(); }
   });
   document.addEventListener("click", ev => { if(!ev.target.closest(".search-wrap")) closeSearch(); });
 
