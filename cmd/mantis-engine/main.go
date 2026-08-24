@@ -12,7 +12,8 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/continuumx1/mantis/internal/engine"
 	"github.com/continuumx1/mantis/internal/httpx"
@@ -28,22 +29,25 @@ import (
 var version = "dev"
 
 func main() {
-	log.Printf("mantis-engine: version %s", version)
+	httpx.InitLogging("mantis-engine")
+	slog.Info("startup", "event", "boot", "version", version)
 
 	addr := httpx.EnvOr("MANTIS_ENGINE_ADDR", ":8080")
 	showAll := httpx.EnvOr("MANTIS_SHOW_ALL", "false") == "true"
 
 	client, err := mantiskube.NewClient()
 	if err != nil {
-		log.Fatalf("mantis-engine: connect to Kubernetes: %v", err)
+		slog.Error("startup failed", "event", "kubernetes_connect_failed", "error", err.Error())
+		os.Exit(1)
 	}
 
 	server := engine.New(client, showAll)
 
-	log.Printf("mantis-engine: serving graph API on %s", addr)
-	log.Printf("mantis-engine: cluster context %q (%s)", client.Context, client.Server)
+	slog.Info("startup", "event", "ready_to_serve", "addr", addr,
+		"cluster_context", client.Context, "cluster_server", client.Server, "show_all", showAll)
 
 	if err := httpx.ListenAndServe(addr, server.Handler()); err != nil {
-		log.Fatalf("mantis-engine: %v", err)
+		slog.Error("fatal", "event", "serve_failed", "error", err.Error())
+		os.Exit(1)
 	}
 }

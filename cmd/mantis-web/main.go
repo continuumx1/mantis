@@ -12,7 +12,8 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/continuumx1/mantis/internal/httpx"
 	"github.com/continuumx1/mantis/internal/web"
@@ -24,21 +25,23 @@ import (
 var version = "dev"
 
 func main() {
-	log.Printf("mantis-web: version %s", version)
+	httpx.InitLogging("mantis-web")
+	slog.Info("startup", "event", "boot", "version", version)
 
 	addr := httpx.EnvOr("MANTIS_WEB_ADDR", ":8080")
 	engineURL := httpx.EnvOr("MANTIS_ENGINE_URL", "http://mantis-engine:8080")
 
 	handler, err := web.NewHandler(engineURL)
 	if err != nil {
-		log.Fatalf("mantis-web: %v", err)
+		slog.Error("startup failed", "event", "handler_init_failed", "error", err.Error())
+		os.Exit(1)
 	}
 
-	log.Printf("mantis-web: serving UI on %s", addr)
-	log.Printf("mantis-web: proxying /api → %s", engineURL)
-	log.Printf("mantis-web: ⚠ public-preview auth active (admin/admin, see internal/web/auth.go) — not a production login, replace before any non-preview deployment")
+	slog.Info("startup", "event", "ready_to_serve", "addr", addr, "engine_url", engineURL,
+		"warning", "public-preview auth active (admin/admin, see internal/web/auth.go) — not production login")
 
 	if err := httpx.ListenAndServe(addr, handler); err != nil {
-		log.Fatalf("mantis-web: %v", err)
+		slog.Error("fatal", "event", "serve_failed", "error", err.Error())
+		os.Exit(1)
 	}
 }

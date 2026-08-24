@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 // Playground's cluster-scoped fixtures are named (playground/data/*/resources
 // /__Node__*.yaml, __PersistentVolume__*.yaml), so without it those 404 at
 // runtime with no build-time signal that anything is missing.
+//
 //go:embed all:ui
 var uiFiles embed.FS
 
@@ -51,6 +53,7 @@ func NewHandler(engineURL string) (http.Handler, error) {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Error("proxy", "event", "proxy_failure", "path", r.URL.Path, "engine_url", engineURL, "error", err.Error())
 		http.Error(w, "engine unreachable: "+err.Error(), http.StatusBadGateway)
 	}
 

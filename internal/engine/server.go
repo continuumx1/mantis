@@ -6,6 +6,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sort"
 	"time"
@@ -53,11 +54,19 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), buildTimeout)
 	defer cancel()
 
+	start := time.Now()
+	slog.Info("sync", "event", "sync_start")
+
 	gctx, skipped, err := graph.BuildClusterGraph(ctx, s.client.Clientset, s.client.Dynamic, s.showAll)
 	if err != nil {
+		slog.Error("sync", "event", "sync_failed", "duration_ms", time.Since(start).Milliseconds(),
+			"error", err.Error(), "kind", "kubernetes_api_failure")
 		http.Error(w, "cluster read failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	slog.Info("sync", "event", "sync_complete", "duration_ms", time.Since(start).Milliseconds(),
+		"resources_discovered", len(gctx.Nodes()), "relationships_created", len(gctx.Relations),
+		"kinds_skipped", skipped)
 
 	meta := MetaDTO{
 		Context:        s.client.Context,
@@ -101,6 +110,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // reachable, so the Pod only takes traffic once it can actually serve graphs.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.client.Clientset.Discovery().ServerVersion(); err != nil {
+		slog.Warn("probe", "event", "readyz_failed", "error", err.Error())
 		http.Error(w, "cluster unreachable: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}

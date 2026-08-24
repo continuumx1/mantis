@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,16 +15,19 @@ import (
 
 // ListenAndServe runs an HTTP server on addr until SIGINT/SIGTERM, then drains
 // in-flight requests so a rolling update or scale-down terminates cleanly. It is
-// the standard entry point for every Mantis service.
+// the standard entry point for every Mantis service. handler is wrapped in
+// Recover so a panic in any request logs and 500s instead of crashing the
+// process out from under this function.
 func ListenAndServe(addr string, handler http.Handler) error {
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           handler,
+		Handler:           Recover(handler),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
+		slog.Info("startup", "event", "listening", "addr", addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -35,12 +38,19 @@ func ListenAndServe(addr string, handler http.Handler) error {
 
 	select {
 	case err := <-errCh:
+		slog.Error("startup failed", "event", "listen_failed", "addr", addr, "error", err.Error())
 		return fmt.Errorf("listen on %s: %w", addr, err)
-	case <-stop:
-		log.Print("shutting down…")
+	case sig := <-stop:
+		slog.Info("shutdown", "event", "shutdown_start", "signal", sig.String())
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		return server.Shutdown(ctx)
+		err := server.Shutdown(ctx)
+		if err != nil {
+			slog.Error("shutdown", "event", "shutdown_error", "error", err.Error())
+		} else {
+			slog.Info("shutdown", "event", "shutdown_complete")
+		}
+		return err
 	}
 }
 
