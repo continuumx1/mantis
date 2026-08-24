@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: analytics-worker
+    pod-template-hash: 1b4f7c8d2
+  name: analytics-worker-1b4f7c8d2
+  namespace: analytics
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: analytics-worker
+    uid: analytics-worker-deploy-uid
+  resourceVersion: "17849"
+  uid: analytics-worker-1b4f7c8d2-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-worker
+      pod-template-hash: 1b4f7c8d2
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

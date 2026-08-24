@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/max-replicas: "3"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:21:53Z"
+  generation: 1
+  labels:
+    app: payments-api
+    pod-template-hash: cc7dfd779
+  name: payments-api-cc7dfd779
+  namespace: payments-api
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: payments-api
+    uid: af0bd9da-5183-4bfd-adf9-0290c0a8dfa1
+  resourceVersion: "17981"
+  uid: 4bd69626-e5a6-4a2b-82df-f3c429e05534
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-api
+      pod-template-hash: cc7dfd779
+  template:
+    metadata:
+      labels:
+        app: payments-api
+        pod-template-hash: cc7dfd779
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: payments-config-v2
+        image: nginx:1.27-alpine
+        imagePullPolicy: IfNotPresent
+        name: payments-api
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  fullyLabeledReplicas: 2
+  observedGeneration: 1
+  replicas: 2
+  terminatingReplicas: 0

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: pd.csi.storage.gke.io
+    volume.kubernetes.io/storage-provisioner: pd.csi.storage.gke.io
+  creationTimestamp: "2026-08-16T18:21:44Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app: postgres
+  name: data-postgres-1
+  namespace: data-platform
+  resourceVersion: "17940"
+  uid: d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+  volumeMode: Filesystem
+  volumeName: pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  phase: Bound

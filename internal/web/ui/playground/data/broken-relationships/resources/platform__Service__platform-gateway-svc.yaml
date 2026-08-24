@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  name: platform-gateway-svc
+  namespace: platform
+  resourceVersion: "17786"
+  uid: platform-gateway-svc-uid
+spec:
+  clusterIP: 10.100.2.10
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: platform-gateway
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

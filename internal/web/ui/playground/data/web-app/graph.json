@@ -1,0 +1,789 @@
+{
+  "meta": {
+    "context": "kubeadm \u00b7 web application (sample data)",
+    "server": "sample data \u2014 not a live cluster",
+    "version": "v1.29.4",
+    "namespaces": 5,
+    "namespaceList": [
+      "catalog",
+      "checkout",
+      "ingress-nginx",
+      "monitoring",
+      "shop-frontend"
+    ],
+    "nodeCount": 36,
+    "edgeCount": 55
+  },
+  "nodes": [
+    {
+      "id": "shop-frontend/ConfigMap/storefront-config",
+      "kind": "ConfigMap",
+      "name": "storefront-config",
+      "ns": "shop-frontend",
+      "resolved": true
+    },
+    {
+      "id": "shop-frontend/Deployment/storefront",
+      "kind": "Deployment",
+      "name": "storefront",
+      "ns": "shop-frontend",
+      "resolved": true,
+      "attributes": [
+        "replicas: 3/3 ready",
+        "strategy: RollingUpdate",
+        "image: nginx:1.27-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "shop-frontend/HorizontalPodAutoscaler/storefront-hpa",
+      "kind": "HorizontalPodAutoscaler",
+      "name": "storefront-hpa",
+      "ns": "shop-frontend",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2\u20136",
+        "current: 3 desired: 0",
+        "metrics: cpu",
+        "target: Deployment/storefront"
+      ]
+    },
+    {
+      "id": "shop-frontend/Ingress/storefront-ingress",
+      "kind": "Ingress",
+      "name": "storefront-ingress",
+      "ns": "shop-frontend",
+      "resolved": true
+    },
+    {
+      "id": "/Node/k8s-worker-01",
+      "kind": "Node",
+      "name": "k8s-worker-01",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "roles: worker",
+        "version: v1.29.4",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "kind": "Pod",
+      "name": "storefront-655c9d9479-dbbmf",
+      "ns": "shop-frontend",
+      "status": "ok",
+      "resolved": true,
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: nginx:1.27-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "kind": "Pod",
+      "name": "storefront-655c9d9479-lfnf5",
+      "ns": "shop-frontend",
+      "status": "ok",
+      "resolved": true,
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: nginx:1.27-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "kind": "Pod",
+      "name": "storefront-655c9d9479-plg9j",
+      "ns": "shop-frontend",
+      "status": "ok",
+      "resolved": true,
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: nginx:1.27-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "shop-frontend/ReplicaSet/storefront-655c9d9479",
+      "kind": "ReplicaSet",
+      "name": "storefront-655c9d9479",
+      "ns": "shop-frontend",
+      "resolved": true,
+      "attributes": [
+        "replicas: 3/3 ready",
+        "image: nginx:1.27-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "shop-frontend/Service/storefront-svc",
+      "kind": "Service",
+      "name": "storefront-svc",
+      "ns": "shop-frontend",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.105.187.232",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.0.5:80, 10.244.0.6:80, 10.244.0.7:80"
+      ]
+    },
+    {
+      "id": "/Node/k8s-worker-02",
+      "kind": "Node",
+      "name": "k8s-worker-02",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "roles: worker",
+        "version: v1.29.4",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/k8s-worker-03",
+      "kind": "Node",
+      "name": "k8s-worker-03",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "roles: worker",
+        "version: v1.29.4",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/k8s-worker-04",
+      "kind": "Node",
+      "name": "k8s-worker-04",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "roles: worker",
+        "version: v1.29.4",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/k8s-worker-05",
+      "kind": "Node",
+      "name": "k8s-worker-05",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "roles: worker",
+        "version: v1.29.4",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "checkout/Deployment/checkout-api",
+      "kind": "Deployment",
+      "name": "checkout-api",
+      "ns": "checkout",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: node:20-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "checkout/ReplicaSet/checkout-api-6c9b7d4a1",
+      "kind": "ReplicaSet",
+      "name": "checkout-api-6c9b7d4a1",
+      "ns": "checkout",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: node:20-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "kind": "Pod",
+      "name": "checkout-api-6c9b7d4a1-6c9b700",
+      "ns": "checkout",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: node:20-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "kind": "Pod",
+      "name": "checkout-api-6c9b7d4a1-6c9b701",
+      "ns": "checkout",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: node:20-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "checkout/Service/checkout-api-svc",
+      "kind": "Service",
+      "name": "checkout-api-svc",
+      "ns": "checkout",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.0.21",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.87.10:80, 10.244.161.11:80"
+      ]
+    },
+    {
+      "id": "checkout/ConfigMap/checkout-config",
+      "kind": "ConfigMap",
+      "name": "checkout-config",
+      "ns": "checkout",
+      "resolved": true
+    },
+    {
+      "id": "catalog/Deployment/catalog-api",
+      "kind": "Deployment",
+      "name": "catalog-api",
+      "ns": "catalog",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: python:3.12-slim",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "catalog/ReplicaSet/catalog-api-5f8a3e2c9",
+      "kind": "ReplicaSet",
+      "name": "catalog-api-5f8a3e2c9",
+      "ns": "catalog",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: python:3.12-slim",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "kind": "Pod",
+      "name": "catalog-api-5f8a3e2c9-5f8a300",
+      "ns": "catalog",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: python:3.12-slim",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "kind": "Pod",
+      "name": "catalog-api-5f8a3e2c9-5f8a301",
+      "ns": "catalog",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: python:3.12-slim",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "catalog/Service/catalog-api-svc",
+      "kind": "Service",
+      "name": "catalog-api-svc",
+      "ns": "catalog",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.0.22",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.114.10:80, 10.244.212.11:80"
+      ]
+    },
+    {
+      "id": "catalog/ConfigMap/catalog-config",
+      "kind": "ConfigMap",
+      "name": "catalog-config",
+      "ns": "catalog",
+      "resolved": true
+    },
+    {
+      "id": "ingress-nginx/Deployment/ingress-nginx-controller",
+      "kind": "Deployment",
+      "name": "ingress-nginx-controller",
+      "ns": "ingress-nginx",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: registry.k8s.io/ingress-nginx/controller:v1.10.1",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "ingress-nginx/ReplicaSet/ingress-nginx-controller-4d7c1f8b3",
+      "kind": "ReplicaSet",
+      "name": "ingress-nginx-controller-4d7c1f8b3",
+      "ns": "ingress-nginx",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: registry.k8s.io/ingress-nginx/controller:v1.10.1",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "kind": "Pod",
+      "name": "ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "ns": "ingress-nginx",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: registry.k8s.io/ingress-nginx/controller:v1.10.1",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "kind": "Pod",
+      "name": "ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "ns": "ingress-nginx",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: registry.k8s.io/ingress-nginx/controller:v1.10.1",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "ingress-nginx/Service/ingress-nginx-controller-svc",
+      "kind": "Service",
+      "name": "ingress-nginx-controller-svc",
+      "ns": "ingress-nginx",
+      "resolved": true,
+      "attributes": [
+        "type: LoadBalancer",
+        "clusterIP: 10.100.0.23",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.52.10:80, 10.244.204.11:80"
+      ]
+    },
+    {
+      "id": "monitoring/Deployment/prometheus-server",
+      "kind": "Deployment",
+      "name": "prometheus-server",
+      "ns": "monitoring",
+      "resolved": true,
+      "attributes": [
+        "replicas: 1/1 ready",
+        "strategy: RollingUpdate",
+        "image: prom/prometheus:v2.53.0",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "monitoring/ReplicaSet/prometheus-server-3a6b9d2e7",
+      "kind": "ReplicaSet",
+      "name": "prometheus-server-3a6b9d2e7",
+      "ns": "monitoring",
+      "resolved": true,
+      "attributes": [
+        "replicas: 1/1 ready",
+        "image: prom/prometheus:v2.53.0",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "kind": "Pod",
+      "name": "prometheus-server-3a6b9d2e7-3a6b900",
+      "ns": "monitoring",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: prom/prometheus:v2.53.0",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "monitoring/Service/prometheus-server-svc",
+      "kind": "Service",
+      "name": "prometheus-server-svc",
+      "ns": "monitoring",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.0.24",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.137.10:80"
+      ]
+    },
+    {
+      "id": "monitoring/ConfigMap/prometheus-config",
+      "kind": "ConfigMap",
+      "name": "prometheus-config",
+      "ns": "monitoring",
+      "resolved": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "shop-frontend/ReplicaSet/storefront-655c9d9479",
+      "to": "shop-frontend/Deployment/storefront",
+      "type": "controlled-by"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "to": "shop-frontend/ReplicaSet/storefront-655c9d9479",
+      "type": "controlled-by"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "to": "/Node/k8s-worker-01",
+      "type": "runs-on"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "to": "shop-frontend/ConfigMap/storefront-config",
+      "type": "references"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "to": "shop-frontend/ReplicaSet/storefront-655c9d9479",
+      "type": "controlled-by"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "to": "/Node/k8s-worker-01",
+      "type": "runs-on"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "to": "shop-frontend/ConfigMap/storefront-config",
+      "type": "references"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "to": "shop-frontend/ReplicaSet/storefront-655c9d9479",
+      "type": "controlled-by"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "to": "/Node/k8s-worker-01",
+      "type": "runs-on"
+    },
+    {
+      "from": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "to": "shop-frontend/ConfigMap/storefront-config",
+      "type": "references"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "type": "selects"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "type": "selects"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "type": "selects"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-dbbmf",
+      "type": "serves"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-lfnf5",
+      "type": "serves"
+    },
+    {
+      "from": "shop-frontend/Service/storefront-svc",
+      "to": "shop-frontend/Pod/storefront-655c9d9479-plg9j",
+      "type": "serves"
+    },
+    {
+      "from": "shop-frontend/Ingress/storefront-ingress",
+      "to": "shop-frontend/Service/storefront-svc",
+      "type": "routes-to"
+    },
+    {
+      "from": "shop-frontend/HorizontalPodAutoscaler/storefront-hpa",
+      "to": "shop-frontend/Deployment/storefront",
+      "type": "scales"
+    },
+    {
+      "from": "checkout/ReplicaSet/checkout-api-6c9b7d4a1",
+      "to": "checkout/Deployment/checkout-api",
+      "type": "controlled-by"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "to": "checkout/ReplicaSet/checkout-api-6c9b7d4a1",
+      "type": "controlled-by"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "to": "/Node/k8s-worker-02",
+      "type": "runs-on"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "to": "checkout/ConfigMap/checkout-config",
+      "type": "references"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "to": "checkout/ReplicaSet/checkout-api-6c9b7d4a1",
+      "type": "controlled-by"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "to": "/Node/k8s-worker-04",
+      "type": "runs-on"
+    },
+    {
+      "from": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "to": "checkout/ConfigMap/checkout-config",
+      "type": "references"
+    },
+    {
+      "from": "checkout/Service/checkout-api-svc",
+      "to": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "type": "selects"
+    },
+    {
+      "from": "checkout/Service/checkout-api-svc",
+      "to": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b700",
+      "type": "serves"
+    },
+    {
+      "from": "checkout/Service/checkout-api-svc",
+      "to": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "type": "selects"
+    },
+    {
+      "from": "checkout/Service/checkout-api-svc",
+      "to": "checkout/Pod/checkout-api-6c9b7d4a1-6c9b701",
+      "type": "serves"
+    },
+    {
+      "from": "catalog/ReplicaSet/catalog-api-5f8a3e2c9",
+      "to": "catalog/Deployment/catalog-api",
+      "type": "controlled-by"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "to": "catalog/ReplicaSet/catalog-api-5f8a3e2c9",
+      "type": "controlled-by"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "to": "/Node/k8s-worker-03",
+      "type": "runs-on"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "to": "catalog/ConfigMap/catalog-config",
+      "type": "references"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "to": "catalog/ReplicaSet/catalog-api-5f8a3e2c9",
+      "type": "controlled-by"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "to": "/Node/k8s-worker-05",
+      "type": "runs-on"
+    },
+    {
+      "from": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "to": "catalog/ConfigMap/catalog-config",
+      "type": "references"
+    },
+    {
+      "from": "catalog/Service/catalog-api-svc",
+      "to": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "type": "selects"
+    },
+    {
+      "from": "catalog/Service/catalog-api-svc",
+      "to": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a300",
+      "type": "serves"
+    },
+    {
+      "from": "catalog/Service/catalog-api-svc",
+      "to": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "type": "selects"
+    },
+    {
+      "from": "catalog/Service/catalog-api-svc",
+      "to": "catalog/Pod/catalog-api-5f8a3e2c9-5f8a301",
+      "type": "serves"
+    },
+    {
+      "from": "ingress-nginx/ReplicaSet/ingress-nginx-controller-4d7c1f8b3",
+      "to": "ingress-nginx/Deployment/ingress-nginx-controller",
+      "type": "controlled-by"
+    },
+    {
+      "from": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "to": "ingress-nginx/ReplicaSet/ingress-nginx-controller-4d7c1f8b3",
+      "type": "controlled-by"
+    },
+    {
+      "from": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "to": "/Node/k8s-worker-01",
+      "type": "runs-on"
+    },
+    {
+      "from": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "to": "ingress-nginx/ReplicaSet/ingress-nginx-controller-4d7c1f8b3",
+      "type": "controlled-by"
+    },
+    {
+      "from": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "to": "/Node/k8s-worker-04",
+      "type": "runs-on"
+    },
+    {
+      "from": "ingress-nginx/Service/ingress-nginx-controller-svc",
+      "to": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "type": "selects"
+    },
+    {
+      "from": "ingress-nginx/Service/ingress-nginx-controller-svc",
+      "to": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c100",
+      "type": "serves"
+    },
+    {
+      "from": "ingress-nginx/Service/ingress-nginx-controller-svc",
+      "to": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "type": "selects"
+    },
+    {
+      "from": "ingress-nginx/Service/ingress-nginx-controller-svc",
+      "to": "ingress-nginx/Pod/ingress-nginx-controller-4d7c1f8b3-4d7c101",
+      "type": "serves"
+    },
+    {
+      "from": "monitoring/ReplicaSet/prometheus-server-3a6b9d2e7",
+      "to": "monitoring/Deployment/prometheus-server",
+      "type": "controlled-by"
+    },
+    {
+      "from": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "to": "monitoring/ReplicaSet/prometheus-server-3a6b9d2e7",
+      "type": "controlled-by"
+    },
+    {
+      "from": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "to": "/Node/k8s-worker-05",
+      "type": "runs-on"
+    },
+    {
+      "from": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "to": "monitoring/ConfigMap/prometheus-config",
+      "type": "references"
+    },
+    {
+      "from": "monitoring/Service/prometheus-server-svc",
+      "to": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "type": "selects"
+    },
+    {
+      "from": "monitoring/Service/prometheus-server-svc",
+      "to": "monitoring/Pod/prometheus-server-3a6b9d2e7-3a6b900",
+      "type": "serves"
+    }
+  ]
+}

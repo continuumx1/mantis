@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Node
+metadata:
+  annotations:
+    node.alpha.kubernetes.io/ttl: "0"
+    volumes.kubernetes.io/controller-managed-attach-detach: "true"
+  creationTimestamp: "2026-08-16T04:43:51Z"
+  labels:
+    cloud.google.com/gke-nodepool: default-pool
+    cloud.google.com/gke-os-distribution: cos
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: gke-demo-cluster-default-pool-3f9a1c2b-x7k4
+    kubernetes.io/os: linux
+    node.kubernetes.io/instance-type: e2-highcpu-8
+    topology.kubernetes.io/region: us-central1
+    topology.kubernetes.io/zone: us-central1-a
+  name: gke-demo-cluster-default-pool-3f9a1c2b-x7k4
+  resourceVersion: "17992"
+  uid: dcfaf36c-ce1c-4171-b481-90d859da81db
+spec:
+  providerID: gce://mantis-demo-project/us-central1-a/gke-demo-cluster-default-pool-3f9a1c2b-x7k4
+status:
+  addresses:
+  - address: 10.128.0.14
+    type: InternalIP
+  - address: gke-demo-cluster-default-pool-3f9a1c2b-x7k4
+    type: Hostname
+  allocatable:
+    cpu: "8"
+    ephemeral-storage: 234492896Ki
+    memory: 8126756Ki
+    pods: "110"
+  capacity:
+    cpu: "8"
+    ephemeral-storage: 234492896Ki
+    memory: 8126756Ki
+    pods: "110"
+  conditions:
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:51Z"
+    message: kubelet has sufficient memory available
+    reason: KubeletHasSufficientMemory
+    status: "False"
+    type: MemoryPressure
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:51Z"
+    message: kubelet has no disk pressure
+    reason: KubeletHasNoDiskPressure
+    status: "False"
+    type: DiskPressure
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:51Z"
+    message: kubelet has sufficient PID available
+    reason: KubeletHasSufficientPID
+    status: "False"
+    type: PIDPressure
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:58Z"
+    message: kubelet is posting ready status
+    reason: KubeletReady
+    status: "True"
+    type: Ready
+  daemonEndpoints:
+    kubeletEndpoint:
+      Port: 10250
+  nodeInfo:
+    architecture: amd64
+    bootID: fcb0db6b-5fbc-4f26-9939-1e354b8a4aa4
+    containerRuntimeVersion: containerd://1.7.13
+    kernelVersion: 6.1.85+
+    kubeProxyVersion: v1.29.5-gke.1091000
+    kubeletVersion: v1.29.5-gke.1091000
+    machineID: e366bd4b77b9d6be2d67552f69964f40
+    operatingSystem: linux
+    osImage: Container-Optimized OS from Google
+    systemUUID: e366bd4b77b9d6be2d67552f69964f40

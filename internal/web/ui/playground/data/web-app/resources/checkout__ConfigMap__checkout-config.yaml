@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  PAYMENT_PROVIDER: stripe
+  CURRENCY: USD
+kind: ConfigMap
+metadata:
+  name: checkout-config
+  namespace: checkout
+  resourceVersion: "17781"
+  uid: checkout-config-uid

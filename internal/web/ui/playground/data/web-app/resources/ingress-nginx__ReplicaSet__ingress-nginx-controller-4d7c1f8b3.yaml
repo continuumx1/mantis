@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: ingress-nginx-controller
+    pod-template-hash: 4d7c1f8b3
+  name: ingress-nginx-controller-4d7c1f8b3
+  namespace: ingress-nginx
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: ingress-nginx-controller
+    uid: ingress-nginx-controller-deploy-uid
+  resourceVersion: "17849"
+  uid: ingress-nginx-controller-4d7c1f8b3-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ingress-nginx-controller
+      pod-template-hash: 4d7c1f8b3
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

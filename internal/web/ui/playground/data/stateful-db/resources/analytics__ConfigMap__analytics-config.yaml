@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  BATCH_SIZE: 500
+  WORKER_THREADS: 4
+kind: ConfigMap
+metadata:
+  name: analytics-config
+  namespace: analytics
+  resourceVersion: "17781"
+  uid: analytics-config-uid

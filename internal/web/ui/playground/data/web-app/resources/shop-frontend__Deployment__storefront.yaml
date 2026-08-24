@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"storefront"},"name":"storefront","namespace":"shop-frontend"},"spec":{"replicas":3,"selector":{"matchLabels":{"app":"storefront"}},"template":{"metadata":{"labels":{"app":"storefront"}},"spec":{"containers":[{"envFrom":[{"configMapRef":{"name":"storefront-config"}}],"image":"nginx:1.27-alpine","name":"storefront","ports":[{"containerPort":80}],"resources":{"limits":{"cpu":"250m","memory":"128Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}}]}}}}
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generation: 1
+  labels:
+    app: storefront
+  name: storefront
+  namespace: shop-frontend
+  resourceVersion: "17850"
+  uid: 082cc698-3a2c-4f91-89b6-ff4654beb2e2
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: storefront
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: storefront
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: storefront-config
+        image: nginx:1.27-alpine
+        imagePullPolicy: IfNotPresent
+        name: storefront
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 250m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  conditions:
+  - lastTransitionTime: "2026-08-16T18:21:11Z"
+    lastUpdateTime: "2026-08-16T18:21:11Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-08-16T18:20:58Z"
+    lastUpdateTime: "2026-08-16T18:21:11Z"
+    message: ReplicaSet "storefront-655c9d9479" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 1
+  readyReplicas: 3
+  replicas: 3
+  terminatingReplicas: 0
+  updatedReplicas: 3

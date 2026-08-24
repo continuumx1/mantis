@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  CACHE_TTL: 300
+  PAGE_SIZE: 24
+kind: ConfigMap
+metadata:
+  name: catalog-config
+  namespace: catalog
+  resourceVersion: "17781"
+  uid: catalog-config-uid

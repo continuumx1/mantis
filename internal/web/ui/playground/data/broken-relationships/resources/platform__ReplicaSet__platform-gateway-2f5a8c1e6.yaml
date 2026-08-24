@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: platform-gateway
+    pod-template-hash: 2f5a8c1e6
+  name: platform-gateway-2f5a8c1e6
+  namespace: platform
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: platform-gateway
+    uid: platform-gateway-deploy-uid
+  resourceVersion: "17849"
+  uid: platform-gateway-2f5a8c1e6-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: platform-gateway
+      pod-template-hash: 2f5a8c1e6
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: analytics-worker
+  name: analytics-worker
+  namespace: analytics
+  resourceVersion: "17850"
+  uid: analytics-worker-deploy-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-worker
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: analytics-worker
+    spec:
+      containers:
+      - envFrom:
+          - configMapRef:
+              name: analytics-config
+          - secretRef:
+              name: analytics-api-keys
+        image: python:3.12-slim
+        imagePullPolicy: IfNotPresent
+        name: analytics-worker
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 250m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2

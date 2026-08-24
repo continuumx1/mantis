@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: pd.csi.storage.gke.io
+  creationTimestamp: "2026-08-16T18:21:44Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3
+  resourceVersion: "17934"
+  uid: c4ae4c63-c603-47ab-881b-782fb91f6b84
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: data-postgres-1
+    namespace: data-platform
+    resourceVersion: "17925"
+    uid: d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3
+  csi:
+    driver: pd.csi.storage.gke.io
+    fsType: ext4
+    volumeHandle: projects/mantis-demo-project/zones/us-central1-a/disks/pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  volumeMode: Filesystem
+status:
+  lastPhaseTransitionTime: "2026-08-16T18:21:44Z"
+  phase: Bound

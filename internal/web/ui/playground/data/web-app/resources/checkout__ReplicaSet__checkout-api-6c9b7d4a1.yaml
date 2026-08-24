@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: checkout-api
+    pod-template-hash: 6c9b7d4a1
+  name: checkout-api-6c9b7d4a1
+  namespace: checkout
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: checkout-api
+    uid: checkout-api-deploy-uid
+  resourceVersion: "17849"
+  uid: checkout-api-6c9b7d4a1-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout-api
+      pod-template-hash: 6c9b7d4a1
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

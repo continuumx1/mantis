@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  scrape_interval: 15s
+  retention: 15d
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  resourceVersion: "17781"
+  uid: prometheus-config-uid

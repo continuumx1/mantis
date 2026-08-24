@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generateName: platform-gateway-2f5a8c1e6-
+  labels:
+    app: platform-gateway
+    pod-template-hash: 2f5a8c1e6
+  name: platform-gateway-2f5a8c1e6-2f5a800
+  namespace: platform
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: platform-gateway-2f5a8c1e6
+    uid: platform-gateway-2f5a8c1e6-uid
+  resourceVersion: "17836"
+  uid: platform-gateway-2f5a8c1e6-2f5a800-uid
+spec:
+  containers:
+  - envFrom: []
+    image: envoyproxy/envoy:v1.30-latest
+    imagePullPolicy: IfNotPresent
+    name: platform-gateway
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  nodeName: ip-192-168-32-140.us-west-2.compute.internal
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  serviceAccount: default
+  serviceAccountName: default
+status:
+  phase: Running
+  podIP: 10.244.6.10
+  qosClass: Burstable
+  startTime: "2026-08-16T18:20:58Z"
