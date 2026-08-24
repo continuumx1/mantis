@@ -111,6 +111,39 @@ func TestBuildClusterGraph_MatchesProgressiveFinalReport(t *testing.T) {
 	}
 }
 
+// kube-node-lease must never produce a node, an edge, or a namespace count —
+// it's excluded before BuildClusterGraphProgressive even starts processing
+// namespaces, not filtered out of the result afterward.
+func TestBuildClusterGraphProgressive_HidesKubeNodeLease(t *testing.T) {
+	fixtures := []runtime.Object{
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-node-lease"}},
+		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "default"}},
+	}
+	clientset := fake.NewSimpleClientset(fixtures...)
+
+	gctx, _, err := BuildClusterGraph(context.Background(), clientset, nil, false)
+	if err != nil {
+		t.Fatalf("BuildClusterGraph returned error: %v", err)
+	}
+
+	for _, n := range gctx.Nodes() {
+		if n.Ref.Namespace == "kube-node-lease" {
+			t.Errorf("kube-node-lease produced a node: %+v", n)
+		}
+	}
+
+	// NamespacesTotal (surfaced as /api/sync/status's namespacesTotal) must
+	// count only the namespace this pass actually visits.
+	var last ClusterSnapshot
+	if err := BuildClusterGraphProgressive(context.Background(), clientset, nil, false, func(s ClusterSnapshot) { last = s }); err != nil {
+		t.Fatalf("BuildClusterGraphProgressive returned error: %v", err)
+	}
+	if last.NamespacesTotal != 1 {
+		t.Errorf("NamespacesTotal = %d, want 1 (kube-node-lease excluded)", last.NamespacesTotal)
+	}
+}
+
 // A pass must stop at the namespace boundary where its context gets
 // cancelled, rather than continuing to spend API calls on a pass that's
 // already been told to stop — this is what lets the engine's own timeout

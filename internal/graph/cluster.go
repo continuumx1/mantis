@@ -78,11 +78,21 @@ func BuildClusterGraphProgressive(
 	if err != nil {
 		return fmt.Errorf("list namespaces: %w", err)
 	}
+	// Hidden namespaces (kube-node-lease) are dropped before total is even
+	// computed, not skipped mid-loop — so they cost no API call via
+	// BuildNamespaceGraph, and NamespacesTotal itself already reflects only
+	// the namespaces this pass will actually visit and report.
+	namespaces := make([]string, 0, len(nsList.Items))
+	for i := range nsList.Items {
+		if name := nsList.Items[i].Name; !IsHiddenNamespace(name) {
+			namespaces = append(namespaces, name)
+		}
+	}
 
 	merged := map[ResourceRef]Node{}
 	var relations []Relation
 	skippedSet := map[string]struct{}{}
-	total := len(nsList.Items)
+	total := len(namespaces)
 
 	// publish snapshots the current merge state into an independent
 	// ClusterSnapshot — fresh slices, not the loop's own backing arrays/map —
@@ -111,11 +121,10 @@ func BuildClusterGraphProgressive(
 		})
 	}
 
-	for i := range nsList.Items {
+	for i, namespace := range namespaces {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		namespace := nsList.Items[i].Name
 
 		nsCtx, skipped, err := BuildNamespaceGraph(ctx, clientset, dyn, namespace, showAll)
 		if err != nil {

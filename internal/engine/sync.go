@@ -162,7 +162,14 @@ func (s *Server) baseMeta(ctx context.Context) MetaDTO {
 	if nsList, err := s.client.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
 		names := make([]string, 0, len(nsList.Items))
 		for i := range nsList.Items {
-			names = append(names, nsList.Items[i].Name)
+			// kube-node-lease is filtered here too, not just in
+			// BuildClusterGraphProgressive's own namespace list — this is what
+			// keeps it out of the namespace *count* and the empty-region list
+			// the UI draws one per NamespaceList entry for, on top of it never
+			// contributing any nodes/edges in the first place.
+			if name := nsList.Items[i].Name; !graph.IsHiddenNamespace(name) {
+				names = append(names, name)
+			}
 		}
 		sort.Strings(names)
 		meta.NamespaceList = names
