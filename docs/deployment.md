@@ -8,7 +8,7 @@ ClusterRole/ClusterRoleBinding, and Services they need.
 
 ```bash
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
-  --version 0.2.0 --namespace mantis --create-namespace
+  --version 0.3.0 --namespace mantis --create-namespace
 ```
 
 Or from a checkout of the repo: `helm install mantis ./charts/mantis --namespace mantis --create-namespace`.
@@ -17,12 +17,13 @@ Or from a checkout of the repo: `helm install mantis ./charts/mantis --namespace
 
 | Chart `version` | `appVersion` / image tag | Notes |
 |---|---|---|
-| `0.2.0` (current) | `0.1.0-preview.2` | 0 known vulnerabilities (Docker Scout) |
+| `0.3.0` (current) | `0.1.0-preview.3` | Adds the Playground demo and docs site; UI theme refresh. No RBAC or API changes. |
+| `0.2.0` | `0.1.0-preview.2` | 0 known vulnerabilities (Docker Scout) |
 | `0.1.0` | `0.1.0-preview.1` | superseded — had unpatched CVEs, fixed in `preview.2` |
 
-Install an older version by number: `--version 0.1.0`. Both are published
-OCI artifacts under `cx1tech/mantis` on Docker Hub, not just tags in this
-repo's history.
+Install an older version by number: `--version 0.2.0` or `--version 0.1.0`.
+All are published OCI artifacts under `cx1tech/mantis` on Docker Hub, not
+just tags in this repo's history.
 
 ### Exposing it
 

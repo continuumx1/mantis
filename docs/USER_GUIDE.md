@@ -244,7 +244,7 @@ docker build -f build/Dockerfile.web    -t mantis-web:dev .
 ```bash
 # No clone needed — the chart is published too:
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
-  --version 0.2.0 --namespace mantis --create-namespace
+  --version 0.3.0 --namespace mantis --create-namespace
 
 # or, from a checkout of this repo:
 helm install mantis ./charts/mantis --namespace mantis --create-namespace

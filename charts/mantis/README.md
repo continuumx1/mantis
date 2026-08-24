@@ -21,15 +21,17 @@ exact, known-good image, deliberately, not "whatever's currently latest."
 
 | Chart `version` | `appVersion` / image tag | Git tag | Notes |
 |---|---|---|---|
-| `0.2.0` (current) | `0.1.0-preview.2` | `v0.2.0` | 0 known vulnerabilities (Docker Scout) |
+| `0.3.0` (current) | `0.1.0-preview.3` | `v0.3.0` | Adds the static, no-backend Playground demo and the public docs site; mantis-web's UI moved to a neutral charcoal-grey theme. No RBAC or API changes. |
+| `0.2.0` | `0.1.0-preview.2` | `v0.2.0` | 0 known vulnerabilities (Docker Scout) |
 | `0.1.0` | `0.1.0-preview.1` | `v0.1.0-preview.1` | superseded — had unpatched CVEs in `golang.org/x/net`/`x/sys`/`x/text`, fixed in `preview.2` |
 
-Both versions are published as OCI artifacts — install either by number,
-no clone needed:
+All three versions are published as OCI artifacts — install any of them by
+number, no clone needed:
 
 ```bash
+helm install mantis oci://registry-1.docker.io/cx1tech/mantis --version 0.3.0
+# or, to reproduce an earlier release exactly:
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis --version 0.2.0
-# or, to reproduce the earlier release exactly:
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis --version 0.1.0
 ```
 
@@ -37,8 +39,8 @@ To instead get an older chart's *source* (e.g. to modify it), the git tags
 above check out the exact commit each version was built from:
 `git checkout v0.1.0-preview.1 -- charts/mantis`. Overriding just the tag
 on the current chart also works for a quick look —
-`--set image.tag=0.1.0-preview.1` — but that runs preview.1's image under
-preview.2's templates, fine for a quick comparison, not for reproducing
+`--set image.tag=0.1.0-preview.2` — but that runs preview.2's image under
+preview.3's templates, fine for a quick comparison, not for reproducing
 that release exactly.
 
 ## Install
@@ -47,7 +49,7 @@ The chart itself is published too — no clone required:
 
 ```bash
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
-  --version 0.2.0 --namespace mantis --create-namespace
+  --version 0.3.0 --namespace mantis --create-namespace
 ```
 
 Or, from a checkout of this repo:
@@ -106,7 +108,7 @@ helm upgrade mantis ./charts/mantis -n mantis \
 | Key | Default | Meaning |
 |---|---|---|
 | `image.repository` | `cx1tech/mantis` | Shared repo for both images — see `values.yaml`'s comment for the `-engine`/`-web` tag-suffix scheme |
-| `image.tag` | hardcoded literal (currently `0.1.0-preview.2`, see Versions above) | Version tag, before the `-engine`/`-web` suffix is appended |
+| `image.tag` | hardcoded literal (currently `0.1.0-preview.3`, see Versions above) | Version tag, before the `-engine`/`-web` suffix is appended |
 | `engine.showAll` | `false` | Include system-managed ConfigMaps/Secrets in the graph (`MANTIS_SHOW_ALL`) |
 | `web.service.type` | `ClusterIP` | How `mantis-web` is exposed — `ClusterIP`/`NodePort`/`LoadBalancer` |
 | `web.ingress.enabled` | `false` | Create an Ingress for `mantis-web` |
