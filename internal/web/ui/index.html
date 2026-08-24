@@ -59,12 +59,17 @@
      the left, cluster/stats/status/actions on the right, a flexible spacer
      between. Vertical dividers (not "·" text) separate the right-hand groups
      so the eye can parse them without reading every character. */
-  header { display: flex; align-items: center; gap: 18px; padding: 13px 22px; border-bottom: 1px solid var(--line);
+  /* Vertical padding trimmed 13px→10px as the mascot grew 34px→40px below —
+     34+2*13 = 40+2*10 = 60px either way, so the header's own height (driven
+     by its tallest child, the mascot) is unchanged even though the mascot
+     reads noticeably bigger now that it's the header's sole identity mark. */
+  header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
     background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
 
+  /* No "mantis" wordmark text next to it anymore — the mascot is the only
+     brand mark in the header now, so it's sized up to carry that on its own. */
   .brand { display: flex; align-items: center; gap: 10px; flex: none; }
-  .brand .mascot { height: 34px; width: auto; display: block; flex: none; }
-  .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--ink); }
+  .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
 
   .spacer { flex: 1 1 auto; min-width: 16px; }
 
@@ -356,8 +361,7 @@
 <div id="app">
   <header>
     <div class="brand">
-      <img class="mascot" src="mantis-mascot.webp" alt="Mantis mascot" />
-      <span class="brand-name">mantis</span>
+      <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
     </div>
 
     <div class="search-wrap">
