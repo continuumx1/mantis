@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://discord.gg/ZTB4eGfCxa"><strong>💬 Join the Discord</strong></a>
   ·
-  <a href="docs/USER_GUIDE.md">📖 User Guide</a>
+  <a href="https://continuumx1.github.io/mantis/">📖 Docs</a>
 </p>
 
 Mantis is an open-source Kubernetes context and investigation tool with an
@@ -23,8 +23,8 @@ not just *what* exists, but the *story* connecting it.
 > **Status: Public Preview.** Mantis is functional and strictly read-only —
 > safe to point at a real cluster — but its login flow, UI, and interfaces
 > are still evolving ahead of a stable release. See the
-> [User Guide](docs/USER_GUIDE.md) for exactly what "Public Preview" means
-> for security and access.
+> [docs](https://continuumx1.github.io/mantis/security/#public-preview-notes)
+> for exactly what "Public Preview" means for security and access.
 
 Built and maintained by [ContinuumX1 Technologies](https://continuumx1.com).
 
@@ -71,18 +71,9 @@ Mantis runs as **two small services**, plus your browser — no database, no
 extra storage. Every graph you see is built live from a fresh read of the
 Kubernetes API.
 
-```
- Your browser
-      │  same-origin HTTP (no CORS)
-      ▼
- ┌───────────────┐   /api/*  reverse    ┌───────────────┐   client-go /     ┌──────────────────┐
- │  mantis-web   │  ── proxy ─────────► │ mantis-engine │ ── dynamic ─────► │ Kubernetes API   │
- │  (frontend)   │                      │  (backend)    │    client         │  server          │
- │  UI + login   │ ◄── graph JSON ───── │  read-only    │ ◄── objects ───── │                  │
- └───────────────┘                      └───────────────┘                   └──────────────────┘
-   exposed to you                          never exposed —
-   (Ingress / LoadBalancer)                private ClusterIP only
-```
+<p align="center">
+  <img src="docs/images/mantis-arch-white-bg.png" alt="Mantis architecture: browser → mantis-web → mantis-engine → Kubernetes API server" width="720">
+</p>
 
 1. Your browser loads the UI from **`mantis-web`** and signs in.
 2. The page asks `mantis-web` for the graph; `mantis-web` proxies that
@@ -116,7 +107,9 @@ build/
 ```
 
 For the full picture — every UI feature, the security/permissions model, and
-troubleshooting — see the **[User Guide](docs/USER_GUIDE.md)**.
+troubleshooting — see the **[docs site](https://continuumx1.github.io/mantis/)**
+(or [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for the same content as one
+page, if you're reading this on GitHub and want to stay there).
 
 ## Quick start (run it on your own machine)
 
@@ -140,8 +133,8 @@ Then open **<http://localhost:8081>** in your browser.
 - You'll land on a login screen first — this Public Preview build sits
   behind one. Sign in with the demo credential shown right there on the
   screen (`admin` / `admin`). This is a temporary preview gate, not real
-  auth — see the [User Guide](docs/USER_GUIDE.md#public-preview-notes) for
-  what that means.
+  auth — see the [docs](https://continuumx1.github.io/mantis/security/#public-preview-notes)
+  for what that means.
 - You'll then see a live graph of whatever cluster your kubeconfig points
   at. **Click** a resource for its details and relationships, **drag** to
   rearrange, **scroll** to zoom, **Ctrl F** to search.
@@ -187,7 +180,7 @@ distroless nonroot base, no local build required. See
 **[charts/mantis/README.md](charts/mantis/README.md)** for exposing it
 (Ingress/LoadBalancer/port-forward), available chart versions, and the
 full values reference. Full detail on the required permissions and the
-security model is in the **[User Guide](docs/USER_GUIDE.md)**.
+security model is on the **[docs site](https://continuumx1.github.io/mantis/)**.
 
 Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
 iterations, then `0.1.0-rc.1`, then `0.1.0` for stable.
@@ -283,9 +276,9 @@ collaborators, and early feedback shapes it directly. A good place to start:
 - **[Join the Discord](https://discord.gg/ZTB4eGfCxa)** — ask questions,
   report what's confusing or broken, or talk through an idea before you
   build it. This is the fastest way to reach the maintainers.
-- Read the **[User Guide](docs/USER_GUIDE.md)** first — it covers how Mantis
-  works end-to-end, which answers most "how does X work" questions before
-  you need to read code.
+- Read the **[docs site](https://continuumx1.github.io/mantis/)** first —
+  it covers how Mantis works end-to-end, which answers most "how does X
+  work" questions before you need to read code.
 - Keep PRs small and focused, follow [Conventional Commits](https://www.conventionalcommits.org/),
   and include tests for new relationship logic (see `internal/graph`'s
   existing tests for the pattern — they use a fake Kubernetes client, so no
