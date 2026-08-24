@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -107,5 +108,36 @@ func TestBuildClusterGraph_MatchesProgressiveFinalReport(t *testing.T) {
 	}
 	if _, ok := nodeFor(gctx, wantB); !ok {
 		t.Errorf("missing %+v", wantB)
+	}
+}
+
+// A pass must stop at the namespace boundary where its context gets
+// cancelled, rather than continuing to spend API calls on a pass that's
+// already been told to stop — this is what lets the engine's own timeout
+// (see internal/engine/sync.go's syncOnce) actually bound a stuck sync
+// instead of just wrapping it in a context nothing downstream ever checks.
+func TestBuildClusterGraphProgressive_StopsOnContextCancellation(t *testing.T) {
+	fixtures := []runtime.Object{
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-a"}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-b"}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-c"}},
+	}
+	clientset := fake.NewSimpleClientset(fixtures...)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reports := 0
+	err := BuildClusterGraphProgressive(ctx, clientset, nil, false, func(snap ClusterSnapshot) {
+		reports++
+		if reports == 1 {
+			cancel() // cancel right after the first namespace publishes
+		}
+	})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+	if reports != 1 {
+		t.Errorf("reports = %d, want exactly 1 (stopped after cancellation, before namespace 2)", reports)
 	}
 }

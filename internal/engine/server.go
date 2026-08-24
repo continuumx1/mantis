@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/continuumx1/mantis/internal/httpx"
@@ -31,6 +32,12 @@ type Server struct {
 	syncInterval time.Duration
 	cache        *snapshotCache
 	progress     *progressTracker
+	// syncing guards syncOnce against ever running twice at once. The
+	// scheduled loop (syncLoop) is already sequential by construction and
+	// can't overlap itself, but this makes that guarantee an explicit,
+	// enforced property of syncOnce itself rather than an accident of how
+	// it's currently only ever called from one place.
+	syncing atomic.Bool
 }
 
 // New constructs the backend around a Kubernetes client. It does not start
@@ -118,12 +125,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteText(w, "ok")
 }
 
-// handleReady is the readiness probe: it confirms the Kubernetes API is
-// reachable, so the Pod only takes traffic once it can actually serve graphs.
+// handleReady is the readiness probe: the Pod only takes traffic once it can
+// actually serve a graph. It checks the cache, not the live Kubernetes API —
+// deliberately: an independent live call here would compete with the
+// background sync's own, already rate-limited, API calls (see
+// internal/kubernetes.tuneRateLimits) for the same budget, which is exactly
+// the kind of interference that could make a probe flaky *during* a long
+// sync on a large cluster, the one time it matters most that it isn't. Once
+// the cache holds any snapshot — even a partial one from a sync still in
+// progress — Mantis can serve a graph, so it is ready, full stop; readiness
+// deliberately does not flip back off if a later sync fails or the cluster
+// goes unreachable; a stale-but-served snapshot (with the sync pill's own
+// "connection lost" warning right there in the UI) is more useful than
+// mantis-engine dropping out of its Service's endpoints and taking
+// mantis-web's proxy down with it.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.client.Clientset.Discovery().ServerVersion(); err != nil {
-		slog.Warn("probe", "event", "readyz_failed", "error", err.Error())
-		http.Error(w, "cluster unreachable: "+err.Error(), http.StatusServiceUnavailable)
+	if _, ok := s.cache.get(); !ok {
+		slog.Warn("probe", "event", "readyz_failed", "reason", "no_snapshot_yet")
+		http.Error(w, "sync has not produced any data yet", http.StatusServiceUnavailable)
 		return
 	}
 	httpx.WriteText(w, "ready")

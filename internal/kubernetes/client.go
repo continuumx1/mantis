@@ -34,7 +34,12 @@ func tuneRateLimits(c *rest.Config) {
 }
 
 type Client struct {
-	Clientset *kubernetes.Clientset
+	// Clientset is typed kubernetes.Interface, not the concrete *kubernetes.Clientset
+	// NewClient actually builds it from — every call site only ever needs the
+	// interface's methods, and keeping it that wide is what lets engine-side
+	// tests substitute k8s.io/client-go/kubernetes/fake for a real cluster
+	// (see internal/engine's tests) without this struct in the way.
+	Clientset kubernetes.Interface
 	// Dynamic reads arbitrary resources by GVR, including CRDs (VPA, Karpenter)
 	// that the typed Clientset does not know about. It is nil only if it could not
 	// be built; callers must treat CRD collection as best-effort.

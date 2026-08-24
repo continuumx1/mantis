@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/continuumx1/mantis/internal/graph"
+	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 // handleGraph never touches s.client — it only reads s.cache — so a Server
@@ -14,6 +16,38 @@ import (
 // any Kubernetes fixtures.
 func newTestServer() *Server {
 	return &Server{cache: newSnapshotCache(), progress: &progressTracker{}}
+}
+
+// newTestServerWithClient builds a full Server around a fake Kubernetes
+// client, for tests (syncOnce, its overlap guard, context cancellation) that
+// need an actual cluster read to happen. internal/kubernetes.Client.Clientset
+// is kubernetes.Interface specifically so fake.NewSimpleClientset satisfies
+// it here without a real cluster.
+func newTestServerWithClient(clientset *fake.Clientset) *Server {
+	return &Server{
+		client:   &mantiskube.Client{Clientset: clientset},
+		cache:    newSnapshotCache(),
+		progress: &progressTracker{},
+	}
+}
+
+func TestHandleReady_NotReadyBeforeFirstSnapshot(t *testing.T) {
+	s := newTestServer()
+	rec := httptest.NewRecorder()
+	s.handleReady(rec, httptest.NewRequest("GET", "/readyz", nil))
+	if rec.Code != 503 {
+		t.Errorf("status = %d, want 503 before any snapshot exists", rec.Code)
+	}
+}
+
+func TestHandleReady_ReadyOnceAnySnapshotExists(t *testing.T) {
+	s := newTestServer()
+	s.cache.publish(GraphDTO{}) // even an empty/partial snapshot counts
+	rec := httptest.NewRecorder()
+	s.handleReady(rec, httptest.NewRequest("GET", "/readyz", nil))
+	if rec.Code != 200 {
+		t.Errorf("status = %d, want 200 once a snapshot exists", rec.Code)
+	}
 }
 
 func TestHandleGraph_ServesAlreadyCachedSnapshotImmediately(t *testing.T) {

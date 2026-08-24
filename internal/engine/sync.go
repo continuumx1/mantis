@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sort"
 	"sync"
@@ -102,8 +103,20 @@ func (s *Server) syncLoop(ctx context.Context, interval time.Duration) {
 
 // syncOnce runs one whole-cluster pass, publishing a partial snapshot into
 // the cache after every namespace so /api/graph never has to wait for the
-// slowest part of a large cluster to see the fastest part.
+// slowest part of a large cluster to see the fastest part. It refuses to run
+// if another call is already in flight (see Server.syncing) and always
+// bounds itself to buildTimeout, so one stuck pass can never block the next
+// one forever — the deadline cancels the context, which BuildClusterGraph-
+// Progressive and every Kubernetes call underneath it observe and abort on,
+// rather than continuing to burn through remaining namespaces on a pass
+// that's already past its own deadline.
 func (s *Server) syncOnce(ctx context.Context) {
+	if !s.syncing.CompareAndSwap(false, true) {
+		slog.Warn("sync", "event", "sync_skipped_overlap")
+		return
+	}
+	defer s.syncing.Store(false)
+
 	ctx, cancel := context.WithTimeout(ctx, buildTimeout)
 	defer cancel()
 
@@ -121,8 +134,12 @@ func (s *Server) syncOnce(ctx context.Context) {
 
 	duration := time.Since(start)
 	if err != nil {
-		slog.Error("sync", "event", "sync_failed", "duration_ms", duration.Milliseconds(),
-			"error", err.Error(), "kind", "kubernetes_api_failure")
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Error("sync", "event", "sync_timeout", "duration_ms", duration.Milliseconds(), "timeout", buildTimeout.String())
+		} else {
+			slog.Error("sync", "event", "sync_failed", "duration_ms", duration.Milliseconds(),
+				"error", err.Error(), "kind", "kubernetes_api_failure")
+		}
 		s.progress.finish(duration, err)
 		return
 	}

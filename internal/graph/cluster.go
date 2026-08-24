@@ -132,6 +132,14 @@ func BuildClusterGraphProgressive(
 		publish(i+1, false)
 	}
 
+	// One last check before the cluster-scoped extras: a deadline that expired
+	// during the very last namespace should still stop this pass here rather
+	// than spend more time (and API calls) on a pass the caller has already
+	// timed out on.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Karpenter NodePools are cluster-scoped, so list them once here (best-effort
 	// via the dynamic client) rather than per namespace.
 	for r, a := range collectNodePools(ctx, dyn) {
