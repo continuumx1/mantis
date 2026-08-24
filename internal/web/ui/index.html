@@ -1097,8 +1097,16 @@
   // ---- live search ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
   let searchMatches = [], searchActive = -1;
-  // matchNodes ranks resources by how the query hits them: a name prefix beats a
-  // name substring, which beats a kind/namespace hit. Empty query → no results.
+  // matchNodes ranks resources by how the query hits them: a name prefix beats
+  // an exact kind match (typing "node" should surface actual Node objects),
+  // which beats a name substring, which beats a partial kind/namespace hit.
+  // Without the exact-kind tier, searching "node" on a real cluster buried
+  // every Node under any resource merely *named* with "node" in it somewhere
+  // — node-exporter, node-problem-detector, and similar common addons are
+  // both extremely common and score as plain name substrings, so on a
+  // cluster running any of them, real Node objects (which only ever match by
+  // kind, never by name) lost every single one of those ties and vanished
+  // off the end of the result list entirely. Empty query → no results.
   function matchNodes(q){
     q = q.trim().toLowerCase();
     if (!q) return [];
@@ -1107,9 +1115,10 @@
       const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
       let score = -1;
       if (name.startsWith(q)) score = 0;
-      else if (name.includes(q)) score = 1;
-      else if (kind.includes(q)) score = 2;
-      else if (ns.includes(q)) score = 3;
+      else if (kind === q) score = 1;
+      else if (name.includes(q)) score = 2;
+      else if (kind.includes(q)) score = 3;
+      else if (ns.includes(q)) score = 4;
       if (score >= 0) scored.push({ n, score });
     }
     scored.sort((a,b) => a.score-b.score || a.n.name.localeCompare(b.n.name));
