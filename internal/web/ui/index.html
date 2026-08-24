@@ -125,6 +125,10 @@
   @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
   .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
   .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
+  /* warn — a real third state (e.g. a Node whose kubelet stopped reporting:
+     Unknown, not confirmed NotReady) — amber and calm like ok, not pulsing
+     like crit, since it isn't a confirmed failure. */
+  .status-warn .status-ring { stroke: var(--warn); opacity:.8; }
   @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
 
   /* The toggle button is pinned at the same absolute spot — 10px in from the
@@ -174,6 +178,7 @@
   .badge::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; }
   .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
   .badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+  .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
 
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
   .tab { padding: 7px 11px; font-size: 11px; font-family: var(--font-mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -836,7 +841,7 @@
       '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
       '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom. <b>Auto-sync</b> keeps the map live.</p>';
   }
-  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
+  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
   function renderNode(n){
     const head = '<div><div class="p-kind" style="color:'+catColor(n.cat)+'">'+esc(n.kind)+'</div><div class="p-name">'+esc(n.name)+'</div>'+
       '<div class="p-ns">'+(n.ns?"namespace · "+esc(n.ns):"cluster-scoped")+'</div></div>'+ badge(n);
