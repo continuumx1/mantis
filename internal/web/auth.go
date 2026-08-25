@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -118,6 +119,10 @@ func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
 	userOK := subtle.ConstantTimeCompare([]byte(req.Username), []byte(devUsername)) == 1
 	passOK := subtle.ConstantTimeCompare([]byte(req.Password), []byte(devPassword)) == 1
 	if !userOK || !passOK {
+		// Never log the submitted username/password — only that an attempt
+		// failed and where from, enough to spot a brute-force pattern without
+		// putting credentials (real or mistyped-but-sensitive) in the log stream.
+		slog.Warn("auth", "event", "login_failed", "remote_addr", r.RemoteAddr)
 		writeJSONError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
@@ -174,6 +179,12 @@ func (s *sessions) gate(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
+		// An /api/ request with no valid session is the SPA already running in
+		// the browser suddenly finding its session gone (expired, or the
+		// process restarted and dropped the in-memory table) — worth a log line,
+		// unlike a first-time anonymous page load (isNav above), which is
+		// routine and would otherwise flood this at every logged-out visit.
+		slog.Warn("auth", "event", "session_invalid", "path", r.URL.Path)
 		writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 	})
 }

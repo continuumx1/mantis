@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: redis
+    pod-template-hash: 8e2c5a9f1
+  name: redis-8e2c5a9f1
+  namespace: cache
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: redis
+    uid: redis-deploy-uid
+  resourceVersion: "17849"
+  uid: redis-8e2c5a9f1-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+      pod-template-hash: 8e2c5a9f1
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

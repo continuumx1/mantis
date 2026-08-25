@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "1"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: fluentd
+    pod-template-hash: 9c3e6b1a5
+  name: fluentd-9c3e6b1a5
+  namespace: logging
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: fluentd
+    uid: fluentd-deploy-uid
+  resourceVersion: "17849"
+  uid: fluentd-9c3e6b1a5-uid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluentd
+      pod-template-hash: 9c3e6b1a5
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1

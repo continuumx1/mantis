@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Node
+metadata:
+  annotations:
+    node.alpha.kubernetes.io/ttl: "0"
+    volumes.kubernetes.io/controller-managed-attach-detach: "true"
+  creationTimestamp: "2026-08-16T04:43:51Z"
+  labels:
+    beta.kubernetes.io/instance-type: m5.large
+    eks.amazonaws.com/nodegroup: payments-ng
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: ip-192-168-14-87.us-west-2.compute.internal
+    kubernetes.io/os: linux
+    node.kubernetes.io/instance-type: m5.large
+    topology.kubernetes.io/region: us-west-2
+    topology.kubernetes.io/zone: us-west-2a
+  name: ip-192-168-14-87.us-west-2.compute.internal
+  resourceVersion: "17992"
+  uid: ip-192-168-14-87.us-west-2.compute.internal-uid
+spec:
+  providerID: aws:///us-west-2a/i-0000909846fb40795
+status:
+  addresses:
+  - address: 192.168.14.87
+    type: InternalIP
+  - address: ip-192-168-14-87.us-west-2.compute.internal
+    type: InternalDNS
+  - address: ip-192-168-14-87.us-west-2.compute.internal
+    type: Hostname
+  allocatable:
+    cpu: "2"
+    ephemeral-storage: 83873772Ki
+    memory: 7907668Ki
+    pods: "29"
+  capacity:
+    cpu: "2"
+    ephemeral-storage: 104845292Ki
+    memory: 8175316Ki
+    pods: "29"
+  conditions:
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:51Z"
+    message: kubelet is posting ready status
+    reason: KubeletReady
+    status: "True"
+    type: Ready
+  daemonEndpoints:
+    kubeletEndpoint:
+      Port: 10250
+  nodeInfo:
+    architecture: amd64
+    containerRuntimeVersion: containerd://1.7.7
+    kernelVersion: 5.10.234-225.921.amzn2.x86_64
+    kubeProxyVersion: v1.29.6-eks-a5df82a
+    kubeletVersion: v1.29.6-eks-a5df82a
+    operatingSystem: linux
+    osImage: Amazon Linux 2

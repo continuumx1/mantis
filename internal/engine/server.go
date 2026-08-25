@@ -6,83 +6,100 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
-	"sort"
+	"sync/atomic"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/continuumx1/mantis/internal/graph"
 	"github.com/continuumx1/mantis/internal/httpx"
 	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
 )
 
 // buildTimeout bounds a single graph build so a hung API server cannot hang a
-// request.
+// request. It is also, now, the ceiling on how long the very first
+// /api/graph call ever waits — every request after the first snapshot exists
+// returns instantly (see handleGraph).
 const buildTimeout = 30 * time.Second
 
-// Server is the backend service. It reads the cluster and serves the graph
-// projection as JSON.
+// Server is the backend service. A background loop (see sync.go) reads the
+// cluster on its own schedule and publishes what it finds into cache;
+// requests just read the cache. showAll controls whether system-managed
+// noise (service-account/Helm Secrets, the root-CA ConfigMap) is included in
+// the graph; it is wired to the MANTIS_SHOW_ALL env var.
 type Server struct {
-	client  *mantiskube.Client
-	showAll bool
+	client       *mantiskube.Client
+	showAll      bool
+	syncInterval time.Duration
+	cache        *snapshotCache
+	progress     *progressTracker
+	// syncing guards syncOnce against ever running twice at once. The
+	// scheduled loop (syncLoop) is already sequential by construction and
+	// can't overlap itself, but this makes that guarantee an explicit,
+	// enforced property of syncOnce itself rather than an accident of how
+	// it's currently only ever called from one place.
+	syncing atomic.Bool
 }
 
-// New constructs the backend around a Kubernetes client. showAll controls
-// whether system-managed noise (service-account/Helm Secrets, the root-CA
-// ConfigMap) is included in the graph; it is wired to the MANTIS_SHOW_ALL env var.
-func New(client *mantiskube.Client, showAll bool) *Server {
-	return &Server{client: client, showAll: showAll}
+// New constructs the backend around a Kubernetes client. It does not start
+// reading the cluster yet — call Start for that, once, before serving
+// traffic. A syncInterval <= 0 falls back to defaultSyncInterval.
+func New(client *mantiskube.Client, showAll bool, syncInterval time.Duration) *Server {
+	if syncInterval <= 0 {
+		syncInterval = defaultSyncInterval
+	}
+	return &Server{
+		client:       client,
+		showAll:      showAll,
+		syncInterval: syncInterval,
+		cache:        newSnapshotCache(),
+		progress:     &progressTracker{},
+	}
 }
 
-// Handler returns the backend's routes: the graph projection and the
-// liveness/readiness probes.
+// Start launches the background sync loop that keeps the cache warm. It
+// returns immediately; the loop runs until ctx is cancelled (or, in
+// practice, until the process exits — see cmd/mantis-engine, which never
+// cancels the context it passes here, the same "runs until the Pod dies"
+// lifetime every other piece of this service already has).
+func (s *Server) Start(ctx context.Context) {
+	go s.syncLoop(ctx, s.syncInterval)
+}
+
+// Handler returns the backend's routes: the graph projection, the
+// background sync's own progress, and the liveness/readiness probes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/graph", s.handleGraph)
+	mux.HandleFunc("/api/sync/status", s.handleSyncStatus)
 	mux.HandleFunc("/api/resource", s.handleResource)
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/readyz", s.handleReady)
 	return mux
 }
 
-// handleGraph builds the whole-cluster graph and writes it as JSON. A cluster
-// error becomes a 502 with a plain message so the UI can show it rather than a
-// blank canvas.
+// handleGraph serves the current cached snapshot — no cluster read happens on
+// this request path at all; the background loop (sync.go) is the only thing
+// that ever talks to the Kubernetes API to build one. The one exception is
+// the very first request after startup, before the background loop has
+// published anything yet: that request waits (bounded by buildTimeout) for
+// the cache to go ready, which happens as soon as the *first namespace*
+// finishes — not the whole cluster — so even a first load on a large cluster
+// does not have to wait for everything.
 func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), buildTimeout)
-	defer cancel()
-
-	gctx, skipped, err := graph.BuildClusterGraph(ctx, s.client.Clientset, s.client.Dynamic, s.showAll)
-	if err != nil {
-		http.Error(w, "cluster read failed: "+err.Error(), http.StatusBadGateway)
+	dto, ok := s.cache.get()
+	if !ok {
+		select {
+		case <-s.cache.ready:
+			dto, ok = s.cache.get()
+		case <-time.After(buildTimeout):
+		case <-r.Context().Done():
+			return
+		}
+	}
+	if !ok {
+		http.Error(w, "cluster read failed: sync has not produced any data yet", http.StatusServiceUnavailable)
 		return
 	}
-
-	meta := MetaDTO{
-		Context:        s.client.Context,
-		Server:         s.client.Server,
-		Skipped:        skipped,
-		NodeAutoscaler: graph.DetectNodeAutoscaler(ctx, s.client.Dynamic, s.client.Clientset),
-	}
-	meta.Namespaces = countNamespaces(gctx)
-	// Prefer the authoritative namespace list from the API so the UI can show a
-	// region for every namespace (even empty ones), with the count following it.
-	// If the list call fails, fall back to counting namespaces seen on nodes.
-	if nsList, err := s.client.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
-		names := make([]string, 0, len(nsList.Items))
-		for i := range nsList.Items {
-			names = append(names, nsList.Items[i].Name)
-		}
-		sort.Strings(names)
-		meta.NamespaceList = names
-		meta.Namespaces = len(names)
-	}
-	if v, err := s.client.Clientset.Discovery().ServerVersion(); err == nil {
-		meta.Version = v.GitVersion
-	}
-
-	dto := FromContext(gctx, meta)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -91,35 +108,42 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleSyncStatus reports where the background sync loop is right now — the
+// namespaces-done/total count, running resource/relationship totals, and the
+// last completed pass's duration/error — so the UI can show real progress
+// instead of a bare spinner while a large cluster's first pass is still
+// filling in.
+func (s *Server) handleSyncStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(s.progress.snapshot())
+}
+
 // handleHealth is the liveness probe: the process is up. It does not touch the
 // cluster, so a cluster outage never restarts the Pod.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteText(w, "ok")
 }
 
-// handleReady is the readiness probe: it confirms the Kubernetes API is
-// reachable, so the Pod only takes traffic once it can actually serve graphs.
+// handleReady is the readiness probe: the Pod only takes traffic once it can
+// actually serve a graph. It checks the cache, not the live Kubernetes API —
+// deliberately: an independent live call here would compete with the
+// background sync's own, already rate-limited, API calls (see
+// internal/kubernetes.tuneRateLimits) for the same budget, which is exactly
+// the kind of interference that could make a probe flaky *during* a long
+// sync on a large cluster, the one time it matters most that it isn't. Once
+// the cache holds any snapshot — even a partial one from a sync still in
+// progress — Mantis can serve a graph, so it is ready, full stop; readiness
+// deliberately does not flip back off if a later sync fails or the cluster
+// goes unreachable; a stale-but-served snapshot (with the sync pill's own
+// "connection lost" warning right there in the UI) is more useful than
+// mantis-engine dropping out of its Service's endpoints and taking
+// mantis-web's proxy down with it.
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.client.Clientset.Discovery().ServerVersion(); err != nil {
-		http.Error(w, "cluster unreachable: "+err.Error(), http.StatusServiceUnavailable)
+	if _, ok := s.cache.get(); !ok {
+		slog.Warn("probe", "event", "readyz_failed", "reason", "no_snapshot_yet")
+		http.Error(w, "sync has not produced any data yet", http.StatusServiceUnavailable)
 		return
 	}
 	httpx.WriteText(w, "ready")
-}
-
-// countNamespaces counts distinct namespaces represented among the graph's
-// visible nodes, which is what the header's "N namespaces" reflects. Hidden
-// nodes (system-managed noise, e.g. the kube-root-ca.crt ConfigMap every
-// namespace carries) are skipped so the count matches the namespace regions the
-// UI actually draws — a namespace whose only resources are hidden gets no region
-// and must not inflate the count.
-func countNamespaces(gctx *graph.Context) int {
-	seen := map[string]struct{}{}
-	for _, n := range gctx.Nodes() {
-		if n.Hidden || n.Ref.Namespace == "" {
-			continue
-		}
-		seen[n.Ref.Namespace] = struct{}{}
-	}
-	return len(seen)
 }

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generateName: fluentd-9c3e6b1a5-
+  labels:
+    app: fluentd
+    pod-template-hash: 9c3e6b1a5
+  name: fluentd-9c3e6b1a5-9c3e600
+  namespace: logging
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: fluentd-9c3e6b1a5
+    uid: fluentd-9c3e6b1a5-uid
+  resourceVersion: "17836"
+  uid: fluentd-9c3e6b1a5-9c3e600-uid
+spec:
+  containers:
+  - envFrom:
+      - configMapRef:
+          name: fluentd-config
+    image: fluent/fluentd:v1.17-debian
+    imagePullPolicy: IfNotPresent
+    name: fluentd
+    ports:
+    - containerPort: 24224
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  nodeName: gke-demo-cluster-default-pool-3f9a1c2b-v6y5
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  serviceAccount: default
+  serviceAccountName: default
+status:
+  phase: Running
+  podIP: 10.244.40.10
+  qosClass: Burstable
+  startTime: "2026-08-16T18:20:58Z"

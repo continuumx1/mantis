@@ -10,43 +10,125 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// BuildClusterGraph assembles the relationship graph for an entire cluster by
-// listing every namespace the caller can see and running BuildNamespaceGraph for
-// each, then merging the results into one Context. Cluster-scoped resources
-// (Nodes, PersistentVolumes) are listed inside each namespace pass, so the merge
-// deduplicates them by reference: a resolved node always wins over an unresolved
-// one, which also lets a reference that dangles in one namespace resolve against
-// a real resource in another.
-//
-// The merge keeps the whole-cluster map honest without special-casing: every
-// listed resource is still a node, and an edge target is unresolved only when it
-// exists in no namespace at all. Kinds that RBAC forbids listing are collected
-// and returned deduplicated so the caller can report reduced coverage.
-//
-// It re-lists cluster-scoped resources once per namespace, which is wasteful on
-// clusters with very many namespaces; that is a deliberate simplicity trade for
-// now and can become a single up-front list later without changing the shape.
+// ClusterSnapshot is one point-in-time render of the whole-cluster merge as
+// BuildClusterGraphProgressive assembles it, namespace by namespace. Context
+// and Skipped are already a complete, independent, safe-to-keep copy of
+// everything merged so far — not a view onto state the walk keeps mutating —
+// so a caller can publish one straight into a cache read concurrently by
+// other goroutines.
+type ClusterSnapshot struct {
+	Context         *Context
+	Skipped         []string
+	NamespacesDone  int
+	NamespacesTotal int
+	// Complete is true only on the final report of a pass (after every
+	// namespace and the cluster-scoped extras), false on every partial one.
+	Complete bool
+}
+
+// BuildClusterGraph assembles the relationship graph for an entire cluster in
+// one blocking call: every namespace the caller can see, merged into one
+// Context. It is a thin wrapper around BuildClusterGraphProgressive that
+// keeps only the final report — for a caller (tests included) that just
+// wants one complete result and does not care how it got there.
 func BuildClusterGraph(
 	ctx context.Context,
 	clientset kubernetes.Interface,
 	dyn dynamic.Interface,
 	showAll bool,
 ) (*Context, []string, error) {
+	var final ClusterSnapshot
+	err := BuildClusterGraphProgressive(ctx, clientset, dyn, showAll, func(snap ClusterSnapshot) {
+		final = snap
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return final.Context, final.Skipped, nil
+}
+
+// BuildClusterGraphProgressive lists every namespace the caller can see, then
+// builds and merges each one's graph exactly as BuildClusterGraph always has
+// — same BuildNamespaceGraph call, same merge-by-reference dedup for
+// cluster-scoped resources (Nodes, PersistentVolumes) so a resolved node
+// always wins over an unresolved one, and a reference that dangles in one
+// namespace can still resolve against a real resource found in another —
+// except report is called with the merged graph *as it stands so far* after
+// every namespace, not just once at the end.
+//
+// This is what turns "read the whole cluster before anyone gets an answer"
+// into "the first namespace's worth of resources reaches the caller as soon
+// as it's ready, and every namespace after that fills the picture in a
+// little more" — a large cluster's total build time no longer has to fit
+// inside one HTTP request's timeout, because no single request is waiting on
+// all of it.
+//
+// It re-lists cluster-scoped resources once per namespace, which is wasteful
+// on clusters with very many namespaces; that is a deliberate simplicity
+// trade carried over from BuildClusterGraph's original shape, not something
+// this change introduces.
+func BuildClusterGraphProgressive(
+	ctx context.Context,
+	clientset kubernetes.Interface,
+	dyn dynamic.Interface,
+	showAll bool,
+	report func(ClusterSnapshot),
+) error {
 	nsList, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("list namespaces: %w", err)
+		return fmt.Errorf("list namespaces: %w", err)
+	}
+	// Hidden namespaces (kube-node-lease) are dropped before total is even
+	// computed, not skipped mid-loop — so they cost no API call via
+	// BuildNamespaceGraph, and NamespacesTotal itself already reflects only
+	// the namespaces this pass will actually visit and report.
+	namespaces := make([]string, 0, len(nsList.Items))
+	for i := range nsList.Items {
+		if name := nsList.Items[i].Name; !IsHiddenNamespace(name) {
+			namespaces = append(namespaces, name)
+		}
 	}
 
 	merged := map[ResourceRef]Node{}
 	var relations []Relation
 	skippedSet := map[string]struct{}{}
+	total := len(namespaces)
 
-	for i := range nsList.Items {
-		namespace := nsList.Items[i].Name
+	// publish snapshots the current merge state into an independent
+	// ClusterSnapshot — fresh slices, not the loop's own backing arrays/map —
+	// so report's caller can hold onto (or hand to another goroutine) what it
+	// receives without it changing underneath them as the walk continues.
+	publish := func(done int, complete bool) {
+		nodes := make([]Node, 0, len(merged))
+		for _, n := range merged {
+			nodes = append(nodes, n)
+		}
+		skipped := make([]string, 0, len(skippedSet))
+		for kind := range skippedSet {
+			skipped = append(skipped, kind)
+		}
+		sort.Strings(skipped)
+		relCopy := make([]Relation, len(relations))
+		copy(relCopy, relations)
+
+		subject := ResourceRef{Kind: "Cluster"}
+		report(ClusterSnapshot{
+			Context:         NewFromNodes(subject, relCopy, nodes),
+			Skipped:         skipped,
+			NamespacesDone:  done,
+			NamespacesTotal: total,
+			Complete:        complete,
+		})
+	}
+
+	for i, namespace := range namespaces {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
 		nsCtx, skipped, err := BuildNamespaceGraph(ctx, clientset, dyn, namespace, showAll)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		for _, kind := range skipped {
 			skippedSet[kind] = struct{}{}
@@ -56,6 +138,15 @@ func BuildClusterGraph(
 		for _, n := range nsCtx.Nodes() {
 			mergeNode(merged, n)
 		}
+		publish(i+1, false)
+	}
+
+	// One last check before the cluster-scoped extras: a deadline that expired
+	// during the very last namespace should still stop this pass here rather
+	// than spend more time (and API calls) on a pass the caller has already
+	// timed out on.
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Karpenter NodePools are cluster-scoped, so list them once here (best-effort
@@ -63,20 +154,9 @@ func BuildClusterGraph(
 	for r, a := range collectNodePools(ctx, dyn) {
 		mergeNode(merged, Node{Ref: r, Resolved: true, Attributes: a})
 	}
+	publish(total, true)
 
-	nodes := make([]Node, 0, len(merged))
-	for _, n := range merged {
-		nodes = append(nodes, n)
-	}
-
-	skipped := make([]string, 0, len(skippedSet))
-	for kind := range skippedSet {
-		skipped = append(skipped, kind)
-	}
-	sort.Strings(skipped)
-
-	subject := ResourceRef{Kind: "Cluster"}
-	return NewFromNodes(subject, relations, nodes), skipped, nil
+	return nil
 }
 
 // mergeNode folds a namespace-scoped node into the cluster-wide set. A resolved

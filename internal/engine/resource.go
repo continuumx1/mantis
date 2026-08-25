@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -90,6 +91,7 @@ func (s *Server) handleResource(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Read forbidden by RBAC. Access follows your Kubernetes permissions.", http.StatusForbidden)
 			return
 		}
+		slog.Error("resource_fetch", "event", "kubernetes_api_failure", "kind", kind, "namespace", namespace, "name", name, "error", err.Error())
 		http.Error(w, "fetch failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}

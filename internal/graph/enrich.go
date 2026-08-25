@@ -229,10 +229,25 @@ func slicePorts(ports []discoveryv1.EndpointPort) []string {
 func nodeAttributes(node *corev1.Node) []string {
 	var attrs []string
 
-	ready := "NotReady"
+	// "Unknown" (the kubelet has stopped reporting — a node going dark, not
+	// confirmed unhealthy) is a real, distinct NodeReady condition value, not
+	// the same thing as "False" (confirmed NotReady) — collapsing it into
+	// NotReady would call a node's status something Kubernetes never actually
+	// reported. Absent the condition entirely (theoretically possible on a
+	// node still registering) reads as Unknown too — genuinely unverified,
+	// not assumed healthy or unhealthy either way.
+	ready := "Unknown"
 	for _, c := range node.Status.Conditions {
-		if c.Type == corev1.NodeReady && c.Status == corev1.ConditionTrue {
+		if c.Type != corev1.NodeReady {
+			continue
+		}
+		switch c.Status {
+		case corev1.ConditionTrue:
 			ready = "Ready"
+		case corev1.ConditionFalse:
+			ready = "NotReady"
+		default:
+			ready = "Unknown"
 		}
 	}
 	attrs = append(attrs, "status: "+ready)

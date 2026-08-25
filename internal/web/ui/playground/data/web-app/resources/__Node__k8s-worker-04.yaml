@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Node
+metadata:
+  annotations:
+    node.alpha.kubernetes.io/ttl: "0"
+    volumes.kubernetes.io/controller-managed-attach-detach: "true"
+  creationTimestamp: "2026-08-16T04:43:51Z"
+  labels:
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: k8s-worker-04
+    kubernetes.io/os: linux
+    node-role.kubernetes.io/worker: ""
+  name: k8s-worker-04
+  resourceVersion: "17992"
+  uid: k8s-worker-04-uid
+spec: {}
+status:
+  addresses:
+  - address: 10.0.1.14
+    type: InternalIP
+  - address: k8s-worker-04
+    type: Hostname
+  allocatable:
+    cpu: "8"
+    ephemeral-storage: 234492896Ki
+    memory: 8126756Ki
+    pods: "110"
+  capacity:
+    cpu: "8"
+    ephemeral-storage: 234492896Ki
+    memory: 8126756Ki
+    pods: "110"
+  conditions:
+  - lastHeartbeatTime: "2026-08-16T18:22:00Z"
+    lastTransitionTime: "2026-08-16T04:43:51Z"
+    message: kubelet is posting ready status
+    reason: KubeletReady
+    status: "True"
+    type: Ready
+  daemonEndpoints:
+    kubeletEndpoint:
+      Port: 10250
+  nodeInfo:
+    architecture: amd64
+    containerRuntimeVersion: containerd://1.7.13
+    kernelVersion: 5.15.0-91-generic
+    kubeProxyVersion: v1.29.4
+    kubeletVersion: v1.29.4
+    operatingSystem: linux
+    osImage: Ubuntu 22.04.4 LTS

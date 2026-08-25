@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -13,7 +14,13 @@ import (
 	"github.com/continuumx1/mantis/internal/httpx"
 )
 
-//go:embed ui
+// "all:" is required, not cosmetic: a bare "//go:embed ui" silently drops
+// any file/dir whose name starts with "." or "_" — which is exactly how the
+// Playground's cluster-scoped fixtures are named (playground/data/*/resources
+// /__Node__*.yaml, __PersistentVolume__*.yaml), so without it those 404 at
+// runtime with no build-time signal that anything is missing.
+//
+//go:embed all:ui
 var uiFiles embed.FS
 
 // StaticHandler serves the embedded single-page UI. The UI ships inside the
@@ -46,6 +53,7 @@ func NewHandler(engineURL string) (http.Handler, error) {
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Error("proxy", "event", "proxy_failure", "path", r.URL.Path, "engine_url", engineURL, "error", err.Error())
 		http.Error(w, "engine unreachable: "+err.Error(), http.StatusBadGateway)
 	}
 

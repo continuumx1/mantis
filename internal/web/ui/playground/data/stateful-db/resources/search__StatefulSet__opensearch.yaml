@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: "2026-08-16T18:21:00Z"
+  name: opensearch
+  namespace: search
+  resourceVersion: "17900"
+  uid: opensearch-sts-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: opensearch
+  serviceName: opensearch-headless
+  template:
+    metadata:
+      labels:
+        app: opensearch
+    spec:
+      containers:
+      - image: opensearchproject/opensearch:2.15.0
+        name: opensearch
+        ports:
+        - containerPort: 9200
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

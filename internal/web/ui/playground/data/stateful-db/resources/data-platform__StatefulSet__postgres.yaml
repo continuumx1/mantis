@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"name":"postgres","namespace":"data-platform"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"postgres"}},"serviceName":"postgres-headless","template":{"metadata":{"labels":{"app":"postgres"}},"spec":{"containers":[{"envFrom":[{"secretRef":{"name":"postgres-credentials"}},{"configMapRef":{"name":"postgres-config"}}],"image":"postgres:16-alpine","name":"postgres","ports":[{"containerPort":5432}],"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"volumeMounts":[{"mountPath":"/var/lib/postgresql/data","name":"data"}]}]}},"volumeClaimTemplates":[{"metadata":{"name":"data"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}}}}]}}
+  creationTimestamp: "2026-08-16T18:21:27Z"
+  generation: 1
+  name: postgres
+  namespace: data-platform
+  resourceVersion: "17950"
+  uid: 2be692c9-9e6f-4083-8820-e2dfc525757e
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: postgres
+  serviceName: postgres-headless
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - envFrom:
+        - secretRef:
+            name: postgres-credentials
+        - configMapRef:
+            name: postgres-config
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+        name: postgres
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+status:
+  availableReplicas: 2
+  collisionCount: 0
+  currentReplicas: 2
+  currentRevision: postgres-7785d877ff
+  observedGeneration: 1
+  readyReplicas: 2
+  replicas: 2
+  updateRevision: postgres-7785d877ff
+  updatedReplicas: 2

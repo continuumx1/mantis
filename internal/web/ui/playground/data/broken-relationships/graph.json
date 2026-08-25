@@ -1,0 +1,327 @@
+{
+  "meta": {
+    "context": "EKS \u00b7 broken relationships (sample data)",
+    "server": "sample data \u2014 not a live cluster",
+    "version": "v1.29.6-eks-a5df82a",
+    "namespaces": 2,
+    "namespaceList": [
+      "payments-api",
+      "platform"
+    ],
+    "nodeCount": 17,
+    "edgeCount": 17
+  },
+  "nodes": [
+    {
+      "id": "payments-api/ConfigMap/payments-config-v2",
+      "kind": "ConfigMap",
+      "name": "payments-config-v2",
+      "ns": "payments-api",
+      "resolved": false
+    },
+    {
+      "id": "payments-api/Deployment/payments-api",
+      "kind": "Deployment",
+      "name": "payments-api",
+      "ns": "payments-api",
+      "resolved": true,
+      "attributes": [
+        "replicas: 0/2 ready",
+        "strategy: RollingUpdate",
+        "image: nginx:1.27-alpine",
+        "requests: none",
+        "limits: none",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "payments-api/Ingress/payments-ingress",
+      "kind": "Ingress",
+      "name": "payments-ingress",
+      "ns": "payments-api",
+      "resolved": true
+    },
+    {
+      "id": "payments-api/PersistentVolumeClaim/payments-cache",
+      "kind": "PersistentVolumeClaim",
+      "name": "payments-cache",
+      "ns": "payments-api",
+      "resolved": true,
+      "attributes": [
+        "Pending",
+        "1Gi",
+        "RWO",
+        "sc:fast-ssd-nonexistent"
+      ]
+    },
+    {
+      "id": "payments-api/Pod/payments-api-cc7dfd779-khq8q",
+      "kind": "Pod",
+      "name": "payments-api-cc7dfd779-khq8q",
+      "ns": "payments-api",
+      "status": "crit",
+      "resolved": true,
+      "attributes": [
+        "CreateContainerConfigError \u00b7 0/1",
+        "image: nginx:1.27-alpine",
+        "qos: BestEffort",
+        "requests: none",
+        "limits: none",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "payments-api/Pod/payments-api-cc7dfd779-pm58k",
+      "kind": "Pod",
+      "name": "payments-api-cc7dfd779-pm58k",
+      "ns": "payments-api",
+      "status": "crit",
+      "resolved": true,
+      "attributes": [
+        "CreateContainerConfigError \u00b7 0/1",
+        "image: nginx:1.27-alpine",
+        "qos: BestEffort",
+        "requests: none",
+        "limits: none",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "payments-api/ReplicaSet/payments-api-cc7dfd779",
+      "kind": "ReplicaSet",
+      "name": "payments-api-cc7dfd779",
+      "ns": "payments-api",
+      "resolved": true,
+      "attributes": [
+        "replicas: 0/2 ready",
+        "image: nginx:1.27-alpine",
+        "requests: none",
+        "limits: none",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "payments-api/Service/payments-api-svc",
+      "kind": "Service",
+      "name": "payments-api-svc",
+      "ns": "payments-api",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.98.81.53",
+        "ports: 80\u219280/TCP",
+        "endpoints: none"
+      ]
+    },
+    {
+      "id": "payments-api/Service/payments-svc-old",
+      "kind": "Service",
+      "name": "payments-svc-old",
+      "ns": "payments-api",
+      "resolved": false
+    },
+    {
+      "id": "/Node/ip-192-168-14-87.us-west-2.compute.internal",
+      "kind": "Node",
+      "name": "ip-192-168-14-87.us-west-2.compute.internal",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.6-eks-a5df82a",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/ip-192-168-32-140.us-west-2.compute.internal",
+      "kind": "Node",
+      "name": "ip-192-168-32-140.us-west-2.compute.internal",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.6-eks-a5df82a",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/ip-192-168-51-203.us-west-2.compute.internal",
+      "kind": "Node",
+      "name": "ip-192-168-51-203.us-west-2.compute.internal",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.6-eks-a5df82a",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "platform/Deployment/platform-gateway",
+      "kind": "Deployment",
+      "name": "platform-gateway",
+      "ns": "platform",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: envoyproxy/envoy:v1.30-latest",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "platform/ReplicaSet/platform-gateway-2f5a8c1e6",
+      "kind": "ReplicaSet",
+      "name": "platform-gateway-2f5a8c1e6",
+      "ns": "platform",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: envoyproxy/envoy:v1.30-latest",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a800",
+      "kind": "Pod",
+      "name": "platform-gateway-2f5a8c1e6-2f5a800",
+      "ns": "platform",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: envoyproxy/envoy:v1.30-latest",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a801",
+      "kind": "Pod",
+      "name": "platform-gateway-2f5a8c1e6-2f5a801",
+      "ns": "platform",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: envoyproxy/envoy:v1.30-latest",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "platform/Service/platform-gateway-svc",
+      "kind": "Service",
+      "name": "platform-gateway-svc",
+      "ns": "platform",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.2.10",
+        "ports: 80\u219280/TCP",
+        "endpoints: 10.244.164.10:80, 10.244.186.11:80"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "payments-api/ReplicaSet/payments-api-cc7dfd779",
+      "to": "payments-api/Deployment/payments-api",
+      "type": "controlled-by"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-khq8q",
+      "to": "payments-api/ReplicaSet/payments-api-cc7dfd779",
+      "type": "controlled-by"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-khq8q",
+      "to": "payments-api/ConfigMap/payments-config-v2",
+      "type": "references"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-pm58k",
+      "to": "payments-api/ReplicaSet/payments-api-cc7dfd779",
+      "type": "controlled-by"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-pm58k",
+      "to": "payments-api/ConfigMap/payments-config-v2",
+      "type": "references"
+    },
+    {
+      "from": "payments-api/Ingress/payments-ingress",
+      "to": "payments-api/Service/payments-svc-old",
+      "type": "routes-to"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-khq8q",
+      "to": "/Node/ip-192-168-14-87.us-west-2.compute.internal",
+      "type": "runs-on"
+    },
+    {
+      "from": "payments-api/Pod/payments-api-cc7dfd779-pm58k",
+      "to": "/Node/ip-192-168-32-140.us-west-2.compute.internal",
+      "type": "runs-on"
+    },
+    {
+      "from": "platform/ReplicaSet/platform-gateway-2f5a8c1e6",
+      "to": "platform/Deployment/platform-gateway",
+      "type": "controlled-by"
+    },
+    {
+      "from": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a800",
+      "to": "platform/ReplicaSet/platform-gateway-2f5a8c1e6",
+      "type": "controlled-by"
+    },
+    {
+      "from": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a800",
+      "to": "/Node/ip-192-168-32-140.us-west-2.compute.internal",
+      "type": "runs-on"
+    },
+    {
+      "from": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a801",
+      "to": "platform/ReplicaSet/platform-gateway-2f5a8c1e6",
+      "type": "controlled-by"
+    },
+    {
+      "from": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a801",
+      "to": "/Node/ip-192-168-51-203.us-west-2.compute.internal",
+      "type": "runs-on"
+    },
+    {
+      "from": "platform/Service/platform-gateway-svc",
+      "to": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a800",
+      "type": "selects"
+    },
+    {
+      "from": "platform/Service/platform-gateway-svc",
+      "to": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a800",
+      "type": "serves"
+    },
+    {
+      "from": "platform/Service/platform-gateway-svc",
+      "to": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a801",
+      "type": "selects"
+    },
+    {
+      "from": "platform/Service/platform-gateway-svc",
+      "to": "platform/Pod/platform-gateway-2f5a8c1e6-2f5a801",
+      "type": "serves"
+    }
+  ]
+}

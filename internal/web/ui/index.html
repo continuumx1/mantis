@@ -21,7 +21,10 @@
 <style>
   :root {
     color-scheme: dark;
-    --ground: #0a0e13; --ground-2: #0e141b; --panel: #121a23; --panel-2: #172230; --line: #223041; --dot: #223041;
+    /* Neutral charcoal grey (not the near-black, blue-tinted canvas this used
+       to be) — matched to the reference dark-mode docs site: a true grey hue
+       with no blue cast, panels a step up, borders a step up from that. */
+    --ground: #18191c; --ground-2: #1d1e22; --panel: #222327; --panel-2: #292a2f; --line: #35363c; --dot: #3a3b41;
     --ink: #e7eef6; --muted: #8595a6; --faint: #5a6b7d; --brand: #a6e22e;
     --cat-workload: #6ea8fe; --cat-pod: #a6e22e; --cat-network: #d980fb; --cat-config: #e3b341; --cat-storage: #34d1bf; --cat-node: #96a4b5; --cat-autoscale: #f0883e;
     --ns-cluster: #8595a6;
@@ -56,12 +59,17 @@
      the left, cluster/stats/status/actions on the right, a flexible spacer
      between. Vertical dividers (not "·" text) separate the right-hand groups
      so the eye can parse them without reading every character. */
-  header { display: flex; align-items: center; gap: 18px; padding: 13px 22px; border-bottom: 1px solid var(--line);
+  /* Vertical padding trimmed 13px→10px as the mascot grew 34px→40px below —
+     34+2*13 = 40+2*10 = 60px either way, so the header's own height (driven
+     by its tallest child, the mascot) is unchanged even though the mascot
+     reads noticeably bigger now that it's the header's sole identity mark. */
+  header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
     background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
 
+  /* No "mantis" wordmark text next to it anymore — the mascot is the only
+     brand mark in the header now, so it's sized up to carry that on its own. */
   .brand { display: flex; align-items: center; gap: 10px; flex: none; }
-  .brand .mascot { height: 34px; width: auto; display: block; flex: none; }
-  .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--ink); }
+  .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
 
   .spacer { flex: 1 1 auto; min-width: 16px; }
 
@@ -122,6 +130,10 @@
   @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
   .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
   .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
+  /* warn — a real third state (e.g. a Node whose kubelet stopped reporting:
+     Unknown, not confirmed NotReady) — amber and calm like ok, not pulsing
+     like crit, since it isn't a confirmed failure. */
+  .status-warn .status-ring { stroke: var(--warn); opacity:.8; }
   @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
 
   /* The toggle button is pinned at the same absolute spot — 10px in from the
@@ -171,6 +183,7 @@
   .badge::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; }
   .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
   .badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 12%, transparent); }
+  .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
 
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
   .tab { padding: 7px 11px; font-size: 11px; font-family: var(--font-mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -331,6 +344,17 @@
   .overlay code { font-family: var(--font-mono); color: var(--brand); }
   .overlay.err h3 { color: var(--crit); }
 
+  /* Live progress shown in the connecting overlay (and, via the same data,
+     the sync pill's popover) while the background sync is still filling in —
+     namespacesTotal is a real, known-upfront count; the resource/relationship
+     numbers are running totals with deliberately no "/N" denominator, since
+     how much lives in namespaces not yet reached is genuinely unknown until
+     the sync gets there (see internal/engine/sync.go's SyncProgress). */
+  .sync-progress { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    display: flex; flex-direction: column; gap: 5px; font-family: var(--font-mono); font-size: 12px; text-align: left; }
+  .sync-progress .sp-row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+  .sync-progress .sp-row b { color: var(--ink); font-weight: 600; }
+
   /* Non-blocking notice for failures during silent sync. */
   .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 7;
     display: none; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
@@ -348,8 +372,7 @@
 <div id="app">
   <header>
     <div class="brand">
-      <img class="mascot" src="mantis-mascot.webp" alt="Mantis mascot" />
-      <span class="brand-name">mantis</span>
+      <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
     </div>
 
     <div class="search-wrap">
@@ -523,6 +546,8 @@
   let selected = null, curTab = "summary", yamlToken = 0;
   let autoTimer = null, everLoaded = false;
   let lastGraphData = null; // last successful /api/graph payload, kept so a theme switch can recolor without a re-fetch
+  let lastSyncProgress = null; // most recent /api/sync/status payload (see pollSyncStatus, below the sync pill)
+  let onSyncProgress = null; // set by firstLoad while its overlay is up, so pollSyncStatus can refresh it live; null otherwise
 
   // ---- overlay (blocking, first connect only) + toast (non-blocking failures) ----
   function showOverlay(title, bodyHTML, isErr){
@@ -568,13 +593,37 @@
         return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); });
       });
   }
-  // firstLoad shows the blocking overlay — the only time the user waits.
+  // fetchSyncStatus reads the background sync loop's own progress (see
+  // internal/engine/sync.go's SyncProgress) — used by both the connecting
+  // overlay (below) and the sync pill's popover (see pollSyncStatus).
+  function fetchSyncStatus(){
+    return fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject());
+  }
+  // overlayProgressHTML renders SyncProgress as the connecting overlay's
+  // extra detail block. namespacesTotal being falsy means the very first
+  // status poll hasn't landed yet — show nothing rather than "0/0".
+  function overlayProgressHTML(p){
+    if (!p || !p.namespacesTotal) return "";
+    return '<div class="sync-progress">'+
+      '<div class="sp-row"><span>Namespaces</span><b>'+p.namespacesDone+' / '+p.namespacesTotal+'</b></div>'+
+      '<div class="sp-row"><span>Resources found so far</span><b>'+(p.resourcesSoFar||0)+'</b></div>'+
+      '<div class="sp-row"><span>Relationships so far</span><b>'+(p.relationshipsSoFar||0)+'</b></div>'+
+      '</div>';
+  }
+  // firstLoad shows the blocking overlay — the only time the user waits, and
+  // typically brief now: /api/graph answers as soon as the *first* namespace
+  // is ready (see internal/engine/server.go's handleGraph), not the whole
+  // cluster. While it's up, onSyncProgress (driven by pollSyncStatus's own
+  // steady poll, below) refreshes it with real progress instead of a static
+  // "reading resources" message sitting there unchanged.
   function firstLoad(){
     showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
+    onSyncProgress = p => showOverlay("Connecting to your cluster…",
+      "<p>Reading resources and relationships.</p>" + overlayProgressHTML(p), false);
     fetchGraph()
-      .then(data => { hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
-      .catch(err => showOverlay("Cannot read the cluster",
-        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true));
+      .then(data => { onSyncProgress = null; hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
+      .catch(err => { onSyncProgress = null; showOverlay("Cannot read the cluster",
+        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true); });
   }
   // sync is silent: no overlay, positions and selection preserved. The pill only
   // turns amber if a request is slow (latency), red on failure — a routine fast
@@ -833,7 +882,7 @@
       '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
       '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom. <b>Auto-sync</b> keeps the map live.</p>';
   }
-  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
+  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
   function renderNode(n){
     const head = '<div><div class="p-kind" style="color:'+catColor(n.cat)+'">'+esc(n.kind)+'</div><div class="p-name">'+esc(n.name)+'</div>'+
       '<div class="p-ns">'+(n.ns?"namespace · "+esc(n.ns):"cluster-scoped")+'</div></div>'+ badge(n);
@@ -1088,24 +1137,48 @@
 
   // ---- live search ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
-  let searchMatches = [], searchActive = -1;
-  // matchNodes ranks resources by how the query hits them: a name prefix beats a
-  // name substring, which beats a kind/namespace hit. Empty query → no results.
+  // SEARCH_RESULT_CAP replaces what used to be a hard 12-result limit with no
+  // way to see past it. 200 is generous rather than unlimited on purpose —
+  // rendering it is trivial (a few hundred DOM nodes on a keystroke costs
+  // nothing a browser notices) but an actually-unbounded list on a very large
+  // cluster would turn one broad query (e.g. a namespace name matching
+  // hundreds of resources) into thousands of unscrollable rows for no benefit
+  // over just narrowing the query. The dropdown (.search-results) already
+  // scrolls past its fixed height — see its max-height/overflow-y in the
+  // stylesheet — so raising the cap is what actually makes that scrolling
+  // matter instead of every search fitting inside 12 rows already.
+  const SEARCH_RESULT_CAP = 200;
+  let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
+  // matchNodes ranks resources by how the query hits them: a name prefix beats
+  // an exact kind match (typing "node" should surface actual Node objects),
+  // which beats a name substring, which beats a partial kind/namespace hit.
+  // Without the exact-kind tier, searching "node" on a real cluster buried
+  // every Node under any resource merely *named* with "node" in it somewhere
+  // — node-exporter, node-problem-detector, and similar common addons are
+  // both extremely common and score as plain name substrings, so on a
+  // cluster running any of them, real Node objects (which only ever match by
+  // kind, never by name) lost every single one of those ties and vanished
+  // off the end of the result list entirely. Empty query → no results.
+  // matchNodes returns { matches, total }: matches is capped at
+  // SEARCH_RESULT_CAP for rendering, total is every match found (uncapped),
+  // so renderSearch can say how many more there are instead of the list just
+  // silently stopping.
   function matchNodes(q){
     q = q.trim().toLowerCase();
-    if (!q) return [];
+    if (!q) return { matches: [], total: 0 };
     const scored = [];
     for (const n of nodes){
       const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
       let score = -1;
       if (name.startsWith(q)) score = 0;
-      else if (name.includes(q)) score = 1;
-      else if (kind.includes(q)) score = 2;
-      else if (ns.includes(q)) score = 3;
+      else if (kind === q) score = 1;
+      else if (name.includes(q)) score = 2;
+      else if (kind.includes(q)) score = 3;
+      else if (ns.includes(q)) score = 4;
       if (score >= 0) scored.push({ n, score });
     }
     scored.sort((a,b) => a.score-b.score || a.n.name.localeCompare(b.n.name));
-    return scored.slice(0,12).map(s => s.n);
+    return { matches: scored.slice(0,SEARCH_RESULT_CAP).map(s => s.n), total: scored.length };
   }
   function renderSearch(){
     if (!searchMatches.length){
@@ -1120,7 +1193,10 @@
         '<span class="sr-name">'+esc(n.name)+'</span>'+
         '<span class="sr-kind">'+esc(n.kind)+'</span>'+
         '<span class="sr-ns">'+(n.ns?esc(n.ns):"cluster")+'</span>'+
-      '</div>').join("");
+      '</div>').join("") +
+      (searchMatchTotal > searchMatches.length
+        ? '<div class="search-empty">+'+(searchMatchTotal-searchMatches.length)+' more — refine your search</div>'
+        : "");
     searchResults.classList.add("open");
     searchResults.querySelectorAll(".sresult").forEach(el =>
       el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
@@ -1131,12 +1207,17 @@
     closeSearch();
   }
   function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
-  searchInput.addEventListener("input", () => { searchMatches = matchNodes(searchInput.value); searchActive = searchMatches.length ? 0 : -1; renderSearch(); });
+  searchInput.addEventListener("input", () => {
+    const r = matchNodes(searchInput.value);
+    searchMatches = r.matches; searchMatchTotal = r.total;
+    searchActive = searchMatches.length ? 0 : -1;
+    renderSearch();
+  });
   searchInput.addEventListener("keydown", ev => {
     if (ev.key === "ArrowDown"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive+1)%searchMatches.length; renderSearch(); } }
     else if (ev.key === "ArrowUp"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive-1+searchMatches.length)%searchMatches.length; renderSearch(); } }
     else if (ev.key === "Enter"){ if(searchActive>=0 && searchMatches[searchActive]) pickSearch(searchMatches[searchActive].id); }
-    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; closeSearch(); searchInput.blur(); }
+    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; searchMatchTotal=0; closeSearch(); searchInput.blur(); }
   });
   document.addEventListener("click", ev => { if(!ev.target.closest(".search-wrap")) closeSearch(); });
 
@@ -1176,8 +1257,19 @@
         syncWarnLine = document.getElementById("syncWarnLine"), syncWarnTime = document.getElementById("syncWarnTime");
   let syncMode = "60000"; // last value passed to setSync — "manual" or an interval in ms
 
+  // formatSyncProgress renders SyncProgress as one line for the pill's
+  // popover — same numbers as overlayProgressHTML's block, just inline.
+  function formatSyncProgress(p){
+    return "Namespaces "+p.namespacesDone+"/"+p.namespacesTotal+" · "+
+      (p.resourcesSoFar||0)+" resources · "+(p.relationshipsSoFar||0)+" relationships";
+  }
   function updateSyncPill(){
     syncPill.classList.remove("on","warn","err");
+    // backgroundSyncing reflects the engine's *actual* sync loop (see
+    // pollSyncStatus below) — a real signal, not the latency-based guess
+    // connState === "syncing" already was (a single request running long).
+    // Either one earns the pill's amber "working on it" treatment.
+    const backgroundSyncing = !!(lastSyncProgress && lastSyncProgress.running);
     // A failed fetch always shows on the pill itself, even in manual mode —
     // "the data on screen might be stale" is worth surfacing regardless of
     // whether the user chose manual or auto-sync just happens to be between
@@ -1186,18 +1278,37 @@
       syncPill.classList.add("err"); syncPillLabel.textContent = "OFFLINE";
     } else if (syncMode === "manual"){
       syncPillLabel.textContent = "MANUAL";
-    } else if (connState === "syncing"){
+    } else if (connState === "syncing" || backgroundSyncing){
       syncPill.classList.add("warn"); syncPillLabel.textContent = "SYNCING";
     } else {
       syncPill.classList.add("on"); syncPillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE";
     }
-    syncStatusLine.textContent = "Last synced " + timeAgo(lastSyncedAt);
+    syncStatusLine.textContent = backgroundSyncing
+      ? formatSyncProgress(lastSyncProgress)
+      : "Last synced " + timeAgo(lastSyncedAt);
     const stale = connState === "error";
     syncWarnLine.classList.toggle("show", stale);
     if (stale) syncWarnTime.textContent = timeAgo(lastSyncedAt);
     syncPill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
   }
   setInterval(updateSyncPill, 5000); // keeps "Last synced Xs ago" accurate between events, not just at them
+
+  // pollSyncStatus keeps lastSyncProgress fresh independent of the graph's
+  // own poll cadence (including "Manual") — the background sync runs on its
+  // own schedule regardless of how often the browser refetches /api/graph,
+  // so this is what lets the pill and the connecting overlay reflect it in
+  // something close to real time. A plain fetch every second is negligible
+  // load — /api/sync/status is a cache read, no cluster call — and never
+  // touches the canvas/render loop, so nothing here can freeze it.
+  function pollSyncStatus(){
+    fetchSyncStatus().then(p => {
+      lastSyncProgress = p;
+      updateSyncPill();
+      if (onSyncProgress) onSyncProgress(p);
+    }).catch(() => {});
+  }
+  setInterval(pollSyncStatus, 1000);
+  pollSyncStatus();
 
   function setSync(val, immediate){
     if (immediate === undefined) immediate = true;

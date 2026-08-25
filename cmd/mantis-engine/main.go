@@ -5,14 +5,25 @@
 //
 // Configuration (environment variables):
 //
-//	MANTIS_ENGINE_ADDR   listen address                             (default ":8080")
-//	MANTIS_SHOW_ALL      include system-managed ConfigMaps/Secrets  (default "false")
+//	MANTIS_ENGINE_ADDR     listen address                             (default ":8080")
+//	MANTIS_SHOW_ALL        include system-managed ConfigMaps/Secrets  (default "false")
+//	MANTIS_SYNC_INTERVAL   background cluster-read interval, e.g. "20s" (default "20s")
 //
-// Endpoints: GET /api/graph, GET /healthz (liveness), GET /readyz (readiness).
+// The engine reads the cluster on its own background schedule (see
+// internal/engine/sync.go), not on demand per request — MANTIS_SYNC_INTERVAL
+// controls that schedule, independent of how often mantis-web's UI polls
+// GET /api/graph, which now just reads whatever the background loop last
+// published.
+//
+// Endpoints: GET /api/graph, GET /api/sync/status, GET /healthz (liveness),
+// GET /readyz (readiness).
 package main
 
 import (
-	"log"
+	"context"
+	"log/slog"
+	"os"
+	"time"
 
 	"github.com/continuumx1/mantis/internal/engine"
 	"github.com/continuumx1/mantis/internal/httpx"
@@ -28,22 +39,31 @@ import (
 var version = "dev"
 
 func main() {
-	log.Printf("mantis-engine: version %s", version)
+	httpx.InitLogging("mantis-engine")
+	slog.Info("startup", "event", "boot", "version", version)
 
 	addr := httpx.EnvOr("MANTIS_ENGINE_ADDR", ":8080")
 	showAll := httpx.EnvOr("MANTIS_SHOW_ALL", "false") == "true"
+	syncInterval, err := time.ParseDuration(httpx.EnvOr("MANTIS_SYNC_INTERVAL", "20s"))
+	if err != nil {
+		slog.Error("startup failed", "event", "bad_sync_interval", "error", err.Error())
+		os.Exit(1)
+	}
 
 	client, err := mantiskube.NewClient()
 	if err != nil {
-		log.Fatalf("mantis-engine: connect to Kubernetes: %v", err)
+		slog.Error("startup failed", "event", "kubernetes_connect_failed", "error", err.Error())
+		os.Exit(1)
 	}
 
-	server := engine.New(client, showAll)
+	server := engine.New(client, showAll, syncInterval)
+	server.Start(context.Background())
 
-	log.Printf("mantis-engine: serving graph API on %s", addr)
-	log.Printf("mantis-engine: cluster context %q (%s)", client.Context, client.Server)
+	slog.Info("startup", "event", "ready_to_serve", "addr", addr, "sync_interval", syncInterval.String(),
+		"cluster_context", client.Context, "cluster_server", client.Server, "show_all", showAll)
 
 	if err := httpx.ListenAndServe(addr, server.Handler()); err != nil {
-		log.Fatalf("mantis-engine: %v", err)
+		slog.Error("fatal", "event", "serve_failed", "error", err.Error())
+		os.Exit(1)
 	}
 }

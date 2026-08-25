@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generateName: checkout-api-6c9b7d4a1-
+  labels:
+    app: checkout-api
+    pod-template-hash: 6c9b7d4a1
+  name: checkout-api-6c9b7d4a1-6c9b700
+  namespace: checkout
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: checkout-api-6c9b7d4a1
+    uid: checkout-api-6c9b7d4a1-uid
+  resourceVersion: "17836"
+  uid: checkout-api-6c9b7d4a1-6c9b700-uid
+spec:
+  containers:
+  - envFrom:
+      - configMapRef:
+          name: checkout-config
+    image: node:20-alpine
+    imagePullPolicy: IfNotPresent
+    name: checkout-api
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  nodeName: k8s-worker-02
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  serviceAccount: default
+  serviceAccountName: default
+status:
+  phase: Running
+  podIP: 10.244.247.10
+  qosClass: Burstable
+  startTime: "2026-08-16T18:20:58Z"

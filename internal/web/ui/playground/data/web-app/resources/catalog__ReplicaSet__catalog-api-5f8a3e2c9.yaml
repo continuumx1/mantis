@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "2"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: catalog-api
+    pod-template-hash: 5f8a3e2c9
+  name: catalog-api-5f8a3e2c9
+  namespace: catalog
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: catalog-api
+    uid: catalog-api-deploy-uid
+  resourceVersion: "17849"
+  uid: catalog-api-5f8a3e2c9-uid
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-api
+      pod-template-hash: 5f8a3e2c9
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2

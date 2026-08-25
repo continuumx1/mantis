@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"payments-api-svc","namespace":"payments-api"},"spec":{"ports":[{"port":80,"targetPort":80}],"selector":{"app":"payments-api-old"}}}
+  creationTimestamp: "2026-08-16T18:21:53Z"
+  name: payments-api-svc
+  namespace: payments-api
+  resourceVersion: "17973"
+  uid: 81ec2777-c910-40bf-b944-2295bc336625
+spec:
+  clusterIP: 10.98.81.53
+  clusterIPs:
+  - 10.98.81.53
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: payments-api-old
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

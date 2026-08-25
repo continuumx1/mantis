@@ -43,5 +43,11 @@ go.work.sum
 # products, not source; publish them to the OCI registry, don't commit them.
 charts/**/*.tgz
 
+# MkDocs (docs/ site) local build tooling and output — installed via
+# `python3 -m venv .venv-mkdocs && pip install mkdocs mkdocs-material`,
+# see docs/README-DOCS-SITE.md.
+.venv-mkdocs/
+/site/
+
 # macOS
 .DS_Store

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generateName: redis-8e2c5a9f1-
+  labels:
+    app: redis
+    pod-template-hash: 8e2c5a9f1
+  name: redis-8e2c5a9f1-8e2c501
+  namespace: cache
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: redis-8e2c5a9f1
+    uid: redis-8e2c5a9f1-uid
+  resourceVersion: "17836"
+  uid: redis-8e2c5a9f1-8e2c501-uid
+spec:
+  containers:
+  - envFrom:
+      - configMapRef:
+          name: redis-config
+    image: redis:7.2-alpine
+    imagePullPolicy: IfNotPresent
+    name: redis
+    ports:
+    - containerPort: 6379
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  nodeName: gke-demo-cluster-default-pool-3f9a1c2b-t4w1
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  serviceAccount: default
+  serviceAccountName: default
+status:
+  phase: Running
+  podIP: 10.244.127.11
+  qosClass: Burstable
+  startTime: "2026-08-16T18:20:58Z"

@@ -115,13 +115,27 @@ func isHidden(gctx *graph.Context, ref graph.ResourceRef) bool {
 	return false
 }
 
-// statusFor derives a coarse health signal for the status ring. Only Pods carry
-// one today: their first attribute is a health note of the form
-// "Headline · ready/total[ · restarts N]". A Pod that is currently running (or
-// finished cleanly) with every container ready is "ok"; anything else is "crit"
-// so problems draw attention. Non-Pod kinds carry no ring.
+// statusFor derives a coarse health signal for the status ring. Pods and
+// Nodes carry one; every other kind carries no ring at all — not because
+// they're assumed healthy, but because Mantis has no per-kind health model
+// for them yet (see the project roadmap).
 func statusFor(kind string, attrs []string) string {
-	if kind != "Pod" || len(attrs) == 0 {
+	switch kind {
+	case "Pod":
+		return podStatus(attrs)
+	case "Node":
+		return nodeStatus(attrs)
+	default:
+		return ""
+	}
+}
+
+// podStatus reads a Pod's health note (its first attribute, of the form
+// "Headline · ready/total[ · restarts N]" — see graph.podHealthNote). A Pod
+// that is currently running (or finished cleanly) with every container ready
+// is "ok"; anything else is "crit" so problems draw attention.
+func podStatus(attrs []string) string {
+	if len(attrs) == 0 {
 		return ""
 	}
 
@@ -140,6 +154,31 @@ func statusFor(kind string, attrs []string) string {
 		return "ok"
 	}
 	return "crit"
+}
+
+// nodeStatus reads a Node's readiness (its first attribute, "status:
+// Ready|NotReady|Unknown" — see graph.nodeAttributes, which reports the
+// NodeReady condition's actual value rather than assuming a Node is healthy
+// whenever it isn't confirmed otherwise). Ready is "ok", NotReady is "crit",
+// and Unknown (the kubelet has stopped reporting, or the condition was never
+// verified) is "warn" — a real third state, not silently folded into either
+// of the other two.
+func nodeStatus(attrs []string) string {
+	if len(attrs) == 0 {
+		return ""
+	}
+	const prefix = "status: "
+	if !strings.HasPrefix(attrs[0], prefix) {
+		return ""
+	}
+	switch strings.TrimPrefix(attrs[0], prefix) {
+	case "Ready":
+		return "ok"
+	case "NotReady":
+		return "crit"
+	default: // "Unknown", or anything unexpected
+		return "warn"
+	}
 }
 
 // parseReady reads a "ready/total" fragment (e.g. "1/1") into its two counts.

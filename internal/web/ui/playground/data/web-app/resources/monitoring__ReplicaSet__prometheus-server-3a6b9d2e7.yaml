@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "1"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  labels:
+    app: prometheus-server
+    pod-template-hash: 3a6b9d2e7
+  name: prometheus-server-3a6b9d2e7
+  namespace: monitoring
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: prometheus-server
+    uid: prometheus-server-deploy-uid
+  resourceVersion: "17849"
+  uid: prometheus-server-3a6b9d2e7-uid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-server
+      pod-template-hash: 3a6b9d2e7
+status:
+  availableReplicas: 1
+  readyReplicas: 1
+  replicas: 1

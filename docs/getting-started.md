@@ -12,7 +12,7 @@ No clone needed — the chart is published as an OCI artifact:
 
 ```bash
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
-  --version 0.2.0 --namespace mantis --create-namespace
+  --version 0.3.0 --namespace mantis --create-namespace
 ```
 
 This installs both services, the ServiceAccount, and the read-only
@@ -31,8 +31,8 @@ Then open [http://localhost:8081](http://localhost:8081).
 ## Or pull the images directly
 
 ```bash
-docker pull cx1tech/mantis:0.1.0-preview.2-engine
-docker pull cx1tech/mantis:0.1.0-preview.2-web
+docker pull cx1tech/mantis:0.1.0-preview.3-engine
+docker pull cx1tech/mantis:0.1.0-preview.3-web
 ```
 
 Both are multi-arch (`linux/amd64` + `linux/arm64`), built on a distroless

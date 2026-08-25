@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/desired-replicas: "3"
+    deployment.kubernetes.io/max-replicas: "4"
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generation: 1
+  labels:
+    app: storefront
+    pod-template-hash: 655c9d9479
+  name: storefront-655c9d9479
+  namespace: shop-frontend
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Deployment
+    name: storefront
+    uid: 082cc698-3a2c-4f91-89b6-ff4654beb2e2
+  resourceVersion: "17849"
+  uid: fcd5b6bd-c450-43fd-bd69-dc949196fdc1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: storefront
+      pod-template-hash: 655c9d9479
+  template:
+    metadata:
+      labels:
+        app: storefront
+        pod-template-hash: 655c9d9479
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: storefront-config
+        image: nginx:1.27-alpine
+        imagePullPolicy: IfNotPresent
+        name: storefront
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 250m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 3
+  fullyLabeledReplicas: 3
+  observedGeneration: 1
+  readyReplicas: 3
+  replicas: 3
+  terminatingReplicas: 0

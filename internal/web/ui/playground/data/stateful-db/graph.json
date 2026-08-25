@@ -1,0 +1,847 @@
+{
+  "meta": {
+    "context": "GKE \u00b7 stateful database (sample data)",
+    "server": "sample data \u2014 not a live cluster",
+    "version": "v1.29.5-gke.1091000",
+    "namespaces": 5,
+    "namespaceList": [
+      "analytics",
+      "cache",
+      "data-platform",
+      "logging",
+      "search"
+    ],
+    "nodeCount": 41,
+    "edgeCount": 58
+  },
+  "nodes": [
+    {
+      "id": "data-platform/ConfigMap/postgres-config",
+      "kind": "ConfigMap",
+      "name": "postgres-config",
+      "ns": "data-platform",
+      "resolved": true
+    },
+    {
+      "id": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-x7k4",
+      "kind": "Node",
+      "name": "gke-demo-cluster-default-pool-3f9a1c2b-x7k4",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.5-gke.1091000",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/PersistentVolume/pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3",
+      "kind": "PersistentVolume",
+      "name": "pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "1Gi",
+        "Delete",
+        "Bound"
+      ]
+    },
+    {
+      "id": "/PersistentVolume/pvc-f0b94882-1f9f-4b38-9b88-ecb641301d6e",
+      "kind": "PersistentVolume",
+      "name": "pvc-f0b94882-1f9f-4b38-9b88-ecb641301d6e",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "1Gi",
+        "Delete",
+        "Bound"
+      ]
+    },
+    {
+      "id": "data-platform/PersistentVolumeClaim/data-postgres-0",
+      "kind": "PersistentVolumeClaim",
+      "name": "data-postgres-0",
+      "ns": "data-platform",
+      "resolved": true,
+      "attributes": [
+        "Bound",
+        "1Gi",
+        "RWO",
+        "sc:standard"
+      ]
+    },
+    {
+      "id": "data-platform/PersistentVolumeClaim/data-postgres-1",
+      "kind": "PersistentVolumeClaim",
+      "name": "data-postgres-1",
+      "ns": "data-platform",
+      "resolved": true,
+      "attributes": [
+        "Bound",
+        "1Gi",
+        "RWO",
+        "sc:standard"
+      ]
+    },
+    {
+      "id": "data-platform/Pod/postgres-0",
+      "kind": "Pod",
+      "name": "postgres-0",
+      "ns": "data-platform",
+      "status": "ok",
+      "resolved": true,
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: postgres:16-alpine",
+        "qos: Burstable",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "data-platform/Pod/postgres-1",
+      "kind": "Pod",
+      "name": "postgres-1",
+      "ns": "data-platform",
+      "status": "ok",
+      "resolved": true,
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: postgres:16-alpine",
+        "qos: Burstable",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "data-platform/Secret/postgres-credentials",
+      "kind": "Secret",
+      "name": "postgres-credentials",
+      "ns": "data-platform",
+      "resolved": true
+    },
+    {
+      "id": "data-platform/Service/postgres-headless",
+      "kind": "Service",
+      "name": "postgres-headless",
+      "ns": "data-platform",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: None (headless)",
+        "ports: 5432\u21925432/TCP",
+        "endpoints: 10.244.0.8:5432, 10.244.0.9:5432"
+      ]
+    },
+    {
+      "id": "data-platform/StatefulSet/postgres",
+      "kind": "StatefulSet",
+      "name": "postgres",
+      "ns": "data-platform",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: postgres:16-alpine",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-p2m8",
+      "kind": "Node",
+      "name": "gke-demo-cluster-default-pool-3f9a1c2b-p2m8",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.5-gke.1091000",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-q9r3",
+      "kind": "Node",
+      "name": "gke-demo-cluster-default-pool-3f9a1c2b-q9r3",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.5-gke.1091000",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-t4w1",
+      "kind": "Node",
+      "name": "gke-demo-cluster-default-pool-3f9a1c2b-t4w1",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.5-gke.1091000",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-v6y5",
+      "kind": "Node",
+      "name": "gke-demo-cluster-default-pool-3f9a1c2b-v6y5",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "status: Ready",
+        "version: v1.29.5-gke.1091000",
+        "os: linux/amd64",
+        "allocatable: cpu 8 \u00b7 mem 8126756Ki",
+        "pod capacity: 110"
+      ]
+    },
+    {
+      "id": "cache/Deployment/redis",
+      "kind": "Deployment",
+      "name": "redis",
+      "ns": "cache",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: redis:7.2-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "cache/ReplicaSet/redis-8e2c5a9f1",
+      "kind": "ReplicaSet",
+      "name": "redis-8e2c5a9f1",
+      "ns": "cache",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: redis:7.2-alpine",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "kind": "Pod",
+      "name": "redis-8e2c5a9f1-8e2c500",
+      "ns": "cache",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: redis:7.2-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "kind": "Pod",
+      "name": "redis-8e2c5a9f1-8e2c501",
+      "ns": "cache",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: redis:7.2-alpine",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "cache/Service/redis-svc",
+      "kind": "Service",
+      "name": "redis-svc",
+      "ns": "cache",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.1.10",
+        "ports: 6379\u21926379/TCP",
+        "endpoints: 10.244.145.10:6379, 10.244.21.11:6379"
+      ]
+    },
+    {
+      "id": "cache/ConfigMap/redis-config",
+      "kind": "ConfigMap",
+      "name": "redis-config",
+      "ns": "cache",
+      "resolved": true
+    },
+    {
+      "id": "search/StatefulSet/opensearch",
+      "kind": "StatefulSet",
+      "name": "opensearch",
+      "ns": "search",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: opensearchproject/opensearch:2.15.0",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "search/Pod/opensearch-0",
+      "kind": "Pod",
+      "name": "opensearch-0",
+      "ns": "search",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: opensearchproject/opensearch:2.15.0",
+        "qos: Burstable",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "search/PersistentVolumeClaim/data-opensearch-0",
+      "kind": "PersistentVolumeClaim",
+      "name": "data-opensearch-0",
+      "ns": "search",
+      "resolved": true,
+      "attributes": [
+        "Bound",
+        "2Gi",
+        "RWO",
+        "sc:standard"
+      ]
+    },
+    {
+      "id": "/PersistentVolume/pvc-opensearch-0-vol",
+      "kind": "PersistentVolume",
+      "name": "pvc-opensearch-0-vol",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "2Gi",
+        "Delete",
+        "Bound"
+      ]
+    },
+    {
+      "id": "search/Pod/opensearch-1",
+      "kind": "Pod",
+      "name": "opensearch-1",
+      "ns": "search",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: opensearchproject/opensearch:2.15.0",
+        "qos: Burstable",
+        "requests: cpu 100m \u00b7 mem 128Mi",
+        "limits: cpu 500m \u00b7 mem 512Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "search/PersistentVolumeClaim/data-opensearch-1",
+      "kind": "PersistentVolumeClaim",
+      "name": "data-opensearch-1",
+      "ns": "search",
+      "resolved": true,
+      "attributes": [
+        "Bound",
+        "2Gi",
+        "RWO",
+        "sc:standard"
+      ]
+    },
+    {
+      "id": "/PersistentVolume/pvc-opensearch-1-vol",
+      "kind": "PersistentVolume",
+      "name": "pvc-opensearch-1-vol",
+      "ns": "",
+      "resolved": true,
+      "attributes": [
+        "2Gi",
+        "Delete",
+        "Bound"
+      ]
+    },
+    {
+      "id": "search/Service/opensearch-headless",
+      "kind": "Service",
+      "name": "opensearch-headless",
+      "ns": "search",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: None (headless)",
+        "ports: 9200\u21929200/TCP",
+        "endpoints: 10.244.205.20:9200, 10.244.110.21:9200"
+      ]
+    },
+    {
+      "id": "analytics/Deployment/analytics-worker",
+      "kind": "Deployment",
+      "name": "analytics-worker",
+      "ns": "analytics",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "strategy: RollingUpdate",
+        "image: python:3.12-slim",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "analytics/ReplicaSet/analytics-worker-1b4f7c8d2",
+      "kind": "ReplicaSet",
+      "name": "analytics-worker-1b4f7c8d2",
+      "ns": "analytics",
+      "resolved": true,
+      "attributes": [
+        "replicas: 2/2 ready",
+        "image: python:3.12-slim",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "kind": "Pod",
+      "name": "analytics-worker-1b4f7c8d2-1b4f700",
+      "ns": "analytics",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: python:3.12-slim",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "kind": "Pod",
+      "name": "analytics-worker-1b4f7c8d2-1b4f701",
+      "ns": "analytics",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: python:3.12-slim",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "analytics/Service/analytics-worker-svc",
+      "kind": "Service",
+      "name": "analytics-worker-svc",
+      "ns": "analytics",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.1.12",
+        "ports: 8080\u21928080/TCP",
+        "endpoints: 10.244.142.10:8080, 10.244.100.11:8080"
+      ]
+    },
+    {
+      "id": "analytics/ConfigMap/analytics-config",
+      "kind": "ConfigMap",
+      "name": "analytics-config",
+      "ns": "analytics",
+      "resolved": true
+    },
+    {
+      "id": "analytics/Secret/analytics-api-keys",
+      "kind": "Secret",
+      "name": "analytics-api-keys",
+      "ns": "analytics",
+      "resolved": true
+    },
+    {
+      "id": "logging/Deployment/fluentd",
+      "kind": "Deployment",
+      "name": "fluentd",
+      "ns": "logging",
+      "resolved": true,
+      "attributes": [
+        "replicas: 1/1 ready",
+        "strategy: RollingUpdate",
+        "image: fluent/fluentd:v1.17-debian",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "logging/ReplicaSet/fluentd-9c3e6b1a5",
+      "kind": "ReplicaSet",
+      "name": "fluentd-9c3e6b1a5",
+      "ns": "logging",
+      "resolved": true,
+      "attributes": [
+        "replicas: 1/1 ready",
+        "image: fluent/fluentd:v1.17-debian",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "kind": "Pod",
+      "name": "fluentd-9c3e6b1a5-9c3e600",
+      "ns": "logging",
+      "resolved": true,
+      "status": "ok",
+      "attributes": [
+        "Running \u00b7 1/1",
+        "image: fluent/fluentd:v1.17-debian",
+        "qos: Burstable",
+        "requests: cpu 50m \u00b7 mem 64Mi",
+        "limits: cpu 250m \u00b7 mem 128Mi",
+        "probes: none"
+      ]
+    },
+    {
+      "id": "logging/Service/fluentd-svc",
+      "kind": "Service",
+      "name": "fluentd-svc",
+      "ns": "logging",
+      "resolved": true,
+      "attributes": [
+        "type: ClusterIP",
+        "clusterIP: 10.100.1.13",
+        "ports: 24224\u219224224/TCP",
+        "endpoints: 10.244.212.10:24224"
+      ]
+    },
+    {
+      "id": "logging/ConfigMap/fluentd-config",
+      "kind": "ConfigMap",
+      "name": "fluentd-config",
+      "ns": "logging",
+      "resolved": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "data-platform/Pod/postgres-0",
+      "to": "data-platform/StatefulSet/postgres",
+      "type": "controlled-by"
+    },
+    {
+      "from": "data-platform/Pod/postgres-0",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-x7k4",
+      "type": "runs-on"
+    },
+    {
+      "from": "data-platform/Pod/postgres-0",
+      "to": "data-platform/ConfigMap/postgres-config",
+      "type": "references"
+    },
+    {
+      "from": "data-platform/Pod/postgres-0",
+      "to": "data-platform/Secret/postgres-credentials",
+      "type": "references"
+    },
+    {
+      "from": "data-platform/Pod/postgres-0",
+      "to": "data-platform/PersistentVolumeClaim/data-postgres-0",
+      "type": "claims"
+    },
+    {
+      "from": "data-platform/Pod/postgres-1",
+      "to": "data-platform/StatefulSet/postgres",
+      "type": "controlled-by"
+    },
+    {
+      "from": "data-platform/Pod/postgres-1",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-x7k4",
+      "type": "runs-on"
+    },
+    {
+      "from": "data-platform/Pod/postgres-1",
+      "to": "data-platform/ConfigMap/postgres-config",
+      "type": "references"
+    },
+    {
+      "from": "data-platform/Pod/postgres-1",
+      "to": "data-platform/Secret/postgres-credentials",
+      "type": "references"
+    },
+    {
+      "from": "data-platform/Pod/postgres-1",
+      "to": "data-platform/PersistentVolumeClaim/data-postgres-1",
+      "type": "claims"
+    },
+    {
+      "from": "data-platform/Service/postgres-headless",
+      "to": "data-platform/Pod/postgres-0",
+      "type": "selects"
+    },
+    {
+      "from": "data-platform/Service/postgres-headless",
+      "to": "data-platform/Pod/postgres-1",
+      "type": "selects"
+    },
+    {
+      "from": "data-platform/Service/postgres-headless",
+      "to": "data-platform/Pod/postgres-0",
+      "type": "serves"
+    },
+    {
+      "from": "data-platform/Service/postgres-headless",
+      "to": "data-platform/Pod/postgres-1",
+      "type": "serves"
+    },
+    {
+      "from": "data-platform/PersistentVolumeClaim/data-postgres-0",
+      "to": "/PersistentVolume/pvc-f0b94882-1f9f-4b38-9b88-ecb641301d6e",
+      "type": "bound-to"
+    },
+    {
+      "from": "data-platform/PersistentVolumeClaim/data-postgres-1",
+      "to": "/PersistentVolume/pvc-d3f41d97-10de-4c5c-af9e-b1bf1ccd5af3",
+      "type": "bound-to"
+    },
+    {
+      "from": "cache/ReplicaSet/redis-8e2c5a9f1",
+      "to": "cache/Deployment/redis",
+      "type": "controlled-by"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "to": "cache/ReplicaSet/redis-8e2c5a9f1",
+      "type": "controlled-by"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-q9r3",
+      "type": "runs-on"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "to": "cache/ConfigMap/redis-config",
+      "type": "references"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "to": "cache/ReplicaSet/redis-8e2c5a9f1",
+      "type": "controlled-by"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-t4w1",
+      "type": "runs-on"
+    },
+    {
+      "from": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "to": "cache/ConfigMap/redis-config",
+      "type": "references"
+    },
+    {
+      "from": "cache/Service/redis-svc",
+      "to": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "type": "selects"
+    },
+    {
+      "from": "cache/Service/redis-svc",
+      "to": "cache/Pod/redis-8e2c5a9f1-8e2c500",
+      "type": "serves"
+    },
+    {
+      "from": "cache/Service/redis-svc",
+      "to": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "type": "selects"
+    },
+    {
+      "from": "cache/Service/redis-svc",
+      "to": "cache/Pod/redis-8e2c5a9f1-8e2c501",
+      "type": "serves"
+    },
+    {
+      "from": "search/Pod/opensearch-0",
+      "to": "search/StatefulSet/opensearch",
+      "type": "controlled-by"
+    },
+    {
+      "from": "search/Pod/opensearch-0",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-p2m8",
+      "type": "runs-on"
+    },
+    {
+      "from": "search/Pod/opensearch-0",
+      "to": "search/PersistentVolumeClaim/data-opensearch-0",
+      "type": "claims"
+    },
+    {
+      "from": "search/PersistentVolumeClaim/data-opensearch-0",
+      "to": "/PersistentVolume/pvc-opensearch-0-vol",
+      "type": "bound-to"
+    },
+    {
+      "from": "search/Pod/opensearch-1",
+      "to": "search/StatefulSet/opensearch",
+      "type": "controlled-by"
+    },
+    {
+      "from": "search/Pod/opensearch-1",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-v6y5",
+      "type": "runs-on"
+    },
+    {
+      "from": "search/Pod/opensearch-1",
+      "to": "search/PersistentVolumeClaim/data-opensearch-1",
+      "type": "claims"
+    },
+    {
+      "from": "search/PersistentVolumeClaim/data-opensearch-1",
+      "to": "/PersistentVolume/pvc-opensearch-1-vol",
+      "type": "bound-to"
+    },
+    {
+      "from": "search/Service/opensearch-headless",
+      "to": "search/Pod/opensearch-0",
+      "type": "selects"
+    },
+    {
+      "from": "search/Service/opensearch-headless",
+      "to": "search/Pod/opensearch-0",
+      "type": "serves"
+    },
+    {
+      "from": "search/Service/opensearch-headless",
+      "to": "search/Pod/opensearch-1",
+      "type": "selects"
+    },
+    {
+      "from": "search/Service/opensearch-headless",
+      "to": "search/Pod/opensearch-1",
+      "type": "serves"
+    },
+    {
+      "from": "analytics/ReplicaSet/analytics-worker-1b4f7c8d2",
+      "to": "analytics/Deployment/analytics-worker",
+      "type": "controlled-by"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "to": "analytics/ReplicaSet/analytics-worker-1b4f7c8d2",
+      "type": "controlled-by"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-x7k4",
+      "type": "runs-on"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "to": "analytics/ConfigMap/analytics-config",
+      "type": "references"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "to": "analytics/Secret/analytics-api-keys",
+      "type": "references"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "to": "analytics/ReplicaSet/analytics-worker-1b4f7c8d2",
+      "type": "controlled-by"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-q9r3",
+      "type": "runs-on"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "to": "analytics/ConfigMap/analytics-config",
+      "type": "references"
+    },
+    {
+      "from": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "to": "analytics/Secret/analytics-api-keys",
+      "type": "references"
+    },
+    {
+      "from": "analytics/Service/analytics-worker-svc",
+      "to": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "type": "selects"
+    },
+    {
+      "from": "analytics/Service/analytics-worker-svc",
+      "to": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f700",
+      "type": "serves"
+    },
+    {
+      "from": "analytics/Service/analytics-worker-svc",
+      "to": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "type": "selects"
+    },
+    {
+      "from": "analytics/Service/analytics-worker-svc",
+      "to": "analytics/Pod/analytics-worker-1b4f7c8d2-1b4f701",
+      "type": "serves"
+    },
+    {
+      "from": "logging/ReplicaSet/fluentd-9c3e6b1a5",
+      "to": "logging/Deployment/fluentd",
+      "type": "controlled-by"
+    },
+    {
+      "from": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "to": "logging/ReplicaSet/fluentd-9c3e6b1a5",
+      "type": "controlled-by"
+    },
+    {
+      "from": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "to": "/Node/gke-demo-cluster-default-pool-3f9a1c2b-v6y5",
+      "type": "runs-on"
+    },
+    {
+      "from": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "to": "logging/ConfigMap/fluentd-config",
+      "type": "references"
+    },
+    {
+      "from": "logging/Service/fluentd-svc",
+      "to": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "type": "selects"
+    },
+    {
+      "from": "logging/Service/fluentd-svc",
+      "to": "logging/Pod/fluentd-9c3e6b1a5-9c3e600",
+      "type": "serves"
+    }
+  ]
+}

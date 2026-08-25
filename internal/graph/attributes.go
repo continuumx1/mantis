@@ -113,6 +113,26 @@ func isSystemConfigMap(name string) bool {
 	return name == "kube-root-ca.crt"
 }
 
+// IsHiddenNamespace reports whether an entire namespace is cluster-managed
+// plumbing that never belongs in front of a user, in any of the ways a
+// namespace shows up: the topology, search, the namespace/region list, or
+// the resource/namespace counters. Unlike isSystemConfigMap/isSystemSecret
+// above (individual resources hidden but still present in the graph, so
+// references to them keep resolving), a hidden namespace is skipped
+// entirely at the source — see graph.BuildClusterGraphProgressive — so it
+// costs no API calls and leaves no trace, not even an empty region.
+//
+// kube-node-lease holds nothing but per-Node Lease objects (the heartbeat
+// mechanism node controllers use since KEP-0009) — a purely internal
+// implementation detail Mantis has no model for and a user never has reason
+// to look at. It is a standard namespace name defined by Kubernetes itself,
+// not a distro convention, so this one check is already correct on every
+// distribution (kubeadm, EKS, GKE, AKS, RKE2, minikube, kind, ...) without
+// needing per-distro special-casing.
+func IsHiddenNamespace(name string) bool {
+	return name == "kube-node-lease"
+}
+
 // isSystemSecret reports whether a Secret is cluster-managed noise (service
 // account tokens, Helm release state) that the map hides by default.
 func isSystemSecret(secret *corev1.Secret) bool {

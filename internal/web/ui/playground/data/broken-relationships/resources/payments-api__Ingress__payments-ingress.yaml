@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    kubernetes.io/ingress.class: alb
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{},"name":"payments-ingress","namespace":"payments-api"},"spec":{"rules":[{"host":"payments.example.com","http":{"paths":[{"backend":{"service":{"name":"payments-svc-old","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}]}}
+  creationTimestamp: "2026-08-16T18:21:53Z"
+  generation: 1
+  name: payments-ingress
+  namespace: payments-api
+  resourceVersion: "17982"
+  uid: 6c38c43c-df47-4dc6-af93-85f64b99ceae
+spec:
+  rules:
+  - host: payments.example.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: payments-svc-old
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+status:
+  loadBalancer: {}

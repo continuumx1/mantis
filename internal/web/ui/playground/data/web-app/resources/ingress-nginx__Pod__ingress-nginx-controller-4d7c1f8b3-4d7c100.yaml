@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  generateName: ingress-nginx-controller-4d7c1f8b3-
+  labels:
+    app: ingress-nginx-controller
+    pod-template-hash: 4d7c1f8b3
+  name: ingress-nginx-controller-4d7c1f8b3-4d7c100
+  namespace: ingress-nginx
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: ingress-nginx-controller-4d7c1f8b3
+    uid: ingress-nginx-controller-4d7c1f8b3-uid
+  resourceVersion: "17836"
+  uid: ingress-nginx-controller-4d7c1f8b3-4d7c100-uid
+spec:
+  containers:
+  - envFrom: []
+    image: registry.k8s.io/ingress-nginx/controller:v1.10.1
+    imagePullPolicy: IfNotPresent
+    name: ingress-nginx-controller
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 250m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  nodeName: k8s-worker-01
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  serviceAccount: default
+  serviceAccountName: default
+status:
+  phase: Running
+  podIP: 10.244.70.10
+  qosClass: Burstable
+  startTime: "2026-08-16T18:20:58Z"

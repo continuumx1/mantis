@@ -1,0 +1,43 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"autoscaling/v2","kind":"HorizontalPodAutoscaler","metadata":{"annotations":{},"name":"storefront-hpa","namespace":"shop-frontend"},"spec":{"maxReplicas":6,"metrics":[{"resource":{"name":"cpu","target":{"averageUtilization":70,"type":"Utilization"}},"type":"Resource"}],"minReplicas":2,"scaleTargetRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"storefront"}}}
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  name: storefront-hpa
+  namespace: shop-frontend
+  resourceVersion: "17852"
+  uid: 1ff7ce7f-c0a8-4245-9efa-08a1c9f79b0d
+spec:
+  maxReplicas: 6
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 70
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: storefront
+status:
+  conditions:
+  - lastTransitionTime: "2026-08-16T18:21:13Z"
+    message: the HPA controller was able to get the target's current scale
+    reason: SucceededGetScale
+    status: "True"
+    type: AbleToScale
+  - lastTransitionTime: "2026-08-16T18:21:13Z"
+    message: 'the HPA was unable to compute the replica count: failed to get cpu utilization:
+      unable to get metrics for resource cpu: unable to fetch metrics from resource
+      metrics API: the server could not find the requested resource (get pods.metrics.k8s.io)'
+    reason: FailedGetResourceMetric
+    status: "False"
+    type: ScalingActive
+  currentMetrics:
+  - type: ""
+  currentReplicas: 3
+  desiredReplicas: 0

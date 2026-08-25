@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2026-08-16T18:20:58Z"
+  name: fluentd-svc
+  namespace: logging
+  resourceVersion: "17786"
+  uid: fluentd-svc-uid
+spec:
+  clusterIP: 10.100.1.13
+  ports:
+  - port: 24224
+    protocol: TCP
+    targetPort: 24224
+  selector:
+    app: fluentd
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
