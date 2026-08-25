@@ -1,0 +1,123 @@
+name: Release
+
+# Fires when a PR bumps charts/mantis/Chart.yaml's `version`/`appVersion` and
+# lands on main. Chart.yaml is the single source of truth for a release: this
+# workflow reads it, builds+pushes the two multi-arch images it names, and
+# publishes the chart itself as an OCI artifact — the same three things
+# every past release (0.1.0/0.2.0/0.3.0) did by hand. Editing Chart.yaml
+# and values.yaml's image.tag together in a PR, same as always, is now the
+# whole release process; merging that PR does the rest.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/mantis/Chart.yaml"
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.diff.outputs.release }}
+      chart_version: ${{ steps.read.outputs.chart_version }}
+      app_version: ${{ steps.read.outputs.app_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: mikefarah/yq@v4
+
+      - name: Read the version this push leaves in place
+        id: read
+        run: |
+          chart_version=$(yq e '.version' charts/mantis/Chart.yaml)
+          app_version=$(yq e '.appVersion' charts/mantis/Chart.yaml)
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+      - name: Only release if version or appVersion actually changed
+        id: diff
+        run: |
+          prev_chart=$(git show HEAD^:charts/mantis/Chart.yaml 2>/dev/null | yq e '.version' - || echo "")
+          prev_app=$(git show HEAD^:charts/mantis/Chart.yaml 2>/dev/null | yq e '.appVersion' - || echo "")
+          if [ "$prev_chart" = "${{ steps.read.outputs.chart_version }}" ] && \
+             [ "$prev_app" = "${{ steps.read.outputs.app_version }}" ]; then
+            echo "Chart.yaml changed but version/appVersion did not — not a release." >&2
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: values.yaml's image.tag must match Chart.yaml's appVersion
+        if: steps.diff.outputs.release == 'true'
+        run: |
+          values_tag=$(yq e '.image.tag' charts/mantis/values.yaml)
+          if [ "$values_tag" != "${{ steps.read.outputs.app_version }}" ]; then
+            echo "values.yaml image.tag ($values_tag) doesn't match Chart.yaml appVersion (${{ steps.read.outputs.app_version }}) — fix the PR that bumped this." >&2
+            exit 1
+          fi
+
+  build-and-push:
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.detect.outputs.app_version }}
+      CHART_VERSION: ${{ needs.detect.outputs.chart_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Minimal safety gate — this repo has no test suite yet (see
+      # docs/roadmap.md's "Planned" CI item), so this is the floor: don't
+      # publish images that don't even build or vet cleanly.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go build / go vet / gofmt
+        run: |
+          gofmt -l . | tee /tmp/fmt.out
+          test ! -s /tmp/fmt.out
+          go vet ./...
+          go build ./...
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push mantis-engine
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile.engine
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ env.APP_VERSION }}
+          tags: cx1tech/mantis:${{ env.APP_VERSION }}-engine
+
+      - name: Build and push mantis-web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile.web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ env.APP_VERSION }}
+          tags: cx1tech/mantis:${{ env.APP_VERSION }}-web
+
+      - uses: azure/setup-helm@v4
+      - name: Package and push the Helm chart
+        run: |
+          helm registry login registry-1.docker.io \
+            --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --password "${{ secrets.DOCKERHUB_TOKEN }}"
+          helm package charts/mantis --destination /tmp
+          helm push "/tmp/mantis-${CHART_VERSION}.tgz" oci://registry-1.docker.io/cx1tech
