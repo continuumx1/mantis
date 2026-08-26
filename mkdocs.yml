@@ -57,6 +57,15 @@ markdown_extensions:
   - md_in_html
   - pymdownx.details
   - pymdownx.superfences
+  # Renders the :material-xxx:/:octicons-xxx: icon shortcodes used by the
+  # Home page's "grid cards" (docs/index.md's Quick links section) as actual
+  # SVG icons. Without this, pymdownx's grid/attr_list markup still produces
+  # the card boxes, but the icon codes render as literal text jammed against
+  # the heading inside them instead of an icon — grid cards need attr_list +
+  # md_in_html (already listed) *and* this to actually work.
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
