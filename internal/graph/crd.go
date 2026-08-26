@@ -23,8 +23,8 @@ var (
 	vpaGVR = schema.GroupVersionResource{Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"}
 	// karpenterNodePoolGVR is Karpenter's cluster-scoped NodePool. Karpenter
 	// graduated its API to v1; older clusters expose v1beta1, tried as a fallback.
-	karpenterNodePoolGVR      = schema.GroupVersionResource{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}
-	karpenterNodePoolGVRBeta  = schema.GroupVersionResource{Group: "karpenter.sh", Version: "v1beta1", Resource: "nodepools"}
+	karpenterNodePoolGVR     = schema.GroupVersionResource{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}
+	karpenterNodePoolGVRBeta = schema.GroupVersionResource{Group: "karpenter.sh", Version: "v1beta1", Resource: "nodepools"}
 )
 
 // collectVPAs lists VerticalPodAutoscalers in a namespace and returns their node
