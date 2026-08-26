@@ -71,6 +71,18 @@
   .brand { display: flex; align-items: center; gap: 10px; flex: none; }
   .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
   .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--faint); }
+  /* A real button, not a subtle icon — same tab, not target="_blank" like the
+     CTAs below, since this is actual navigation (leaving the playground) for
+     anyone who lands here directly (a bookmark, a shared link, or a new-tab
+     click they don't immediately notice landed in a second tab), not a
+     marketing click-through. Styled a shade brighter than the plain .btn
+     buttons (brand-tinted border/background) so it doesn't read as just
+     another "Reset view"-type control — it's the one button that leaves. */
+  .btn-back { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--brand);
+    background: color-mix(in srgb, var(--brand) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line));
+    border-radius: 7px; padding: 6px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s, border-color .15s; }
+  .btn-back:hover { background: color-mix(in srgb, var(--brand) 20%, var(--panel)); border-color: var(--brand); }
 
   .spacer { flex: 1 1 auto; min-width: 16px; }
 
@@ -418,6 +430,8 @@
 
 <div id="app">
   <header>
+    <a class="btn-back" href="https://mantis.continuumx1.com" title="Back to mantis.continuumx1.com">← Back to Mantis</a>
+
     <div class="brand">
       <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
       <span class="brand-name">· playground</span>
