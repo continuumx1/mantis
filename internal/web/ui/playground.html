@@ -68,15 +68,21 @@
   header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
     background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
 
-  /* The brand mark doubles as a "back to the real site" link — same tab,
-     not target="_blank" like the CTA buttons below, since this is actual
-     navigation (leaving the playground), not a marketing click-through.
-     Anyone who lands here directly (a bookmark, a shared link, or just not
-     noticing this opened in a new tab) otherwise has no way back at all. */
-  a.brand { display: flex; align-items: center; gap: 10px; flex: none; text-decoration: none; }
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
   .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
   .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--faint); }
-  a.brand:hover .brand-name { color: var(--muted); }
+  /* A real button, not a subtle icon — same tab, not target="_blank" like the
+     CTAs below, since this is actual navigation (leaving the playground) for
+     anyone who lands here directly (a bookmark, a shared link, or a new-tab
+     click they don't immediately notice landed in a second tab), not a
+     marketing click-through. Styled a shade brighter than the plain .btn
+     buttons (brand-tinted border/background) so it doesn't read as just
+     another "Reset view"-type control — it's the one button that leaves. */
+  .btn-back { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--brand);
+    background: color-mix(in srgb, var(--brand) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line));
+    border-radius: 7px; padding: 6px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s, border-color .15s; }
+  .btn-back:hover { background: color-mix(in srgb, var(--brand) 20%, var(--panel)); border-color: var(--brand); }
 
   .spacer { flex: 1 1 auto; min-width: 16px; }
 
@@ -424,10 +430,12 @@
 
 <div id="app">
   <header>
-    <a class="brand" href="https://mantis.continuumx1.com" title="Back to mantis.continuumx1.com">
+    <div class="brand">
       <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
-      <span class="brand-name">← · playground</span>
-    </a>
+      <span class="brand-name">· playground</span>
+    </div>
+
+    <a class="btn-back" href="https://mantis.continuumx1.com" title="Back to mantis.continuumx1.com">← Back to Mantis</a>
 
     <div class="search-wrap">
       <span class="search-ico">⌕</span>
