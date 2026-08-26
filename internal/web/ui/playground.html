@@ -68,9 +68,15 @@
   header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
     background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
 
-  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
+  /* The brand mark doubles as a "back to the real site" link — same tab,
+     not target="_blank" like the CTA buttons below, since this is actual
+     navigation (leaving the playground), not a marketing click-through.
+     Anyone who lands here directly (a bookmark, a shared link, or just not
+     noticing this opened in a new tab) otherwise has no way back at all. */
+  a.brand { display: flex; align-items: center; gap: 10px; flex: none; text-decoration: none; }
   .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
   .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--faint); }
+  a.brand:hover .brand-name { color: var(--muted); }
 
   .spacer { flex: 1 1 auto; min-width: 16px; }
 
@@ -418,10 +424,10 @@
 
 <div id="app">
   <header>
-    <div class="brand">
+    <a class="brand" href="https://mantis.continuumx1.com" title="Back to mantis.continuumx1.com">
       <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
-      <span class="brand-name">· playground</span>
-    </div>
+      <span class="brand-name">← · playground</span>
+    </a>
 
     <div class="search-wrap">
       <span class="search-ico">⌕</span>
