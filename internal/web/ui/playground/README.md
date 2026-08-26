@@ -10,6 +10,18 @@ also what the banner across the top of the page says.
 It exists so someone can experience the actual Mantis UI — not a mockup of
 it — before installing anything.
 
+## Keeping it in sync
+
+Because `playground.html` is a fork, not a build artifact, it does not pick up
+`index.html` changes automatically — UI-facing commits to `index.html` (search
+behavior, status colors, header, panel/YAML rendering, and so on) need their
+equivalent applied here by hand. One deliberate, permanent exception: the
+background-sync progress feature (`/api/sync/status` polling, the connecting
+overlay's live namespace/resource counts) is not mirrored — it reflects
+`mantis-engine`'s real progressive sync loop, which has no equivalent against
+a static, already-complete JSON fixture, so there is nothing genuine for it to
+show here.
+
 ## Why static fixtures, not a live demo cluster
 
 A public page that talks to a real, always-on cluster is a real cluster
