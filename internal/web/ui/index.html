@@ -39,11 +39,6 @@
      redefining them here is the whole theme swap. */
   :root[data-theme="light"] {
     color-scheme: light;
-    /* Two rounds of toning down now — first from pure white (#ffffff panels on
-       #f5f7fa), which still read as flashy, to a soft gray; this pushes further
-       still, roughly halfway between white and a mid gray rather than just off-
-       white, since a full-bright canvas filling most of the screen is a lot of
-       sustained brightness even at "soft gray". */
     --ground: #c9cdd4; --ground-2: #c0c4cc; --panel: #d6d9de; --panel-2: #cbcfd5; --line: #b0b6bf; --dot: #7c8794;
     --ink: #161b22; --muted: #4b5563; --faint: #838f9d; --brand: #4f8a1c;
     --cat-workload: #2f6fe0; --cat-pod: #4f8a1c; --cat-network: #a23fd1; --cat-config: #a06400; --cat-storage: #0a8f7c; --cat-node: #5b6670; --cat-autoscale: #b85c17;
@@ -55,19 +50,9 @@
   body { background: var(--ground); color: var(--ink); font-family: var(--font-ui); overflow: hidden; }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
 
-  /* Header — three loose groups instead of one dense line: identity+search on
-     the left, cluster/stats/status/actions on the right, a flexible spacer
-     between. Vertical dividers (not "·" text) separate the right-hand groups
-     so the eye can parse them without reading every character. */
-  /* Vertical padding trimmed 13px→10px as the mascot grew 34px→40px below —
-     34+2*13 = 40+2*10 = 60px either way, so the header's own height (driven
-     by its tallest child, the mascot) is unchanged even though the mascot
-     reads noticeably bigger now that it's the header's sole identity mark. */
   header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
     background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
 
-  /* No "mantis" wordmark text next to it anymore — the mascot is the only
-     brand mark in the header now, so it's sized up to carry that on its own. */
   .brand { display: flex; align-items: center; gap: 10px; flex: none; }
   .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
 
@@ -75,7 +60,7 @@
 
   .cluster-chip { display: flex; align-items: baseline; gap: 7px; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; flex: none; }
   .cluster-chip .cluster-label { color: var(--faint); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
-  .cluster-chip b { color: var(--ink); font-weight: 600; } /* identity text, not an accent — brand green is reserved for interactive/active states */
+  .cluster-chip b { color: var(--ink); font-weight: 600; }
 
   .hdr-divider { width: 1px; height: 18px; background: var(--line); flex: none; }
 
@@ -96,22 +81,37 @@
 
   main { position: relative; flex: 1; min-height: 0; }
   #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
-    /* --dot is its own token, not --line: in light mode --line is close enough
-       to --ground that the dotted grid all but disappeared (read as a flat
-       white canvas); --dot is tuned per theme to stay visible-but-quiet against
-       its own background instead of inheriting a border color's contrast. */
     background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--dot) 0.6px, transparent 0.6px);
     background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
   #canvas.panning { cursor: grabbing; }
+  #canvas.hidden-screen { display: none; }
 
-  /* Namespaces are regions, not walls: a whisper of tint and a thin edge, never
-     competing with the resources inside them. Empty namespaces are dashed and
-     fainter still — present as context, not as something to look at. */
-  .region-box { fill-opacity: 0.032; stroke-width: 1; stroke-opacity: .32; }
-  .region-box.empty { fill-opacity: 0.016; stroke-dasharray: 3 4; stroke-opacity: .18; }
-  .region-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; opacity: .62; }
+  /* ---- namespace overview: an ArgoCD-Applications-style grid, the app's new
+     landing screen. Clicking a card drills into that namespace's tree
+     (#canvas below); "All namespaces" in the header controls comes back. ---- */
+  #overviewScreen { position: absolute; inset: 0; overflow-y: auto; padding: 28px 32px 48px; display: none; }
+  #overviewScreen.active { display: block; }
+  .ov-head { max-width: 1400px; margin: 0 auto 18px; color: var(--faint); font-size: 13px; }
+  .ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; max-width: 1400px; margin: 0 auto; }
+  .ns-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; cursor: pointer;
+    transition: border-color .15s, transform .1s; }
+  .ns-card:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); transform: translateY(-1px); }
+  .ns-card.empty { opacity: .55; }
+  .ns-card .ns-name { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--ink); word-break: break-all; }
+  .ns-card .ns-count { font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-top: 5px; }
+  .ns-card .ns-health { display: flex; gap: 10px; margin-top: 11px; font-family: var(--font-mono); font-size: 11px; flex-wrap: wrap; }
+  .ns-health .hc { display: flex; align-items: center; gap: 5px; }
+  .ns-health .hc::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+  .ns-health .hc.ok { color: var(--ok); } .ns-health .hc.warn { color: var(--warn); } .ns-health .hc.crit,
+  .ns-health .hc.unresolved { color: var(--crit); }
 
-  .edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
+  .edge, .secondary-edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
+  .edge { fill: none; }
+  /* Secondary (non-ownership) relations render behind the bold ownership tree
+     lines, thinner and fainter, so the tree skeleton reads first — see
+     graph-engine.js's computeTreeLayout doc comment. */
+  .secondary-edge { fill: none; stroke-width: 1.2; stroke-opacity: .22; }
+  .secondary-edge.dashed { stroke-dasharray: 4 4; }
   .edge-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; opacity: 0; transition: opacity .18s; pointer-events: none; }
 
   .node { cursor: pointer; }
@@ -119,37 +119,31 @@
   .node .kind { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .6px; text-transform: uppercase; }
   .node .name { font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink); }
   .node .sub  { font-family: var(--font-mono); font-size: 8px; fill: var(--crit); letter-spacing: .5px; }
-  .node .ready { font-family: var(--font-mono); font-size: 9px; font-weight: 600; text-anchor: end; }
   .node:hover .chip-bg { stroke: color-mix(in srgb, var(--brand) 55%, var(--line)); }
   .node.selected .chip-bg { stroke: var(--brand); stroke-width: 1.6; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--brand) 45%, transparent)); }
   .node.dim { opacity: .22; }
   .node.ghost .chip-bg { stroke: var(--crit); stroke-dasharray: 4 3; fill: color-mix(in srgb, var(--crit) 8%, var(--panel-2)); }
   .node.ghost .name { fill: var(--muted); }
 
+  /* Collapse/expand toggle — bottom-right corner of a node's box, shown only
+     when it has children. Collapsed shows "+N" (hidden descendant count)
+     instead of "–", so the count itself is the affordance to expand again. */
+  .collapse-toggle { cursor: pointer; }
+  .collapse-toggle circle { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .15s; }
+  .collapse-toggle:hover circle { stroke: var(--brand); }
+  .collapse-toggle text { font-family: var(--font-mono); font-size: 9px; fill: var(--muted); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+
   .status-ring { fill: none; stroke-width: 2; }
   @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
   .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
   .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
-  /* warn — a real third state (e.g. a Node whose kubelet stopped reporting:
-     Unknown, not confirmed NotReady) — amber and calm like ok, not pulsing
-     like crit, since it isn't a confirmed failure. */
   .status-warn .status-ring { stroke: var(--warn); opacity:.8; }
   @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
 
-  /* The toggle button is pinned at the same absolute spot — 10px in from the
-     panel's own bottom-left corner — in both states, via position:absolute
-     rather than normal document flow. Collapsed or expanded, .legend's own box
-     keeps the same left/bottom anchor, so the button never actually moves:
-     clicking it to open, then clicking again to close, needs no mouse
-     movement at all. */
   .legend { position: absolute; left: 16px; bottom: 16px; z-index: 4; width: 240px;
     background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
     border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 44px; font-size: 11.5px;
     transition: width .15s, height .15s, padding .15s; }
-  /* Collapsed, the box shrinks to just the button's own footprint and stops
-     painting its own background/border — it used to keep a rounded-square
-     border/background underneath the toggle's circular chrome, so square
-     corners peeked out past the circle. Only the button paints now. */
   .legend.collapsed { width: 46px; height: 46px; padding: 0; border: 0; background: none; }
   .legend-toggle { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; justify-content: center;
     width: 26px; height: 26px; border-radius: 50%;
@@ -157,9 +151,6 @@
   .legend.collapsed .legend-toggle { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); }
   .legend-toggle:hover { color: var(--brand); }
   .legend-toggle svg { width: 15px; height: 15px; }
-  /* Collapsed shows an info glyph ("there's a legend here"); expanded swaps to
-     a chevron ("click to collapse") — reusing the info icon for both states
-     read as if the button didn't know what it currently did. */
   .legend-toggle .i-close { display: none; }
   .legend:not(.collapsed) .legend-toggle .i-info { display: none; }
   .legend:not(.collapsed) .legend-toggle .i-close { display: block; }
@@ -197,7 +188,6 @@
 
   .sec-h { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; margin: 10px 0 4px; }
 
-  /* Detail list — clean two-column rows instead of bordered boxes. */
   .detail { display: flex; flex-direction: column; }
   .drow { display: grid; grid-template-columns: 40% 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent); align-items: baseline; }
   .drow:last-child { border-bottom: 0; }
@@ -214,13 +204,11 @@
   .notice { border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; white-space: pre-line; }
   .yaml-actions { display: flex; gap: 6px; align-items: center; }
 
-  /* Manifest block with Copy/Expand floating on its top-right border. */
   .yaml-wrap { position: relative; }
   .yaml-wrap .yaml { padding-top: 40px; }
   .yaml-tools { position: absolute; top: 7px; right: 9px; z-index: 2; display: flex; gap: 6px; }
   .yaml-tools .copy-btn { background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(4px); }
 
-  /* Expanded YAML reader — a large modal for comfortable reading of long/wide manifests. */
   .ymodal-overlay { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 24px;
     background: color-mix(in srgb, var(--ground) 74%, transparent); backdrop-filter: blur(3px); }
   .ymodal-overlay.open { display: flex; }
@@ -234,9 +222,6 @@
   .ymodal-close { font-family: var(--font-mono); font-size: 13px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; }
   .ymodal-close:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
 
-  /* Find-in-YAML — a small in-modal search, useful once a manifest is more than
-     a screenful. Matches highlight inline; the current match gets its own
-     stronger color so stepping through with Enter/↑↓ is easy to track. */
   .ymodal-search { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; position: relative; }
   .ymodal-search .search-ico { position: static; transform: none; }
   .ymodal-search input { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line);
@@ -251,13 +236,6 @@
   .yaml mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; border-radius: 2px; }
   .yaml mark.cur { background: var(--brand); color: var(--ground); }
 
-  /* Search — live type-ahead over resources, ⌘K to jump to it from anywhere. */
-  /* The kbd hint used to be an absolutely-positioned overlay on top of the
-     input's own right edge, reserved by padding-right — but the chip's actual
-     rendered width was wider than the padding reserved for it, so long enough
-     typed text ran underneath it. It's a plain flex sibling now, in its own
-     box outside the input entirely, so there is no padding/width arithmetic
-     that has to stay in sync for it to never overlap. */
   .search-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
   .search { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px 6px 28px; width: 176px; outline: none; transition: border-color .15s, width .2s; }
   .search::placeholder { color: var(--faint); }
@@ -277,10 +255,6 @@
   .sresult .sr-ns { color: var(--faint); font-size: 10px; margin-left: auto; flex: none; }
   .search-empty { padding: 10px; color: var(--faint); font-family: var(--font-mono); font-size: 11px; }
 
-  /* Panel is a drawer: hidden by default (main.md item 2) — it exists only
-     while a resource is selected, and closing it (✕, Escape, or clicking empty
-     canvas) clears the selection too. There is deliberately no "hide but keep
-     selected" state anymore: select → drawer, clear → full topology. */
   .panel-collapse { position: absolute; top: 12px; right: 12px; z-index: 2; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
     font-size: 14px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; transition: color .15s, border-color .15s; }
   .panel-collapse:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
@@ -300,13 +274,7 @@
   .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
   .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
   .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  /* Sync — a status pill, not a settings dropdown. It's the *only* status
-     indicator in the app now (there used to be a second, redundant "live" text
-     in the header — removed): it answers "is this live, and if not, since
-     when?" at a glance, with cadence a click away. States: on (green, auto-sync
-     healthy), warn (amber, a request is running slow), err (red, the last
-     request failed — stale data is still on screen, so this has to be visible,
-     not just a toast that fades). */
+  #nsLabel { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
   .sync-wrap { position: relative; }
   .sync-pill { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .3px;
     color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer;
@@ -344,18 +312,11 @@
   .overlay code { font-family: var(--font-mono); color: var(--brand); }
   .overlay.err h3 { color: var(--crit); }
 
-  /* Live progress shown in the connecting overlay (and, via the same data,
-     the sync pill's popover) while the background sync is still filling in —
-     namespacesTotal is a real, known-upfront count; the resource/relationship
-     numbers are running totals with deliberately no "/N" denominator, since
-     how much lives in namespaces not yet reached is genuinely unknown until
-     the sync gets there (see internal/engine/sync.go's SyncProgress). */
   .sync-progress { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
     display: flex; flex-direction: column; gap: 5px; font-family: var(--font-mono); font-size: 12px; text-align: left; }
   .sync-progress .sp-row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
   .sync-progress .sp-row b { color: var(--ink); font-weight: 600; }
 
-  /* Non-blocking notice for failures during silent sync. */
   .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 7;
     display: none; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
     padding: 9px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--crit) 45%, var(--line));
@@ -407,8 +368,10 @@
 
   <main>
     <div class="controls">
+      <button class="btn" id="backToOverview" style="display:none">← All namespaces</button>
+      <span id="nsLabel"></span>
       <button class="btn" id="reset">Reset view</button>
-      <button class="btn" id="relayout">Re-layout</button>
+      <button class="btn" id="expandAll">Expand all</button>
       <div class="sync-wrap">
         <button class="sync-pill on" id="syncPill" aria-haspopup="true" aria-expanded="false">
           <span class="dot"></span><span id="syncPillLabel">LIVE</span>
@@ -429,11 +392,16 @@
       <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <svg id="canvas"><defs></defs>
-      <g id="viewport"><g id="regions"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
+    <div id="overviewScreen" class="active">
+      <div class="ov-head">Every namespace Mantis can see — click one to open its resource tree.</div>
+      <div class="ns-grid" id="nsGrid"></div>
+    </div>
+
+    <svg id="canvas" class="hidden-screen"><defs></defs>
+      <g id="viewport"><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
     </svg>
 
-    <div class="legend collapsed" id="legend">
+    <div class="legend collapsed" id="legend" style="display:none">
       <div class="legend-body">
         <h4>Resource</h4>
         <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
@@ -444,9 +412,9 @@
         <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
         <div class="row"><span class="sw" style="background:var(--cat-autoscale)"></span>Autoscaler (HPA / VPA / NodePool)</div>
         <div class="divider"></div>
-        <h4>Reading the map</h4>
-        <div class="row"><span class="ln" style="border-color:var(--cat-node)"></span>relationship (edge)</div>
-        <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
+        <h4>Reading the tree</h4>
+        <div class="row"><span class="ln" style="border-color:var(--cat-workload)"></span>ownership (controlled-by)</div>
+        <div class="row"><span class="ln" style="border-color:var(--cat-node);border-top-style:dashed"></span>other relationship</div>
         <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
       </div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
@@ -485,69 +453,39 @@
   </main>
 </div>
 
+<script src="graph-engine.js"></script>
 <script>
 (function () {
   "use strict";
 
-  const SVGNS = "http://www.w3.org/2000/svg";
-  const el = (t,a) => { const e = document.createElementNS(SVGNS,t); for (const k in a) e.setAttribute(k,a[k]); return e; };
-  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-
-  const CAT = { Deployment:"workload", ReplicaSet:"workload", StatefulSet:"workload", DaemonSet:"workload", CronJob:"workload", Job:"workload",
-    Pod:"pod", Service:"network", Ingress:"network", ConfigMap:"config", Secret:"config", ResourceQuota:"config", LimitRange:"config",
-    PersistentVolumeClaim:"storage", PersistentVolume:"storage", StorageClass:"storage", Node:"node",
-    HorizontalPodAutoscaler:"autoscale", VerticalPodAutoscaler:"autoscale", NodePool:"autoscale" };
-  const catColor = c => css("--cat-"+c);
-  const FAMILY = { "controlled-by":"workload","runs-on":"node","selects":"network","serves":"network","routes-to":"network","references":"config","mounts":"config","claims":"storage","bound-to":"storage","storage-class":"storage","scales":"autoscale" };
-  const REVERSE = { "controlled-by":"controls","runs-on":"hosts","selects":"selected-by","serves":"served-by","routes-to":"routed-from","references":"used-by","mounts":"mounted-by","claims":"claimed-by","bound-to":"bound-from","storage-class":"class-of","scales":"scaled-by" };
-  // Namespace region colors aren't CSS custom properties — there can be more
-  // namespaces than named tokens, so they're an index-picked palette instead.
-  // That means, unlike everything styled via var(--x), they won't repaint
-  // themselves on a theme switch; nsPalette() picks the set with the right
-  // contrast for the current background, and recolorForTheme() (below) is what
-  // actually re-picks it for already-drawn regions.
-  const NS_PALETTE_DARK  = ["#a6e22e","#6ea8fe","#d980fb","#e3b341","#34d1bf","#f0883e","#db61a2","#7ee787","#a371f7","#4ec9b0"];
-  const NS_PALETTE_LIGHT = ["#4f8a1c","#2f6fe0","#a23fd1","#a06400","#0a8f7c","#b85c17","#c23f82","#1f8f4e","#7a4fd1","#0f8f82"];
-  const nsPalette = () => document.documentElement.getAttribute("data-theme") === "light" ? NS_PALETTE_LIGHT : NS_PALETTE_DARK;
-
-  // Layout: a simple, calm force sim — repulsion spreads nodes apart, links pull
-  // related resources together, and a gentle per-namespace anchor keeps each
-  // namespace loosely in its own area. Kept deliberately simple so it stays
-  // stable and readable.
+  const G = window.MantisGraph;
+  const el = G.el, esc = G.esc, css = G.css, catColor = G.catColor, FAMILY = G.FAMILY, REVERSE = G.REVERSE;
 
   const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
-    gRegions = document.getElementById("regions"), gEdges = document.getElementById("edges"),
+    gSecondaryEdges = document.getElementById("secondaryEdges"), gEdges = document.getElementById("edges"),
     gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
-    defs = svg.querySelector("defs"), panel = document.getElementById("panel"),
-    panelContent = document.getElementById("panelContent"),
-    overlay = document.getElementById("overlay"), toast = document.getElementById("toast");
+    panel = document.getElementById("panel"), panelContent = document.getElementById("panelContent"),
+    overlay = document.getElementById("overlay"), toast = document.getElementById("toast"),
+    overviewScreen = document.getElementById("overviewScreen"), nsGrid = document.getElementById("nsGrid"),
+    legend = document.getElementById("legend"), backToOverviewBtn = document.getElementById("backToOverview"),
+    nsLabel = document.getElementById("nsLabel");
 
-  // Arrow markers bake catColor(f) in as a literal fill at creation time (SVG
-  // <marker> defs can't hold a live var() the way inline styles can), so a
-  // theme switch needs these rebuilt — see recolorForTheme().
-  function buildArrowMarkers(){
-    defs.querySelectorAll("marker[id^='arrow-']").forEach(m => m.remove());
-    ["workload","network","config","storage","node","autoscale"].forEach(f => {
-      const m = el("marker",{ id:"arrow-"+f, viewBox:"0 0 10 10", refX:"9", refY:"5", markerWidth:"6", markerHeight:"6", orient:"auto-start-reverse" });
-      m.appendChild(el("path",{ d:"M0,0 L10,5 L0,10 z", fill: catColor(f) })); defs.appendChild(m);
-    });
-  }
-  buildArrowMarkers();
-
-  const groupKey = n => n.ns || "__cluster";
-  const short = s => s.length > 22 ? s.slice(0,21)+"…" : s;
-
-  // Live state, reconciled on every load/refresh. anchorPos persists across
-  // refreshes so a settled layout does not jump when new data arrives.
-  let nodes = [], edges = [], byId = {}, groups = {}, regionEls = {}, nodeEls = {}, anchorPos = {};
-  let namespaceList = [];
-  let W = svg.clientWidth||1000, H = svg.clientHeight||640, alpha = 1;
+  // ---- global data (the whole /api/graph payload) vs. the current screen's
+  // rendered subset. Search, the relationships tab, and the overview grid all
+  // read the global set; the tree screen only ever draws one namespace's
+  // slice of it (see setView/renderTree). ----
+  let allNodes = [], allEdges = [], byId = {}, namespaceList = [];
+  let viewState = null; // null = overview screen; "" = cluster-scoped pseudo-namespace; else a real namespace name
+  let collapsedIds = new Set(); // per-namespace; reset on every namespace switch (see setView)
+  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], childrenOf: {} };
+  let currentById = {}; // byId, but only nodes actually rendered in the current tree
+  let nodeEls = {};
+  let W = svg.clientWidth || 1000, H = svg.clientHeight || 640;
   let selected = null, curTab = "summary", yamlToken = 0;
   let autoTimer = null, everLoaded = false;
-  let lastGraphData = null; // last successful /api/graph payload, kept so a theme switch can recolor without a re-fetch
-  let lastSyncProgress = null; // most recent /api/sync/status payload (see pollSyncStatus, below the sync pill)
-  let onSyncProgress = null; // set by firstLoad while its overlay is up, so pollSyncStatus can refresh it live; null otherwise
+  let lastGraphData = null;
+  let lastSyncProgress = null;
+  let onSyncProgress = null;
 
   // ---- overlay (blocking, first connect only) + toast (non-blocking failures) ----
   function showOverlay(title, bodyHTML, isErr){
@@ -559,13 +497,8 @@
   function showToast(msg){ document.getElementById("toastMsg").textContent = msg; toast.classList.add("show"); }
   const hideToast = () => toast.classList.remove("show");
 
-  // ---- connection status — feeds the sync pill (see updateSyncPill below),
-  // which is now the app's only status indicator. "Live" on its own never says
-  // how current the data actually is, so every successful fetch stamps
-  // lastSyncedAt, and the pill/popover surface it as "Xs ago" rather than
-  // making the user guess. ----
   let connState = "live"; // "live" | "syncing" | "error"
-  let lastSyncedAt = null; // Date of the last successful fetch, or null before the first one
+  let lastSyncedAt = null;
   function timeAgo(date){
     if (!date) return "never";
     const s = Math.max(0, Math.round((Date.now()-date.getTime())/1000));
@@ -575,10 +508,6 @@
     if (m < 60) return m+"m ago";
     return Math.round(m/60)+"h ago";
   }
-  // setConn is called from updateSyncPill's declaration site too (it's defined
-  // further down, alongside the sync pill it drives) — safe, since setConn is
-  // only ever invoked later, from firstLoad/sync, by which point the whole
-  // script has finished initializing.
   function setConn(state){
     connState = state;
     if (state === "live") lastSyncedAt = new Date();
@@ -593,15 +522,9 @@
         return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); });
       });
   }
-  // fetchSyncStatus reads the background sync loop's own progress (see
-  // internal/engine/sync.go's SyncProgress) — used by both the connecting
-  // overlay (below) and the sync pill's popover (see pollSyncStatus).
   function fetchSyncStatus(){
     return fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject());
   }
-  // overlayProgressHTML renders SyncProgress as the connecting overlay's
-  // extra detail block. namespacesTotal being falsy means the very first
-  // status poll hasn't landed yet — show nothing rather than "0/0".
   function overlayProgressHTML(p){
     if (!p || !p.namespacesTotal) return "";
     return '<div class="sync-progress">'+
@@ -610,12 +533,6 @@
       '<div class="sp-row"><span>Relationships so far</span><b>'+(p.relationshipsSoFar||0)+'</b></div>'+
       '</div>';
   }
-  // firstLoad shows the blocking overlay — the only time the user waits, and
-  // typically brief now: /api/graph answers as soon as the *first* namespace
-  // is ready (see internal/engine/server.go's handleGraph), not the whole
-  // cluster. While it's up, onSyncProgress (driven by pollSyncStatus's own
-  // steady poll, below) refreshes it with real progress instead of a static
-  // "reading resources" message sitting there unchanged.
   function firstLoad(){
     showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
     onSyncProgress = p => showOverlay("Connecting to your cluster…",
@@ -625,9 +542,6 @@
       .catch(err => { onSyncProgress = null; showOverlay("Cannot read the cluster",
         '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true); });
   }
-  // sync is silent: no overlay, positions and selection preserved. The pill only
-  // turns amber if a request is slow (latency), red on failure — a routine fast
-  // sync is invisible.
   function sync(){
     if (!everLoaded) { firstLoad(); return; }
     const slow = setTimeout(() => setConn("syncing"), 1500);
@@ -636,200 +550,187 @@
       .catch(err => { clearTimeout(slow); setConn("error"); showToast("Lost contact with the engine — showing last snapshot, retrying…"); });
   }
 
-  // applyData reconciles the scene with a fresh payload. Existing nodes keep their
-  // position (no jarring re-layout on sync); new nodes seed near their region
-  // anchor and animate in; removed nodes disappear. Selection + view preserved.
+  // applyData reconciles global state with a fresh /api/graph payload, then
+  // re-renders whichever screen is currently active — the overview grid, or
+  // one namespace's tree — without resetting camera pan/zoom, selection, or
+  // collapsed subtrees (those only reset on an explicit namespace switch,
+  // see setView).
   function applyData(data, first){
     lastGraphData = data;
     W = svg.clientWidth||W; H = svg.clientHeight||H;
     const meta = data.meta || {};
     namespaceList = meta.namespaceList || [];
-
-    const prevPos = {};
-    nodes.forEach(n => { prevPos[n.id] = { x:n.x, y:n.y, vx:n.vx, vy:n.vy }; });
-    const prevSelected = selected;
-
-    gRegions.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
-    byId = {}; groups = {}; regionEls = {}; nodeEls = {};
-
-    nodes = (data.nodes || []).map(n => ({ ...n, cat: CAT[n.kind] || "node" }));
-    edges = (data.edges || []).slice();
-    nodes.forEach(n => { byId[n.id] = n; n.w = Math.min(210, Math.max(104, short(n.name).length*7 + 48)); n.h = n.resolved===false?46:40; });
-
-    // Groups from nodes, plus an (empty) group for every namespace the cluster has.
-    nodes.forEach(n => { const g = groupKey(n); (groups[g] = groups[g] || []).push(n); });
-    namespaceList.forEach(ns => { if (!groups[ns]) groups[ns] = []; });
-
-    assignRegions(); // (re)assigns anchors for NEW groups, keeps settled ones, builds region els
-
-    nodes.forEach(n => {
-      const p = prevPos[n.id];
-      if (p){ n.x=p.x; n.y=p.y; n.vx=p.vx; n.vy=p.vy; n.fx=null; n.fy=null; }
-      else { seedNode(n); }
-    });
-
-    buildNodeEls();
-    buildEdgeEls();
+    allNodes = (data.nodes || []).map(n => ({ ...n, cat: G.CAT[n.kind] || "node" }));
+    allEdges = (data.edges || []).slice();
+    byId = {}; allNodes.forEach(n => byId[n.id] = n);
 
     document.getElementById("clusterName").textContent = meta.context || "unknown";
-    document.getElementById("nCount").textContent = nodes.length;
-    document.getElementById("eCount").textContent = edges.length;
+    document.getElementById("nCount").textContent = allNodes.length;
+    document.getElementById("eCount").textContent = allEdges.length;
     document.getElementById("nsCount").textContent = meta.namespaces != null ? meta.namespaces : namespaceList.length;
     document.getElementById("autoscalerChip").innerHTML = meta.nodeAutoscaler
       ? '<span class="autoscale-badge">autoscaler <b>'+esc(meta.nodeAutoscaler)+'</b></span>'
       : '';
 
-    const hasNew = nodes.some(n => !prevPos[n.id]);
-    alpha = first ? 1 : (hasNew ? 0.4 : 0.05);
-
-    if (prevSelected && byId[prevSelected]) select(prevSelected, { silent: true });
-    else { selected = null; renderEmpty(); }
+    if (viewState === null) { renderOverview(); return; }
+    // A namespace can disappear between syncs (deleted, or was never real to
+    // begin with for the cluster-scoped "" pseudo-namespace, which always
+    // "exists"). Fall back to the overview rather than showing an empty tree
+    // with no way to tell why.
+    const stillHasNodes = allNodes.some(n => G.groupKey(n) === (viewState || "__cluster"));
+    if (viewState !== "" && !stillHasNodes && !namespaceList.includes(viewState)) { setView(null); return; }
+    renderTree(viewState);
   }
 
-  const anchor = g => anchorPos[g] || { x: W/2, y: H/2 };
-  function seedNode(n){ const a = anchor(groupKey(n)); n.x = a.x + (Math.random()-.5)*120; n.y = a.y + (Math.random()-.5)*100; n.vx=0; n.vy=0; n.fx=null; n.fy=null; }
-
-  // assignRegions gives every region (namespace or cluster-scoped, incl. empty) a
-  // colour + anchor and creates its box/label. Existing anchors are preserved so
-  // the layout is stable across syncs; only new regions get a default position.
-  // Namespace grid slots — fixed-size cells claimed once and never reassigned.
-  // The previous version spread every namespace evenly across "current total
-  // count", which meant a namespace's position was really an answer to "where
-  // is slot 2 of 4?" — and the moment a 5th namespace showed up, that became
-  // "slot 2 of 5", a *different* point on screen, while the already-settled
-  // namespaces stayed exactly where "slot 2 of 4" used to be. A brand-new
-  // (often empty, undraggable) namespace could land squarely on top of one
-  // that already existed. Claiming the next free grid cell — independent of
-  // how many namespaces exist in total — means a namespace's spot never moves
-  // once given, so a new one can only ever land in genuinely open space.
-  // Sized generously — a namespace holding a dozen-plus resources (kube-system
-  // in a typical cluster) grows well past one cell, so neighbors need enough
-  // clearance that its overflow doesn't reach them.
-  const REGION_COLS = 3, REGION_COL_W = 330, REGION_ROW_H = 270, REGION_X0 = 180, REGION_Y0 = 140;
-  function assignRegions(){
-    const ns = Object.keys(groups).filter(g => g !== "__cluster").sort();
-    Object.keys(anchorPos).forEach(g => { if (!groups[g]) delete anchorPos[g]; });
-    let slot = Object.keys(anchorPos).length;
-    ns.forEach(g => {
-      if (anchorPos[g]) return;
-      const col = slot % REGION_COLS, row = Math.floor(slot / REGION_COLS);
-      anchorPos[g] = { x: REGION_X0 + col*REGION_COL_W, y: REGION_Y0 + row*REGION_ROW_H };
-      slot++;
-    });
-    // Cluster-scoped resources (Nodes, etc.) get their own reserved row below
-    // every namespace row claimed so far, rather than a fixed screen fraction
-    // (the old H*0.86) — on a tall namespace grid, that fixed spot could end up
-    // inside a namespace row instead of below it.
-    if (groups["__cluster"] && !anchorPos["__cluster"]){
-      const namespaceRows = Math.ceil(Object.keys(anchorPos).length / REGION_COLS) || 1;
-      anchorPos["__cluster"] = { x: REGION_X0 + REGION_COL_W, y: REGION_Y0 + namespaceRows*REGION_ROW_H };
-    }
-
-    Object.keys(groups).forEach(g => {
-      const cluster = g === "__cluster";
-      const empty = groups[g].length === 0;
-      const palette = nsPalette();
-      const color = cluster ? css("--ns-cluster") : palette[Math.max(0, ns.indexOf(g)) % palette.length];
-      const box = el("rect",{ class:"region-box" + (empty ? " empty" : ""), rx:16, fill: color, stroke: color, "stroke-dasharray": (cluster && !empty)?"6 5":"none" });
-      const lbl = el("text",{ class:"region-label", fill: color });
-      lbl.textContent = cluster ? "cluster-scoped · not namespaced" : ("namespace · " + g + (empty ? "  ·  empty" : ""));
-      gRegions.appendChild(box); gRegions.appendChild(lbl);
-      regionEls[g] = { box, lbl, color };
-    });
+  // ---- namespace overview ----
+  function renderOverview(){
+    const cards = G.computeOverview(allNodes, namespaceList);
+    nsGrid.innerHTML = cards.map(c => {
+      const label = c.cluster ? "Cluster resources" : c.ns;
+      const bits = [];
+      if (c.crit) bits.push('<span class="hc crit">'+c.crit+' crit</span>');
+      if (c.warn) bits.push('<span class="hc warn">'+c.warn+' warn</span>');
+      if (c.unresolved) bits.push('<span class="hc unresolved">'+c.unresolved+' not found</span>');
+      if (c.ok) bits.push('<span class="hc ok">'+c.ok+' ok</span>');
+      return '<div class="ns-card'+(c.count===0?' empty':'')+'" data-ns="'+esc(c.ns)+'">'+
+        '<div class="ns-name">'+(c.cluster?'⬡ ':'')+esc(label)+'</div>'+
+        '<div class="ns-count">'+c.count+' resource'+(c.count===1?'':'s')+'</div>'+
+        (bits.length ? '<div class="ns-health">'+bits.join('')+'</div>' : '')+
+        '</div>';
+    }).join("");
+    nsGrid.querySelectorAll(".ns-card").forEach(card =>
+      card.addEventListener("click", () => setView(card.getAttribute("data-ns"))));
   }
 
-  function buildNodeEls(){
-    nodes.forEach(n => {
-      const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"");
-      const g = el("g",{ class: cls, "data-id": n.id });
+  // setView switches screens — the only place camera position and collapsed
+  // subtrees reset (a plain data refresh, applyData→renderTree, preserves
+  // both; see the comment on applyData above).
+  function setView(ns){
+    viewState = ns;
+    collapsedIds = new Set();
+    selected = null;
+    overviewScreen.classList.toggle("active", viewState === null);
+    svg.classList.toggle("hidden-screen", viewState === null);
+    legend.style.display = viewState === null ? "none" : "";
+    backToOverviewBtn.style.display = viewState === null ? "none" : "";
+    nsLabel.textContent = viewState === null ? "" : (viewState === "" ? "cluster resources" : "namespace · " + viewState);
+    if (viewState === null) { showPanel(false); renderOverview(); return; }
+    view.x = 0; view.y = 200; view.k = 1; applyView();
+    renderTree(viewState);
+  }
+  backToOverviewBtn.addEventListener("click", () => setView(null));
+
+  // ---- per-namespace tree ----
+  function renderTree(ns){
+    const layout = G.computeTreeLayout(allNodes, allEdges, ns, collapsedIds);
+    currentLayout = layout;
+    currentById = {}; layout.nodes.forEach(n => currentById[n.id] = n);
+
+    gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
+    nodeEls = {};
+
+    buildSecondaryEdgeEls(layout.secondaryEdges);
+    buildOwnershipEdgeEls(layout.ownershipEdges);
+    buildNodeEls(layout.nodes, layout.childrenOf);
+
+    if (selected && currentById[selected]) select(selected, { silent: true });
+    else { selected = null; renderNamespaceHint(ns); }
+  }
+
+  function buildOwnershipEdgeEls(edges){
+    edges.forEach(e => {
+      const parent = currentById[e.to], child = currentById[e.from];
+      if (!parent || !child) return;
+      const x1=parent.x, y1=parent.y+parent.h/2, x2=child.x, y2=child.y-child.h/2, midY=(y1+y2)/2;
+      const path = el("path", { class:"edge", d:`M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
+        stroke: catColor("workload"), "stroke-opacity":.5, "stroke-width":1.8 });
+      e._path = path; e._baseOpacity = .5; e._baseWidth = 1.8; e._label = null;
+      gEdges.appendChild(path);
+    });
+  }
+  function buildSecondaryEdgeEls(edges){
+    edges.forEach(e => {
+      const a = currentById[e.from], b = currentById[e.to];
+      if (!a || !b) return;
+      const fam = FAMILY[e.type] || "node", toGhost = b.resolved === false;
+      const dashed = toGhost || e.type==="references" || e.type==="claims" || e.type==="bound-to";
+      const midY = (a.y+b.y)/2;
+      const path = el("path", { class:"secondary-edge"+(dashed?" dashed":""), d:`M${a.x},${a.y} C${a.x},${midY} ${b.x},${midY} ${b.x},${b.y}`,
+        stroke: toGhost?css("--crit"):catColor(fam) });
+      const lbl = el("text",{ class:"edge-label", "text-anchor":"middle", x:(a.x+b.x)/2, y:(a.y+b.y)/2-3 }); lbl.textContent = e.type;
+      e._path = path; e._baseOpacity = .22; e._baseWidth = 1.2; e._label = lbl;
+      gSecondaryEdges.appendChild(path); gEdgeLabels.appendChild(lbl);
+    });
+  }
+  function buildNodeEls(list, childrenOf){
+    list.forEach(n => {
+      const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"") + (n.collapsed?" collapsed":"");
+      const g = el("g",{ class: cls, "data-id": n.id, transform:`translate(${n.x},${n.y})` });
       g.appendChild(el("rect",{ class:"accent", x:-n.w/2, y:-n.h/2, width:4, height:n.h, rx:2, fill: catColor(n.cat) }));
       g.appendChild(el("rect",{ class:"chip-bg", x:-n.w/2, y:-n.h/2, width:n.w, height:n.h, rx:9 }));
       if (n.status) g.appendChild(el("circle",{ class:"status-ring", cx:n.w/2-11, cy:-n.h/2+11, r:4.5 }));
       const kind = el("text",{ class:"kind", x:-n.w/2+12, y:n.resolved===false?-6:-3, fill: catColor(n.cat) }); kind.textContent = n.kind.toUpperCase();
-      const name = el("text",{ class:"name", x:-n.w/2+12, y:n.resolved===false?9:12 }); name.textContent = short(n.name);
+      const name = el("text",{ class:"name", x:-n.w/2+12, y:n.resolved===false?9:12 }); name.textContent = G.short(n.name);
       g.appendChild(kind); g.appendChild(name);
       if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
       const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
+
+      const kids = childrenOf[n.id];
+      if (kids && kids.length){
+        const cx = n.w/2-11, cy = n.h/2-11;
+        const toggle = el("g",{ class:"collapse-toggle", "data-toggle-id": n.id });
+        toggle.appendChild(el("circle",{ cx, cy, r:8 }));
+        const lbl = el("text",{ x:cx, y:cy+1 }); lbl.textContent = n.collapsed ? ("+"+n.hiddenCount) : "–";
+        toggle.appendChild(lbl);
+        g.appendChild(toggle);
+      }
       gNodes.appendChild(g); nodeEls[n.id] = g;
     });
   }
-
-  function buildEdgeEls(){
-    edges.forEach(e => {
-      const fam = FAMILY[e.type] || "node", a = byId[e.from], b = byId[e.to];
-      e.cross = a && b && a.ns && b.ns && a.ns !== b.ns; e.toGhost = b && b.resolved === false;
-      const line = el("line",{ class:"edge", stroke: e.toGhost?css("--crit"):catColor(fam), "stroke-opacity":.32, "stroke-width":1.6,
-        "stroke-dasharray": e.type==="runs-on"?"4 4":(e.toGhost?"5 4":"none"), "marker-end": e.toGhost?"":"url(#arrow-"+fam+")" });
-      e._line = line; gEdges.appendChild(line);
-      const lbl = el("text",{ class:"edge-label", "text-anchor":"middle" }); lbl.textContent = e.type; e._label = lbl; gEdgeLabels.appendChild(lbl);
-    });
+  function toggleCollapse(id){
+    if (collapsedIds.has(id)) collapsedIds.delete(id); else collapsedIds.add(id);
+    renderTree(viewState);
   }
+  document.getElementById("expandAll").addEventListener("click", () => { if (viewState !== null) { collapsedIds = new Set(); renderTree(viewState); } });
 
-  // tick — the exact simulation from docs/prototype/cluster-graph.html, no
-  // additions: plain repulsion, plain edge springs, plain per-region anchor
-  // pull. Nothing here treats cluster-scoped resources specially.
-  function tick(){
-    W = svg.clientWidth||W; H = svg.clientHeight||H;
-    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++){ const a=nodes[i],b=nodes[j]; let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||.01,d=Math.sqrt(d2); const rep=5200/d2,ux=dx/d,uy=dy/d; a.vx+=ux*rep; a.vy+=uy*rep; b.vx-=ux*rep; b.vy-=uy*rep; }
-    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||.01; const k=0.032*(d-118),ux=dx/d,uy=dy/d; a.vx+=ux*k; a.vy+=uy*k; b.vx-=ux*k; b.vy-=uy*k; });
-    nodes.forEach(n => { const a=anchor(groupKey(n)); n.vx+=(a.x-n.x)*0.02; n.vy+=(a.y-n.y)*0.02; });
-    nodes.forEach(n => { if(n.fx!=null){ n.x=n.fx; n.y=n.fy; n.vx=0; n.vy=0; return; } n.vx*=0.82; n.vy*=0.82; n.x+=n.vx*alpha; n.y+=n.vy*alpha; });
-    alpha *= 0.992; if(alpha<0.03) alpha=0.03; render();
-  }
-  function render(){
-    Object.keys(groups).forEach(g => {
-      const ns = groups[g], r = regionEls[g]; if (!r) return;
-      let minx, miny, maxx, maxy;
-      if (ns.length === 0){ const a = anchor(g), bw = 168, bh = 74; minx=a.x-bw/2; maxx=a.x+bw/2; miny=a.y-bh/2; maxy=a.y+bh/2; }
-      else { minx=1e9; miny=1e9; maxx=-1e9; maxy=-1e9; ns.forEach(n => { minx=Math.min(minx,n.x-n.w/2); maxx=Math.max(maxx,n.x+n.w/2); miny=Math.min(miny,n.y-n.h/2); maxy=Math.max(maxy,n.y+n.h/2); }); }
-      const pad=26;
-      r.box.setAttribute("x",minx-pad); r.box.setAttribute("y",miny-pad); r.box.setAttribute("width",(maxx-minx)+pad*2); r.box.setAttribute("height",(maxy-miny)+pad*2);
-      r.lbl.setAttribute("x",minx-pad+12); r.lbl.setAttribute("y",miny-pad-8);
-    });
-    nodes.forEach(n => nodeEls[n.id].setAttribute("transform",`translate(${n.x},${n.y})`));
-    edges.forEach(e => { const a=byId[e.from],b=byId[e.to]; if(!a||!b) return; let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/d,uy=dy/d;
-      const x1=a.x+ux*24,y1=a.y+uy*20,x2=b.x-ux*30,y2=b.y-uy*22; e._line.setAttribute("x1",x1); e._line.setAttribute("y1",y1); e._line.setAttribute("x2",x2); e._line.setAttribute("y2",y2);
-      e._label.setAttribute("x",(x1+x2)/2); e._label.setAttribute("y",(y1+y2)/2-3); });
-  }
-  function loop(){ tick(); requestAnimationFrame(loop); } loop();
-
-  // ---- pan/zoom ----
+  // ---- pan/zoom (drag-to-move-a-node is gone — positions are computed, not
+  // physics, so there's nothing meaningful to drag; only the canvas pans) ----
   const view = { x:0, y:0, k:1 };
   const applyView = () => gViewport.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`); applyView();
   svg.addEventListener("wheel", ev => { ev.preventDefault(); const r=svg.getBoundingClientRect(); const mx=ev.clientX-r.left,my=ev.clientY-r.top,f=Math.exp(-ev.deltaY*0.0016);
     const nk=Math.min(2.6,Math.max(0.3,view.k*f)); view.x=mx-(mx-view.x)*(nk/view.k); view.y=my-(my-view.y)*(nk/view.k); view.k=nk; applyView(); }, {passive:false});
   let drag=null;
-  const world = ev => { const r=svg.getBoundingClientRect(); return { x:(ev.clientX-r.left-view.x)/view.k, y:(ev.clientY-r.top-view.y)/view.k }; };
   svg.addEventListener("pointerdown", ev => {
-    const g = ev.target.closest && ev.target.closest(".node");
-    if (g){ const n=byId[g.getAttribute("data-id")],w=world(ev); drag={node:n,dx:n.x-w.x,dy:n.y-w.y,moved:false}; n.fx=n.x; n.fy=n.y; alpha=Math.max(alpha,.35); }
-    else { const r=svg.getBoundingClientRect(); drag={pan:true,sx:ev.clientX-r.left-view.x,sy:ev.clientY-r.top-view.y,moved:false,target:ev.target}; svg.classList.add("panning"); }
-    svg.setPointerCapture(ev.pointerId);
+    const r=svg.getBoundingClientRect();
+    drag={sx:ev.clientX-r.left-view.x,sy:ev.clientY-r.top-view.y,moved:false,target:ev.target};
+    svg.classList.add("panning"); svg.setPointerCapture(ev.pointerId);
   });
   svg.addEventListener("pointermove", ev => { if(!drag) return; drag.moved=true;
-    if (drag.pan){ const r=svg.getBoundingClientRect(); view.x=ev.clientX-r.left-drag.sx; view.y=ev.clientY-r.top-drag.sy; applyView(); }
-    else { const w=world(ev); drag.node.fx=w.x+drag.dx; drag.node.fy=w.y+drag.dy; alpha=Math.max(alpha,.3); } });
-  svg.addEventListener("pointerup", () => { svg.classList.remove("panning"); if(drag&&!drag.pan&&drag.node){ drag.node.fx=null; drag.node.fy=null; }
-    if(drag&&drag.pan&&!drag.moved&&!drag.target.closest(".node")) select(null); drag=null; });
-  gNodes.addEventListener("click", ev => { const g=ev.target.closest(".node"); if(g) select(g.getAttribute("data-id")); });
+    const r=svg.getBoundingClientRect(); view.x=ev.clientX-r.left-drag.sx; view.y=ev.clientY-r.top-drag.sy; applyView(); });
+  svg.addEventListener("pointerup", () => { svg.classList.remove("panning");
+    if(drag && !drag.moved && !drag.target.closest(".node")) select(null); drag=null; });
+  gNodes.addEventListener("click", ev => {
+    const toggle = ev.target.closest(".collapse-toggle");
+    if (toggle){ toggleCollapse(toggle.getAttribute("data-toggle-id")); return; }
+    const g=ev.target.closest(".node"); if(g) select(g.getAttribute("data-id"));
+  });
 
   // ---- selection, focus/trace + drawer ----
   const TABS = { summary:"Summary", relationships:"Relationships", yaml:"YAML" };
-  // traceFrom walks outward from a resource, breadth-first, up to maxDepth hops,
-  // and returns how far each reached node is (0 = the resource itself). This is
-  // what "select something → understand everything around it" runs on: depth 1
-  // is what it directly touches, depth 2 is one step further out — e.g. a Pod's
-  // owning Deployment through its ReplicaSet. Capped at 2 hops on purpose: this
-  // is a focus tool, not "highlight the whole cluster" — an unbounded walk would
-  // light up half the graph through a busy Node or Service.
+  // traceFrom is scoped to the current tree's rendered edges (ownership +
+  // secondary) — it must never reach a node that isn't actually on screen,
+  // since only rendered nodes have a nodeEls[] entry to dim/highlight.
+  // Cross-namespace relationships still show, unfiltered, in the
+  // Relationships tab (relHTML, below) — that reads the full graph, not this.
   function traceFrom(id, maxDepth){
     maxDepth = maxDepth == null ? 2 : maxDepth;
+    const viewEdges = currentLayout.ownershipEdges.concat(currentLayout.secondaryEdges);
     const depth = new Map([[id, 0]]);
     let frontier = [id];
     for (let d = 0; d < maxDepth && frontier.length; d++){
       const next = [];
       frontier.forEach(cur => {
-        edges.forEach(e => {
+        viewEdges.forEach(e => {
           const other = e.from === cur ? e.to : (e.to === cur ? e.from : null);
           if (other && !depth.has(other)) { depth.set(other, d + 1); next.push(other); }
         });
@@ -838,49 +739,35 @@
     }
     return depth;
   }
-  // select(id) is Mantis's signature interaction: clicking a resource traces its
-  // neighborhood, dims everything else, and opens the drawer on it. select(null)
-  // is the way back out — same action whether it comes from the drawer's ✕,
-  // Escape, or clicking empty canvas — clearing focus and returning to the full,
-  // calm topology.
-  // select(id, opts.silent) — opts.silent is set only by applyData's post-sync
-  // re-selection (see below), which exists purely to keep node/edge highlight
-  // classes correct after every sync rebuilds the DOM from scratch. Without the
-  // silent flag, that call was indistinguishable from a real click: it reset
-  // curTab to Summary and re-rendered the whole drawer — including refetching
-  // and reloading the YAML tab — on every single sync tick. The graph itself
-  // (node health, edges, positions) still updates live regardless; only the
-  // drawer's snapshot now holds still until the user actually interacts with
-  // it, same as everything else in Mantis staying calm between syncs.
   function select(id, opts){
     opts = opts || {};
     const isNewSelection = id !== selected;
     if (isNewSelection) curTab = "summary";
     selected = id;
+    const viewEdges = currentLayout.ownershipEdges.concat(currentLayout.secondaryEdges);
     if (!id){
       Object.values(nodeEls).forEach(g => g.classList.remove("selected","dim"));
-      edges.forEach(e => { e._line.setAttribute("stroke-opacity",.32); e._line.setAttribute("stroke-width",1.6); e._label.style.opacity=0; });
+      viewEdges.forEach(e => { e._path.setAttribute("stroke-opacity", e._baseOpacity); e._path.setAttribute("stroke-width", e._baseWidth); if (e._label) e._label.style.opacity=0; });
       showPanel(false);
       return;
     }
     showPanel(true);
     const trace = traceFrom(id);
-    nodes.forEach(n => { const g=nodeEls[n.id]; g.classList.toggle("selected", n.id===id); g.classList.toggle("dim", !trace.has(n.id)); });
-    edges.forEach(e => {
+    Object.keys(nodeEls).forEach(nid => { const g=nodeEls[nid]; g.classList.toggle("selected", nid===id); g.classList.toggle("dim", !trace.has(nid)); });
+    viewEdges.forEach(e => {
       const da = trace.get(e.from), db = trace.get(e.to);
       const inTrace = da !== undefined && db !== undefined;
-      const direct = inTrace && (da === 0 || db === 0); // touches the selected resource itself
-      e._line.setAttribute("stroke-opacity", direct ? 1 : (inTrace ? .55 : .05));
-      e._line.setAttribute("stroke-width", direct ? 2.6 : (inTrace ? 1.8 : 1.1));
-      e._label.style.opacity = direct ? 1 : 0; // labels only on the direct edges — the wider trace stays legible, not noisy
+      const direct = inTrace && (da === 0 || db === 0);
+      e._path.setAttribute("stroke-opacity", direct ? 1 : (inTrace ? .55 : e._baseOpacity*0.4));
+      e._path.setAttribute("stroke-width", direct ? e._baseWidth+0.8 : e._baseWidth);
+      if (e._label) e._label.style.opacity = direct ? 1 : 0;
     });
     if (isNewSelection || !opts.silent) renderNode(byId[id]);
   }
-  function renderEmpty(){
-    const cluster = document.getElementById("clusterName").textContent;
-    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
-      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>.<br><br>'+
-      '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to arrange, <b>scroll</b> to zoom. <b>Auto-sync</b> keeps the map live.</p>';
+  function renderNamespaceHint(ns){
+    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Namespace</div><div class="p-name">'+esc(ns||"Cluster resources")+'</div></div>'+
+      '<p class="hint">This namespace\'s ownership tree — <b>solid lines are ownership</b> (controlled-by), <b>faint curved lines</b> are other relationships.<br><br>'+
+      '<b>Search</b> or <b>click</b> a resource for details. <b>Drag empty space</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>';
   }
   const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
   function renderNode(n){
@@ -896,12 +783,19 @@
     const body = document.getElementById("tabbody");
     if (curTab==="yaml"){ renderYaml(n, body); return; }
     body.innerHTML = curTab==="summary" ? overviewHTML(n) : relHTML(n);
-    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => select(r.getAttribute("data-goto"))));
+    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => selectAnywhere(r.getAttribute("data-goto"))));
   }
-  // renderYaml lazily fetches a resource's manifest only when the YAML tab is
-  // opened. A monotonic token guards against a slow fetch landing after the user
-  // has clicked a different node. A 403 (Secrets, or RBAC) is shown as a notice
-  // rather than an error, since it is an expected, explained outcome.
+  // selectAnywhere is what the Relationships tab uses to jump to a related
+  // resource — unlike select(), the target might be in a different namespace
+  // (or cluster-scoped) than the one currently open, so it switches views
+  // first when needed, same as picking a cross-namespace search result.
+  function selectAnywhere(id){
+    const target = byId[id]; if (!target) return;
+    const targetNs = G.groupKey(target) === "__cluster" ? "" : target.ns;
+    if (viewState === null || targetNs !== viewState) setView(targetNs);
+    select(id);
+    centerOn(currentById[id]);
+  }
   function renderYaml(n, body){
     if (n.resolved===false){ body.innerHTML = '<p class="hint">This resource was referenced but not found in the cluster, so there is no manifest to show.</p>'; return; }
     body.innerHTML = '<p class="hint">Loading manifest…</p>';
@@ -911,7 +805,7 @@
     fetch("/api/resource?"+params.toString())
       .then(async r => ({ ok:r.ok, status:r.status, text:await r.text() }))
       .then(res => {
-        if (token !== yamlToken) return; // superseded by a newer selection
+        if (token !== yamlToken) return;
         if (res.ok) {
           body.innerHTML = '<div class="yaml-wrap"><div class="yaml-tools">'+
             '<button class="copy-btn" id="expandYaml" title="Open a large reader">⤢ Expand</button>'+
@@ -925,8 +819,6 @@
       })
       .catch(e => { if (token === yamlToken) body.innerHTML = '<div class="notice">Could not load manifest — '+esc(String(e))+'</div>'; });
   }
-  // doCopy writes text to the clipboard and flashes the button, with a textarea
-  // fallback for browsers without the async clipboard API.
   async function doCopy(btn, text){
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(text);
@@ -935,7 +827,6 @@
       setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
     } catch { btn.textContent = "Copy failed"; setTimeout(() => btn.textContent = "Copy", 1600); }
   }
-  // wireCopy binds the copy action to a freshly-rendered inline Copy button.
   function wireCopy(btn, text){ if (btn) btn.addEventListener("click", () => doCopy(btn, text)); }
 
   // ---- expanded YAML reader ----
@@ -946,10 +837,6 @@
         ymodalNextBtn = document.getElementById("ymodalNext");
   let ymodalRawText = "", ymodalMatches = [], ymodalMatchIdx = -1;
 
-  // renderYamlSearch re-renders the <pre> with every match wrapped in <mark>,
-  // the current one in a distinct color, and scrolls it into view. Matching is
-  // done against the raw text (not the escaped HTML) so it can't be confused by
-  // entity sequences, then the highlighted markup is rebuilt segment by segment.
   function renderYamlSearch(){
     const q = ymodalSearch.value;
     if (!q){ ymodalPre.innerHTML = esc(ymodalRawText); ymodalMatchCount.textContent = ""; ymodalMatches = []; ymodalMatchIdx = -1; return; }
@@ -980,10 +867,6 @@
   ymodalSearch.addEventListener("keydown", ev => {
     if (ev.key === "Enter"){ ev.preventDefault(); ymodalStep(ev.shiftKey ? -1 : 1); }
     else if (ev.key === "Escape"){
-      // First Escape clears the search (and keeps the modal open); a second
-      // Escape — now with nothing to clear — falls through to the global
-      // handler below and closes the modal, same "back out one layer" logic
-      // as everywhere else in Mantis.
       if (ymodalSearch.value){ ev.stopPropagation(); ymodalSearch.value = ""; renderYamlSearch(); }
       else ymodalSearch.blur();
     }
@@ -998,20 +881,13 @@
     ymodalMatchCount.textContent = "";
     ymodalTitle.innerHTML = '<b>'+esc(n.kind)+' · </b>'+esc(n.name)+(n.ns?' <b>· '+esc(n.ns)+'</b>':'');
     ymodalCopy.textContent = "Copy"; ymodalCopy.classList.remove("done");
-    ymodalCopy.onclick = () => doCopy(ymodalCopy, text); // onclick replaces any prior binding
+    ymodalCopy.onclick = () => doCopy(ymodalCopy, text);
     ymodalOverlay.classList.add("open");
   }
   function closeYamlModal(){ ymodalOverlay.classList.remove("open"); ymodalPre.textContent = ""; ymodalRawText = ""; }
   ymodalClose.addEventListener("click", closeYamlModal);
   ymodalOverlay.addEventListener("click", ev => { if (ev.target === ymodalOverlay) closeYamlModal(); });
 
-  // ---- global keyboard: Escape backs out one layer at a time, Ctrl+F jumps to
-  // search from anywhere — the same physical key on every OS (this is a real
-  // Ctrl, not ⌘ on Mac), so the shortcut never changes depending on who's
-  // using it. It's context-aware: with the YAML reader open it focuses that
-  // modal's find box (every search bar gets the same shortcut), otherwise the
-  // main resource search. Escape's own priority — modal, then search, then
-  // focus — matches what's actually on top of the screen at each point. ----
   document.addEventListener("keydown", ev => {
     if (ev.ctrlKey && ev.key.toLowerCase() === "f"){
       ev.preventDefault();
@@ -1023,10 +899,8 @@
     if (ymodalOverlay.classList.contains("open")) { closeYamlModal(); return; }
     if (searchResults.classList.contains("open")) { closeSearch(); searchInput.blur(); return; }
     if (selected) select(null);
+    else if (viewState !== null) setView(null);
   });
-  // splitAttr parses an attribute line into a key/value pair on its first ": ".
-  // Lines with no colon (e.g. a Pod's "Running · 1/1" health note) have no key
-  // and render as a standalone status pill.
   function splitAttr(a){
     const i = a.indexOf(": ");
     if (i < 0) return { k:null, v:a };
@@ -1051,10 +925,10 @@
   }
   function relHTML(n){
     const out=[], inc=[];
-    edges.forEach(e => { if(e.from===n.id){ const o=byId[e.to]; if(o) out.push({verb:e.type,arrow:"→",other:o,cross:e.cross}); }
-                         if(e.to===n.id){ const o=byId[e.from]; if(o) inc.push({verb:REVERSE[e.type]||e.type,arrow:"←",other:o,cross:e.cross}); } });
+    allEdges.forEach(e => { if(e.from===n.id){ const o=byId[e.to]; if(o) out.push({verb:e.type,arrow:"→",other:o,cross:o.ns&&n.ns&&o.ns!==n.ns}); }
+                         if(e.to===n.id){ const o=byId[e.from]; if(o) inc.push({verb:REVERSE[e.type]||e.type,arrow:"←",other:o,cross:o.ns&&n.ns&&o.ns!==n.ns}); } });
     const row = r => '<div class="rel" data-goto="'+esc(r.other.id)+'"><span class="verb">'+esc(r.verb)+'</span><span class="arrow">'+r.arrow+'</span>'+
-      '<span class="rel-target"><span class="rk" style="color:'+catColor(r.other.cat)+'">'+esc(r.other.kind)+'/</span>'+esc(short(r.other.name))+'</span>'+(r.cross?'<span class="cross-tag">cross-ns</span>':'')+'</div>';
+      '<span class="rel-target"><span class="rk" style="color:'+catColor(r.other.cat)+'">'+esc(r.other.kind)+'/</span>'+esc(G.short(r.other.name))+'</span>'+(r.cross?'<span class="cross-tag">cross-ns</span>':'')+'</div>';
     let h = "";
     if (out.length) h += '<div class="sec-h">Depends on</div>'+out.map(row).join("");
     if (inc.length) h += '<div class="sec-h">Used by</div>'+inc.map(row).join("");
@@ -1062,20 +936,12 @@
   }
 
   // ---- controls ----
-  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
-  document.getElementById("relayout").addEventListener("click", () => {
-    gRegions.innerHTML = ""; regionEls = {}; anchorPos = {}; assignRegions(); nodes.forEach(seedNode); alpha = 1;
-  });
+  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y= viewState===null?0:200; view.k=1; applyView(); });
   document.getElementById("signOut").addEventListener("click", () => {
     fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; });
   });
 
   // ---- theme toggle ----
-  // Most of the app repaints itself for free — everything styled via var(--x)
-  // in the stylesheet updates the instant the attribute below flips. The graph
-  // canvas is the exception: node/edge/arrow colors are resolved once into
-  // literal values when drawn (see catColor()), so recolorForTheme() rebuilds
-  // just those pieces from the data already in hand — no re-fetch needed.
   const THEME_KEY = "mantis-theme";
   const themeToggle = document.getElementById("themeToggle");
   function applyTheme(theme){
@@ -1087,9 +953,11 @@
     themeToggle.title = label;
     themeToggle.setAttribute("aria-label", label);
   }
+  // recolorForTheme re-renders whichever screen is active from data already
+  // in hand — node/edge colors are resolved to literal values when drawn
+  // (see catColor()), so a theme switch needs a full rebuild, not a re-fetch.
   function recolorForTheme(){
-    buildArrowMarkers();
-    if (lastGraphData) applyData(lastGraphData, false);
+    if (viewState === null) renderOverview(); else renderTree(viewState);
   }
   applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
   themeToggle.addEventListener("click", () => {
@@ -1100,7 +968,7 @@
   });
 
   // ---- legend collapse ----
-  const legend = document.getElementById("legend"), legendToggle = document.getElementById("legendToggle");
+  const legendToggle = document.getElementById("legendToggle");
   legendToggle.addEventListener("click", () => {
     const collapsed = legend.classList.toggle("collapsed");
     const label = collapsed ? "Legend" : "Close legend";
@@ -1108,10 +976,6 @@
   });
 
   // ---- fly-to-node ----
-  // animateView eases the camera to a target pan/zoom over a short duration,
-  // rather than snapping — this is the one place a "fly" reads as purposeful
-  // rather than decorative: it's how the user actually finds their way to a
-  // search result on a canvas that can be zoomed and dragged anywhere.
   let viewAnimId = null;
   function animateView(tx, ty, tk, duration){
     if (viewAnimId) cancelAnimationFrame(viewAnimId);
@@ -1119,15 +983,13 @@
     duration = duration || 480;
     function step(now){
       const t = Math.min(1, (now-start)/duration);
-      const eased = 1 - Math.pow(1-t, 3); // ease-out cubic — fast start, gentle settle
+      const eased = 1 - Math.pow(1-t, 3);
       view.x = sx + (tx-sx)*eased; view.y = sy + (ty-sy)*eased; view.k = sk + (tk-sk)*eased;
       applyView();
       viewAnimId = t < 1 ? requestAnimationFrame(step) : null;
     }
     viewAnimId = requestAnimationFrame(step);
   }
-  // centerOn flies the camera so a node lands in the visible area, offset left
-  // by the drawer's width so the selection is not hidden behind it.
   function centerOn(n){
     if (!n) return;
     const tk = view.k < 0.85 ? 1 : view.k;
@@ -1135,39 +997,18 @@
     animateView((W - pw)/2 - n.x*tk, H/2 - n.y*tk, tk);
   }
 
-  // ---- live search ----
+  // ---- live search — global across every namespace regardless of the
+  // current screen, since "which namespace is this in?" is often exactly
+  // what a search is for. Picking a result switches view first if needed
+  // (selectAnywhere), same as the Relationships tab's cross-namespace jumps. ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
-  // SEARCH_RESULT_CAP replaces what used to be a hard 12-result limit with no
-  // way to see past it. 200 is generous rather than unlimited on purpose —
-  // rendering it is trivial (a few hundred DOM nodes on a keystroke costs
-  // nothing a browser notices) but an actually-unbounded list on a very large
-  // cluster would turn one broad query (e.g. a namespace name matching
-  // hundreds of resources) into thousands of unscrollable rows for no benefit
-  // over just narrowing the query. The dropdown (.search-results) already
-  // scrolls past its fixed height — see its max-height/overflow-y in the
-  // stylesheet — so raising the cap is what actually makes that scrolling
-  // matter instead of every search fitting inside 12 rows already.
   const SEARCH_RESULT_CAP = 200;
   let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
-  // matchNodes ranks resources by how the query hits them: a name prefix beats
-  // an exact kind match (typing "node" should surface actual Node objects),
-  // which beats a name substring, which beats a partial kind/namespace hit.
-  // Without the exact-kind tier, searching "node" on a real cluster buried
-  // every Node under any resource merely *named* with "node" in it somewhere
-  // — node-exporter, node-problem-detector, and similar common addons are
-  // both extremely common and score as plain name substrings, so on a
-  // cluster running any of them, real Node objects (which only ever match by
-  // kind, never by name) lost every single one of those ties and vanished
-  // off the end of the result list entirely. Empty query → no results.
-  // matchNodes returns { matches, total }: matches is capped at
-  // SEARCH_RESULT_CAP for rendering, total is every match found (uncapped),
-  // so renderSearch can say how many more there are instead of the list just
-  // silently stopping.
   function matchNodes(q){
     q = q.trim().toLowerCase();
     if (!q) return { matches: [], total: 0 };
     const scored = [];
-    for (const n of nodes){
+    for (const n of allNodes){
       const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
       let score = -1;
       if (name.startsWith(q)) score = 0;
@@ -1202,8 +1043,7 @@
       el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
   }
   function pickSearch(id){
-    select(id); // opens the drawer itself
-    centerOn(byId[id]);
+    selectAnywhere(id);
     closeSearch();
   }
   function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
@@ -1224,9 +1064,8 @@
   // ---- drawer open/close + resize ----
   const panelCollapse = document.getElementById("panelCollapse"), panelResizer = document.getElementById("panelResizer");
   function showPanel(show){ panel.classList.toggle("collapsed", !show); }
-  panelCollapse.addEventListener("click", () => select(null)); // the ✕ clears focus, it doesn't just hide the drawer
+  panelCollapse.addEventListener("click", () => select(null));
 
-  // Drag the left edge to widen the panel (helpful for horizontally long YAML).
   let resizing = null;
   panelResizer.addEventListener("pointerdown", ev => {
     resizing = { startX: ev.clientX, startW: panel.offsetWidth };
@@ -1234,46 +1073,26 @@
   });
   panelResizer.addEventListener("pointermove", ev => {
     if (!resizing) return;
-    const w = resizing.startW + (resizing.startX - ev.clientX); // drag left → wider
+    const w = resizing.startW + (resizing.startX - ev.clientX);
     panel.style.width = Math.max(300, Math.min(window.innerWidth - 80, w)) + "px";
   });
   const endResize = () => { if(resizing){ resizing=null; panel.classList.remove("resizing"); } };
   panelResizer.addEventListener("pointerup", endResize);
   panelResizer.addEventListener("pointercancel", endResize);
 
-  // Sync control: a single status pill, not a settings dropdown and not a
-  // second status readout duplicating it elsewhere. It answers two questions
-  // at a glance: is Mantis set to keep refreshing (and how often — a bare
-  // "LIVE" label didn't say whether that meant 3 seconds or 5 minutes), and —
-  // the part neither label could tell you — did the last attempt actually
-  // succeed, and when. The dot's color is connection health (green/amber/red);
-  // the label is the cadence itself (3s/10s/30s/1m/5m) while auto-sync is
-  // healthy, or SYNCING/OFFLINE/MANUAL when something more important than the
-  // cadence needs saying; the popover always shows "last synced" too, so "how
-  // current is this?" never has to be guessed either way.
   const SYNC_LABELS = { "3000":"3s", "10000":"10s", "30000":"30s", "60000":"1m", "300000":"5m" };
   const syncPill = document.getElementById("syncPill"), syncPillLabel = document.getElementById("syncPillLabel"),
         syncMenu = document.getElementById("syncMenu"), syncStatusLine = document.getElementById("syncStatusLine"),
         syncWarnLine = document.getElementById("syncWarnLine"), syncWarnTime = document.getElementById("syncWarnTime");
-  let syncMode = "60000"; // last value passed to setSync — "manual" or an interval in ms
+  let syncMode = "60000";
 
-  // formatSyncProgress renders SyncProgress as one line for the pill's
-  // popover — same numbers as overlayProgressHTML's block, just inline.
   function formatSyncProgress(p){
     return "Namespaces "+p.namespacesDone+"/"+p.namespacesTotal+" · "+
       (p.resourcesSoFar||0)+" resources · "+(p.relationshipsSoFar||0)+" relationships";
   }
   function updateSyncPill(){
     syncPill.classList.remove("on","warn","err");
-    // backgroundSyncing reflects the engine's *actual* sync loop (see
-    // pollSyncStatus below) — a real signal, not the latency-based guess
-    // connState === "syncing" already was (a single request running long).
-    // Either one earns the pill's amber "working on it" treatment.
     const backgroundSyncing = !!(lastSyncProgress && lastSyncProgress.running);
-    // A failed fetch always shows on the pill itself, even in manual mode —
-    // "the data on screen might be stale" is worth surfacing regardless of
-    // whether the user chose manual or auto-sync just happens to be between
-    // ticks; it should never be something only visible if you open the popover.
     if (connState === "error"){
       syncPill.classList.add("err"); syncPillLabel.textContent = "OFFLINE";
     } else if (syncMode === "manual"){
@@ -1291,15 +1110,8 @@
     if (stale) syncWarnTime.textContent = timeAgo(lastSyncedAt);
     syncPill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
   }
-  setInterval(updateSyncPill, 5000); // keeps "Last synced Xs ago" accurate between events, not just at them
+  setInterval(updateSyncPill, 5000);
 
-  // pollSyncStatus keeps lastSyncProgress fresh independent of the graph's
-  // own poll cadence (including "Manual") — the background sync runs on its
-  // own schedule regardless of how often the browser refetches /api/graph,
-  // so this is what lets the pill and the connecting overlay reflect it in
-  // something close to real time. A plain fetch every second is negligible
-  // load — /api/sync/status is a cache read, no cluster call — and never
-  // touches the canvas/render loop, so nothing here can freeze it.
   function pollSyncStatus(){
     fetchSyncStatus().then(p => {
       lastSyncProgress = p;
@@ -1327,7 +1139,7 @@
     ev.stopPropagation();
     const open = syncMenu.classList.toggle("open");
     syncPill.setAttribute("aria-expanded", String(open));
-    if (open) updateSyncPill(); // refresh "last synced" the moment it's looked at
+    if (open) updateSyncPill();
   });
   syncMenu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => {
     setSync(o.getAttribute("data-val"), true);
@@ -1337,7 +1149,7 @@
   document.getElementById("syncNow").addEventListener("click", () => sync());
 
   firstLoad();
-  setSync("60000", false); // default 1m auto, no immediate (firstLoad already fetching)
+  setSync("60000", false);
 })();
 </script>
 </body>
