@@ -81,35 +81,29 @@
 
   main { position: relative; flex: 1; min-height: 0; }
   #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+    /* --dot is its own token, not --line: in light mode --line is close enough
+       to --ground that the dotted grid all but disappeared (read as a flat
+       white canvas); --dot is tuned per theme to stay visible-but-quiet against
+       its own background instead of inheriting a border color's contrast. */
     background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--dot) 0.6px, transparent 0.6px);
     background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
   #canvas.panning { cursor: grabbing; }
-  #canvas.hidden-screen { display: none; }
 
-  /* ---- namespace overview: an ArgoCD-Applications-style grid, the app's new
-     landing screen. Clicking a card drills into that namespace's tree
-     (#canvas below); "All namespaces" in the header controls comes back. ---- */
-  #overviewScreen { position: absolute; inset: 0; overflow-y: auto; padding: 28px 32px 48px; display: none; }
-  #overviewScreen.active { display: block; }
-  .ov-head { max-width: 1400px; margin: 0 auto 18px; color: var(--faint); font-size: 13px; }
-  .ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; max-width: 1400px; margin: 0 auto; }
-  .ns-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; cursor: pointer;
-    transition: border-color .15s, transform .1s; }
-  .ns-card:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); transform: translateY(-1px); }
-  .ns-card.empty { opacity: .55; }
-  .ns-card .ns-name { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--ink); word-break: break-all; }
-  .ns-card .ns-count { font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-top: 5px; }
-  .ns-card .ns-health { display: flex; gap: 10px; margin-top: 11px; font-family: var(--font-mono); font-size: 11px; flex-wrap: wrap; }
-  .ns-health .hc { display: flex; align-items: center; gap: 5px; }
-  .ns-health .hc::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-  .ns-health .hc.ok { color: var(--ok); } .ns-health .hc.warn { color: var(--warn); } .ns-health .hc.crit,
-  .ns-health .hc.unresolved { color: var(--crit); }
+  /* Namespaces are regions, not walls: a whisper of tint and a thin edge,
+     never competing with the resources inside them. Empty namespaces are
+     dashed and fainter still — present as context, not as something to
+     look at. Every namespace's resources render together on one shared
+     canvas, connected by their real relationships (including across
+     namespaces) — a region is a visual grouping, not a separate screen. */
+  .region-box { fill-opacity: 0.032; stroke-width: 1; stroke-opacity: .32; }
+  .region-box.empty { fill-opacity: 0.016; stroke-dasharray: 3 4; stroke-opacity: .18; }
+  .region-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; opacity: .62; }
 
   .edge, .secondary-edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
   .edge { fill: none; }
   /* Secondary (non-ownership) relations render behind the bold ownership tree
-     lines, thinner and fainter, so the tree skeleton reads first — see
-     graph-engine.js's computeTreeLayout doc comment. */
+     lines, thinner and fainter, so each namespace's ownership skeleton reads
+     first even though every relation type is drawn. */
   .secondary-edge { fill: none; stroke-width: 1.2; stroke-opacity: .22; }
   .secondary-edge.dashed { stroke-dasharray: 4 4; }
   .edge-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; opacity: 0; transition: opacity .18s; pointer-events: none; }
@@ -125,9 +119,6 @@
   .node.ghost .chip-bg { stroke: var(--crit); stroke-dasharray: 4 3; fill: color-mix(in srgb, var(--crit) 8%, var(--panel-2)); }
   .node.ghost .name { fill: var(--muted); }
 
-  /* Collapse/expand toggle — bottom-right corner of a node's box, shown only
-     when it has children. Collapsed shows "+N" (hidden descendant count)
-     instead of "–", so the count itself is the affordance to expand again. */
   .collapse-toggle { cursor: pointer; }
   .collapse-toggle circle { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .15s; }
   .collapse-toggle:hover circle { stroke: var(--brand); }
@@ -274,7 +265,6 @@
   .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
   .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
   .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  #nsLabel { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
   .sync-wrap { position: relative; }
   .sync-pill { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .3px;
     color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer;
@@ -368,8 +358,6 @@
 
   <main>
     <div class="controls">
-      <button class="btn" id="backToOverview" style="display:none">← All namespaces</button>
-      <span id="nsLabel"></span>
       <button class="btn" id="reset">Reset view</button>
       <button class="btn" id="expandAll">Expand all</button>
       <div class="sync-wrap">
@@ -392,16 +380,11 @@
       <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <div id="overviewScreen" class="active">
-      <div class="ov-head">Every namespace Mantis can see — click one to open its resource tree.</div>
-      <div class="ns-grid" id="nsGrid"></div>
-    </div>
-
-    <svg id="canvas" class="hidden-screen"><defs></defs>
-      <g id="viewport"><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
+    <svg id="canvas"><defs></defs>
+      <g id="viewport"><g id="regions"></g><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
     </svg>
 
-    <div class="legend collapsed" id="legend" style="display:none">
+    <div class="legend collapsed" id="legend">
       <div class="legend-body">
         <h4>Resource</h4>
         <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
@@ -412,9 +395,10 @@
         <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
         <div class="row"><span class="sw" style="background:var(--cat-autoscale)"></span>Autoscaler (HPA / VPA / NodePool)</div>
         <div class="divider"></div>
-        <h4>Reading the tree</h4>
+        <h4>Reading the map</h4>
         <div class="row"><span class="ln" style="border-color:var(--cat-workload)"></span>ownership (controlled-by)</div>
         <div class="row"><span class="ln" style="border-color:var(--cat-node);border-top-style:dashed"></span>other relationship</div>
+        <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
         <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
       </div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
@@ -462,23 +446,18 @@
   const el = G.el, esc = G.esc, css = G.css, catColor = G.catColor, FAMILY = G.FAMILY, REVERSE = G.REVERSE;
 
   const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
-    gSecondaryEdges = document.getElementById("secondaryEdges"), gEdges = document.getElementById("edges"),
-    gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
+    gRegions = document.getElementById("regions"), gSecondaryEdges = document.getElementById("secondaryEdges"),
+    gEdges = document.getElementById("edges"), gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
     panel = document.getElementById("panel"), panelContent = document.getElementById("panelContent"),
-    overlay = document.getElementById("overlay"), toast = document.getElementById("toast"),
-    overviewScreen = document.getElementById("overviewScreen"), nsGrid = document.getElementById("nsGrid"),
-    legend = document.getElementById("legend"), backToOverviewBtn = document.getElementById("backToOverview"),
-    nsLabel = document.getElementById("nsLabel");
+    overlay = document.getElementById("overlay"), toast = document.getElementById("toast");
 
-  // ---- global data (the whole /api/graph payload) vs. the current screen's
-  // rendered subset. Search, the relationships tab, and the overview grid all
-  // read the global set; the tree screen only ever draws one namespace's
-  // slice of it (see setView/renderTree). ----
+  // ---- state — everything renders together on one canvas; there is no
+  // separate "screen" per namespace. collapsedIds persists across a data
+  // refresh (only "Expand all" clears it) so background syncs don't keep
+  // re-expanding something the user just folded. ----
   let allNodes = [], allEdges = [], byId = {}, namespaceList = [];
-  let viewState = null; // null = overview screen; "" = cluster-scoped pseudo-namespace; else a real namespace name
-  let collapsedIds = new Set(); // per-namespace; reset on every namespace switch (see setView)
-  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], childrenOf: {} };
-  let currentById = {}; // byId, but only nodes actually rendered in the current tree
+  let collapsedIds = new Set();
+  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], regions: [] };
   let nodeEls = {};
   let W = svg.clientWidth || 1000, H = svg.clientHeight || 640;
   let selected = null, curTab = "summary", yamlToken = 0;
@@ -551,10 +530,10 @@
   }
 
   // applyData reconciles global state with a fresh /api/graph payload, then
-  // re-renders whichever screen is currently active — the overview grid, or
-  // one namespace's tree — without resetting camera pan/zoom, selection, or
-  // collapsed subtrees (those only reset on an explicit namespace switch,
-  // see setView).
+  // recomputes the whole-cluster layout and redraws — camera pan/zoom,
+  // selection, and collapsed subtrees all persist across a refresh (the
+  // layout is deterministic, so unless the resource set actually changed,
+  // nothing visibly jumps).
   function applyData(data, first){
     lastGraphData = data;
     W = svg.clientWidth||W; H = svg.clientHeight||H;
@@ -572,74 +551,40 @@
       ? '<span class="autoscale-badge">autoscaler <b>'+esc(meta.nodeAutoscaler)+'</b></span>'
       : '';
 
-    if (viewState === null) { renderOverview(); return; }
-    // A namespace can disappear between syncs (deleted, or was never real to
-    // begin with for the cluster-scoped "" pseudo-namespace, which always
-    // "exists"). Fall back to the overview rather than showing an empty tree
-    // with no way to tell why.
-    const stillHasNodes = allNodes.some(n => G.groupKey(n) === (viewState || "__cluster"));
-    if (viewState !== "" && !stillHasNodes && !namespaceList.includes(viewState)) { setView(null); return; }
-    renderTree(viewState);
+    renderCluster();
   }
 
-  // ---- namespace overview ----
-  function renderOverview(){
-    const cards = G.computeOverview(allNodes, namespaceList);
-    nsGrid.innerHTML = cards.map(c => {
-      const label = c.cluster ? "Cluster resources" : c.ns;
-      const bits = [];
-      if (c.crit) bits.push('<span class="hc crit">'+c.crit+' crit</span>');
-      if (c.warn) bits.push('<span class="hc warn">'+c.warn+' warn</span>');
-      if (c.unresolved) bits.push('<span class="hc unresolved">'+c.unresolved+' not found</span>');
-      if (c.ok) bits.push('<span class="hc ok">'+c.ok+' ok</span>');
-      return '<div class="ns-card'+(c.count===0?' empty':'')+'" data-ns="'+esc(c.ns)+'">'+
-        '<div class="ns-name">'+(c.cluster?'⬡ ':'')+esc(label)+'</div>'+
-        '<div class="ns-count">'+c.count+' resource'+(c.count===1?'':'s')+'</div>'+
-        (bits.length ? '<div class="ns-health">'+bits.join('')+'</div>' : '')+
-        '</div>';
-    }).join("");
-    nsGrid.querySelectorAll(".ns-card").forEach(card =>
-      card.addEventListener("click", () => setView(card.getAttribute("data-ns"))));
-  }
-
-  // setView switches screens — the only place camera position and collapsed
-  // subtrees reset (a plain data refresh, applyData→renderTree, preserves
-  // both; see the comment on applyData above).
-  function setView(ns){
-    viewState = ns;
-    collapsedIds = new Set();
-    selected = null;
-    overviewScreen.classList.toggle("active", viewState === null);
-    svg.classList.toggle("hidden-screen", viewState === null);
-    legend.style.display = viewState === null ? "none" : "";
-    backToOverviewBtn.style.display = viewState === null ? "none" : "";
-    nsLabel.textContent = viewState === null ? "" : (viewState === "" ? "cluster resources" : "namespace · " + viewState);
-    if (viewState === null) { showPanel(false); renderOverview(); return; }
-    view.x = 0; view.y = 200; view.k = 1; applyView();
-    renderTree(viewState);
-  }
-  backToOverviewBtn.addEventListener("click", () => setView(null));
-
-  // ---- per-namespace tree ----
-  function renderTree(ns){
-    const layout = G.computeTreeLayout(allNodes, allEdges, ns, collapsedIds);
+  // ---- whole-cluster render ----
+  function renderCluster(){
+    const layout = G.computeClusterLayout(allNodes, allEdges, namespaceList, collapsedIds);
     currentLayout = layout;
-    currentById = {}; layout.nodes.forEach(n => currentById[n.id] = n);
 
-    gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
+    gRegions.innerHTML = ""; gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
     nodeEls = {};
 
+    buildRegionEls(layout.regions);
     buildSecondaryEdgeEls(layout.secondaryEdges);
     buildOwnershipEdgeEls(layout.ownershipEdges);
-    buildNodeEls(layout.nodes, layout.childrenOf);
+    buildNodeEls(layout.nodes);
 
-    if (selected && currentById[selected]) select(selected, { silent: true });
-    else { selected = null; renderNamespaceHint(ns); }
+    if (selected && byId[selected] && layout.nodes.some(n => n.id === selected)) select(selected, { silent: true });
+    else { selected = null; renderEmpty(); }
   }
 
+  function buildRegionEls(regions){
+    const palette = G.nsPalette();
+    let i = 0;
+    regions.forEach(r => {
+      const color = r.cluster ? css("--ns-cluster") : palette[i++ % palette.length];
+      const box = el("rect",{ class:"region-box" + (r.empty ? " empty" : ""), x:r.x0, y:r.y0, width:r.x1-r.x0, height:r.y1-r.y0, rx:16, fill: color, stroke: color, "stroke-dasharray": (r.cluster && !r.empty)?"6 5":"none" });
+      const lbl = el("text",{ class:"region-label", x:r.x0+12, y:r.y0-8, fill: color });
+      lbl.textContent = r.cluster ? r.label : ("namespace · " + r.label + (r.empty ? "  ·  empty" : ""));
+      gRegions.appendChild(box); gRegions.appendChild(lbl);
+    });
+  }
   function buildOwnershipEdgeEls(edges){
     edges.forEach(e => {
-      const parent = currentById[e.to], child = currentById[e.from];
+      const parent = currentById(e.to), child = currentById(e.from);
       if (!parent || !child) return;
       const x1=parent.x, y1=parent.y+parent.h/2, x2=child.x, y2=child.y-child.h/2, midY=(y1+y2)/2;
       const path = el("path", { class:"edge", d:`M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
@@ -650,7 +595,7 @@
   }
   function buildSecondaryEdgeEls(edges){
     edges.forEach(e => {
-      const a = currentById[e.from], b = currentById[e.to];
+      const a = currentById(e.from), b = currentById(e.to);
       if (!a || !b) return;
       const fam = FAMILY[e.type] || "node", toGhost = b.resolved === false;
       const dashed = toGhost || e.type==="references" || e.type==="claims" || e.type==="bound-to";
@@ -662,7 +607,24 @@
       gSecondaryEdges.appendChild(path); gEdgeLabels.appendChild(lbl);
     });
   }
-  function buildNodeEls(list, childrenOf){
+  function currentById(id){ return currentLayout.nodes.find(n => n.id === id); } // small N per redraw; a map isn't worth the bookkeeping here
+  // childrenOfMap is rebuilt per render purely to know which nodes get a
+  // collapse toggle drawn — computeClusterLayout already knows this per
+  // region internally but doesn't thread it back out; deriving it from the
+  // (already computed) ownership edges is cheap and keeps the return shape simple.
+  function childrenCounts(ownershipEdges){
+    const counts = {};
+    ownershipEdges.forEach(e => { counts[e.to] = (counts[e.to]||0) + 1; });
+    return counts;
+  }
+  function buildNodeEls(list){
+    const kidCounts = childrenCounts(currentLayout.ownershipEdges.concat(
+      // Collapsed nodes' own hiddenCount already reflects their subtree, but
+      // their *children* aren't in `list` (they were pruned) or in
+      // ownershipEdges (only edges between two visible nodes are returned)
+      // — so a collapsed node still needs its toggle drawn from `collapsed`
+      // alone, not from kidCounts. See the `n.collapsed ||` check below.
+      []));
     list.forEach(n => {
       const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"") + (n.collapsed?" collapsed":"");
       const g = el("g",{ class: cls, "data-id": n.id, transform:`translate(${n.x},${n.y})` });
@@ -675,8 +637,7 @@
       if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
       const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
 
-      const kids = childrenOf[n.id];
-      if (kids && kids.length){
+      if (n.collapsed || kidCounts[n.id]){
         const cx = n.w/2-11, cy = n.h/2-11;
         const toggle = el("g",{ class:"collapse-toggle", "data-toggle-id": n.id });
         toggle.appendChild(el("circle",{ cx, cy, r:8 }));
@@ -689,12 +650,12 @@
   }
   function toggleCollapse(id){
     if (collapsedIds.has(id)) collapsedIds.delete(id); else collapsedIds.add(id);
-    renderTree(viewState);
+    renderCluster();
   }
-  document.getElementById("expandAll").addEventListener("click", () => { if (viewState !== null) { collapsedIds = new Set(); renderTree(viewState); } });
+  document.getElementById("expandAll").addEventListener("click", () => { collapsedIds = new Set(); renderCluster(); });
 
   // ---- pan/zoom (drag-to-move-a-node is gone — positions are computed, not
-  // physics, so there's nothing meaningful to drag; only the canvas pans) ----
+  // physics; only the canvas itself pans) ----
   const view = { x:0, y:0, k:1 };
   const applyView = () => gViewport.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`); applyView();
   svg.addEventListener("wheel", ev => { ev.preventDefault(); const r=svg.getBoundingClientRect(); const mx=ev.clientX-r.left,my=ev.clientY-r.top,f=Math.exp(-ev.deltaY*0.0016);
@@ -717,11 +678,6 @@
 
   // ---- selection, focus/trace + drawer ----
   const TABS = { summary:"Summary", relationships:"Relationships", yaml:"YAML" };
-  // traceFrom is scoped to the current tree's rendered edges (ownership +
-  // secondary) — it must never reach a node that isn't actually on screen,
-  // since only rendered nodes have a nodeEls[] entry to dim/highlight.
-  // Cross-namespace relationships still show, unfiltered, in the
-  // Relationships tab (relHTML, below) — that reads the full graph, not this.
   function traceFrom(id, maxDepth){
     maxDepth = maxDepth == null ? 2 : maxDepth;
     const viewEdges = currentLayout.ownershipEdges.concat(currentLayout.secondaryEdges);
@@ -764,10 +720,11 @@
     });
     if (isNewSelection || !opts.silent) renderNode(byId[id]);
   }
-  function renderNamespaceHint(ns){
-    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Namespace</div><div class="p-name">'+esc(ns||"Cluster resources")+'</div></div>'+
-      '<p class="hint">This namespace\'s ownership tree — <b>solid lines are ownership</b> (controlled-by), <b>faint curved lines</b> are other relationships.<br><br>'+
-      '<b>Search</b> or <b>click</b> a resource for details. <b>Drag empty space</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>';
+  function renderEmpty(){
+    const cluster = document.getElementById("clusterName").textContent;
+    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
+      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>. Solid lines are ownership (controlled-by); faint curved lines are other relationships.<br><br>'+
+      '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>';
   }
   const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
   function renderNode(n){
@@ -783,18 +740,14 @@
     const body = document.getElementById("tabbody");
     if (curTab==="yaml"){ renderYaml(n, body); return; }
     body.innerHTML = curTab==="summary" ? overviewHTML(n) : relHTML(n);
-    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => selectAnywhere(r.getAttribute("data-goto"))));
+    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => jumpTo(r.getAttribute("data-goto"))));
   }
-  // selectAnywhere is what the Relationships tab uses to jump to a related
-  // resource — unlike select(), the target might be in a different namespace
-  // (or cluster-scoped) than the one currently open, so it switches views
-  // first when needed, same as picking a cross-namespace search result.
-  function selectAnywhere(id){
-    const target = byId[id]; if (!target) return;
-    const targetNs = G.groupKey(target) === "__cluster" ? "" : target.ns;
-    if (viewState === null || targetNs !== viewState) setView(targetNs);
+  // jumpTo is what the Relationships tab and search use to focus a resource
+  // — everything is already on the one screen, so this is just select + fly.
+  function jumpTo(id){
+    if (!byId[id]) return;
     select(id);
-    centerOn(currentById[id]);
+    centerOn(currentById(id));
   }
   function renderYaml(n, body){
     if (n.resolved===false){ body.innerHTML = '<p class="hint">This resource was referenced but not found in the cluster, so there is no manifest to show.</p>'; return; }
@@ -899,7 +852,6 @@
     if (ymodalOverlay.classList.contains("open")) { closeYamlModal(); return; }
     if (searchResults.classList.contains("open")) { closeSearch(); searchInput.blur(); return; }
     if (selected) select(null);
-    else if (viewState !== null) setView(null);
   });
   function splitAttr(a){
     const i = a.indexOf(": ");
@@ -936,7 +888,7 @@
   }
 
   // ---- controls ----
-  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y= viewState===null?0:200; view.k=1; applyView(); });
+  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
   document.getElementById("signOut").addEventListener("click", () => {
     fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; });
   });
@@ -953,12 +905,10 @@
     themeToggle.title = label;
     themeToggle.setAttribute("aria-label", label);
   }
-  // recolorForTheme re-renders whichever screen is active from data already
-  // in hand — node/edge colors are resolved to literal values when drawn
-  // (see catColor()), so a theme switch needs a full rebuild, not a re-fetch.
-  function recolorForTheme(){
-    if (viewState === null) renderOverview(); else renderTree(viewState);
-  }
+  // recolorForTheme re-renders from data already in hand — node/edge/region
+  // colors are resolved to literal values when drawn, so a theme switch
+  // needs a full rebuild, not a re-fetch.
+  function recolorForTheme(){ renderCluster(); }
   applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
   themeToggle.addEventListener("click", () => {
     const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
@@ -968,7 +918,7 @@
   });
 
   // ---- legend collapse ----
-  const legendToggle = document.getElementById("legendToggle");
+  const legend = document.getElementById("legend"), legendToggle = document.getElementById("legendToggle");
   legendToggle.addEventListener("click", () => {
     const collapsed = legend.classList.toggle("collapsed");
     const label = collapsed ? "Legend" : "Close legend";
@@ -997,10 +947,7 @@
     animateView((W - pw)/2 - n.x*tk, H/2 - n.y*tk, tk);
   }
 
-  // ---- live search — global across every namespace regardless of the
-  // current screen, since "which namespace is this in?" is often exactly
-  // what a search is for. Picking a result switches view first if needed
-  // (selectAnywhere), same as the Relationships tab's cross-namespace jumps. ----
+  // ---- live search ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
   const SEARCH_RESULT_CAP = 200;
   let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
@@ -1043,7 +990,7 @@
       el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
   }
   function pickSearch(id){
-    selectAnywhere(id);
+    jumpTo(id);
     closeSearch();
   }
   function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }

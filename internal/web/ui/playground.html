@@ -130,27 +130,15 @@
     background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--dot) 0.6px, transparent 0.6px);
     background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
   #canvas.panning { cursor: grabbing; }
-  #canvas.hidden-screen { display: none; }
 
-  /* ---- namespace overview: an ArgoCD-Applications-style grid, the app's new
-     landing screen. Clicking a card drills into that namespace's tree
-     (#canvas below); "All namespaces" in the header controls comes back. ---- */
-  #overviewScreen { position: absolute; inset: 0; overflow-y: auto; padding: 28px 32px 48px; display: none; }
-  #overviewScreen.active { display: block; }
-  .ov-head { max-width: 1400px; margin: 0 auto 18px; color: var(--faint); font-size: 13px; }
-  .ov-head .pg-tip { color: var(--muted); }
-  .ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; max-width: 1400px; margin: 0 auto; }
-  .ns-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; cursor: pointer;
-    transition: border-color .15s, transform .1s; }
-  .ns-card:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); transform: translateY(-1px); }
-  .ns-card.empty { opacity: .55; }
-  .ns-card .ns-name { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--ink); word-break: break-all; }
-  .ns-card .ns-count { font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-top: 5px; }
-  .ns-card .ns-health { display: flex; gap: 10px; margin-top: 11px; font-family: var(--font-mono); font-size: 11px; flex-wrap: wrap; }
-  .ns-health .hc { display: flex; align-items: center; gap: 5px; }
-  .ns-health .hc::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-  .ns-health .hc.ok { color: var(--ok); } .ns-health .hc.warn { color: var(--warn); } .ns-health .hc.crit,
-  .ns-health .hc.unresolved { color: var(--crit); }
+  /* Namespaces are regions, not walls: a whisper of tint and a thin edge,
+     never competing with the resources inside them. Every namespace's
+     resources render together on one shared canvas, connected by their real
+     relationships (including across namespaces) — a region is a visual
+     grouping, not a separate screen. */
+  .region-box { fill-opacity: 0.032; stroke-width: 1; stroke-opacity: .32; }
+  .region-box.empty { fill-opacity: 0.016; stroke-dasharray: 3 4; stroke-opacity: .18; }
+  .region-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; opacity: .62; }
 
   .edge, .secondary-edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
   .edge { fill: none; }
@@ -315,7 +303,6 @@
   .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
   .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
   .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  #nsLabel { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
   .sync-wrap { position: relative; }
   .sync-pill { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .3px;
     color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer;
@@ -418,8 +405,6 @@
 
   <main>
     <div class="controls">
-      <button class="btn" id="backToOverview" style="display:none">← All namespaces</button>
-      <span id="nsLabel"></span>
       <button class="btn" id="reset">Reset view</button>
       <button class="btn" id="expandAll">Expand all</button>
       <div class="sync-wrap">
@@ -442,16 +427,11 @@
       <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <div id="overviewScreen" class="active">
-      <div class="ov-head">Every namespace in this scenario — click one to open its resource tree. <span class="pg-tip" id="ovTip"></span></div>
-      <div class="ns-grid" id="nsGrid"></div>
-    </div>
-
-    <svg id="canvas" class="hidden-screen"><defs></defs>
-      <g id="viewport"><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
+    <svg id="canvas"><defs></defs>
+      <g id="viewport"><g id="regions"></g><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
     </svg>
 
-    <div class="legend collapsed" id="legend" style="display:none">
+    <div class="legend collapsed" id="legend">
       <div class="legend-body">
         <h4>Resource</h4>
         <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
@@ -462,9 +442,10 @@
         <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
         <div class="row"><span class="sw" style="background:var(--cat-autoscale)"></span>Autoscaler (HPA / VPA / NodePool)</div>
         <div class="divider"></div>
-        <h4>Reading the tree</h4>
+        <h4>Reading the map</h4>
         <div class="row"><span class="ln" style="border-color:var(--cat-workload)"></span>ownership (controlled-by)</div>
         <div class="row"><span class="ln" style="border-color:var(--cat-node);border-top-style:dashed"></span>other relationship</div>
+        <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
         <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
       </div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
@@ -520,11 +501,11 @@
   // different real-world distributions, which is the actual point being made.
   const PLAYGROUND_SCENARIOS = [
     { id: "web-app", flavor: "kubeadm", label: "Web application", dataPath: "playground/data/web-app",
-      tip: "A normal app: Deployment → ReplicaSet → Pods, a Service, an Ingress, and an HPA. Open shop-frontend and click the HorizontalPodAutoscaler to see what it scales." },
+      tip: "A normal app: Deployment → ReplicaSet → Pods, a Service, an Ingress, and an HPA. Click the HorizontalPodAutoscaler to see what it scales." },
     { id: "stateful-db", flavor: "GKE", label: "Stateful database", dataPath: "playground/data/stateful-db",
-      tip: "A StatefulSet with real per-Pod storage. Open data-platform, click a PersistentVolumeClaim to trace claims → bound-to through to its PersistentVolume, and notice the Secret's values are never shown." },
+      tip: "A StatefulSet with real per-Pod storage. Click a PersistentVolumeClaim to trace claims → bound-to through to its PersistentVolume, and notice the Secret's values are never shown." },
     { id: "broken-relationships", flavor: "EKS", label: "Broken relationships", dataPath: "playground/data/broken-relationships",
-      tip: "Three real failures Mantis surfaces instead of hiding: open payments-api for an Ingress routing to a Service that no longer exists (red, dashed) and a Deployment referencing a missing ConfigMap." },
+      tip: "Three real failures Mantis surfaces instead of hiding: an Ingress routing to a Service that no longer exists (red, dashed), a Deployment referencing a missing ConfigMap, and a Service whose selector matches zero Pods." },
   ];
   const scenarioIdFromURL = () => {
     const q = new URLSearchParams(location.search).get("scenario");
@@ -534,19 +515,14 @@
   const scenario = () => PLAYGROUND_SCENARIOS.find(s => s.id === currentScenario);
 
   const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
-    gSecondaryEdges = document.getElementById("secondaryEdges"), gEdges = document.getElementById("edges"),
-    gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
+    gRegions = document.getElementById("regions"), gSecondaryEdges = document.getElementById("secondaryEdges"),
+    gEdges = document.getElementById("edges"), gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
     panel = document.getElementById("panel"), panelContent = document.getElementById("panelContent"),
-    overlay = document.getElementById("overlay"), toast = document.getElementById("toast"),
-    overviewScreen = document.getElementById("overviewScreen"), nsGrid = document.getElementById("nsGrid"),
-    legend = document.getElementById("legend"), backToOverviewBtn = document.getElementById("backToOverview"),
-    nsLabel = document.getElementById("nsLabel"), ovTip = document.getElementById("ovTip");
+    overlay = document.getElementById("overlay"), toast = document.getElementById("toast");
 
   let allNodes = [], allEdges = [], byId = {}, namespaceList = [];
-  let viewState = null;
   let collapsedIds = new Set();
-  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], childrenOf: {} };
-  let currentById = {};
+  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], regions: [] };
   let nodeEls = {};
   let W = svg.clientWidth || 1000, H = svg.clientHeight || 640;
   let selected = null, curTab = "summary", yamlToken = 0;
@@ -605,12 +581,11 @@
       b.addEventListener("click", () => loadScenario(s.id));
       bar.appendChild(b);
     });
-    ovTip.textContent = "👉 " + scenario().tip;
   }
-  // loadScenario resets every piece of view state a fresh cluster would start
-  // with — there's no reason a namespace tree or collapsed subtree from one
-  // scenario should carry into an unrelated one — and re-runs firstLoad
-  // against the new dataPath, landing back on the namespace overview.
+  // loadScenario resets every piece of state a fresh cluster would start
+  // with (there is no reason a collapsed subtree from one scenario should
+  // carry into an unrelated one) and re-runs firstLoad against the new
+  // dataPath.
   function loadScenario(id){
     if (id === currentScenario) return;
     currentScenario = id;
@@ -618,9 +593,7 @@
     renderScenarioBar();
     everLoaded = false; selected = null; collapsedIds = new Set();
     allNodes = []; allEdges = []; byId = {}; namespaceList = [];
-    viewState = null;
-    overviewScreen.classList.add("active"); svg.classList.add("hidden-screen"); legend.style.display = "none";
-    backToOverviewBtn.style.display = "none"; nsLabel.textContent = "";
+    gRegions.innerHTML = ""; gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
     view.x = 0; view.y = 0; view.k = 1; applyView();
     firstLoad();
   }
@@ -649,65 +622,39 @@
       ? '<span class="autoscale-badge">autoscaler <b>'+esc(meta.nodeAutoscaler)+'</b></span>'
       : '';
 
-    if (viewState === null) { renderOverview(); return; }
-    const stillHasNodes = allNodes.some(n => G.groupKey(n) === (viewState || "__cluster"));
-    if (viewState !== "" && !stillHasNodes && !namespaceList.includes(viewState)) { setView(null); return; }
-    renderTree(viewState);
+    renderCluster();
   }
 
-  function renderOverview(){
-    const cards = G.computeOverview(allNodes, namespaceList);
-    nsGrid.innerHTML = cards.map(c => {
-      const label = c.cluster ? "Cluster resources" : c.ns;
-      const bits = [];
-      if (c.crit) bits.push('<span class="hc crit">'+c.crit+' crit</span>');
-      if (c.warn) bits.push('<span class="hc warn">'+c.warn+' warn</span>');
-      if (c.unresolved) bits.push('<span class="hc unresolved">'+c.unresolved+' not found</span>');
-      if (c.ok) bits.push('<span class="hc ok">'+c.ok+' ok</span>');
-      return '<div class="ns-card'+(c.count===0?' empty':'')+'" data-ns="'+esc(c.ns)+'">'+
-        '<div class="ns-name">'+(c.cluster?'⬡ ':'')+esc(label)+'</div>'+
-        '<div class="ns-count">'+c.count+' resource'+(c.count===1?'':'s')+'</div>'+
-        (bits.length ? '<div class="ns-health">'+bits.join('')+'</div>' : '')+
-        '</div>';
-    }).join("");
-    nsGrid.querySelectorAll(".ns-card").forEach(card =>
-      card.addEventListener("click", () => setView(card.getAttribute("data-ns"))));
-  }
-
-  function setView(ns){
-    viewState = ns;
-    collapsedIds = new Set();
-    selected = null;
-    overviewScreen.classList.toggle("active", viewState === null);
-    svg.classList.toggle("hidden-screen", viewState === null);
-    legend.style.display = viewState === null ? "none" : "";
-    backToOverviewBtn.style.display = viewState === null ? "none" : "";
-    nsLabel.textContent = viewState === null ? "" : (viewState === "" ? "cluster resources" : "namespace · " + viewState);
-    if (viewState === null) { showPanel(false); renderOverview(); return; }
-    view.x = 0; view.y = 200; view.k = 1; applyView();
-    renderTree(viewState);
-  }
-  backToOverviewBtn.addEventListener("click", () => setView(null));
-
-  function renderTree(ns){
-    const layout = G.computeTreeLayout(allNodes, allEdges, ns, collapsedIds);
+  function renderCluster(){
+    const layout = G.computeClusterLayout(allNodes, allEdges, namespaceList, collapsedIds);
     currentLayout = layout;
-    currentById = {}; layout.nodes.forEach(n => currentById[n.id] = n);
 
-    gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
+    gRegions.innerHTML = ""; gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
     nodeEls = {};
 
+    buildRegionEls(layout.regions);
     buildSecondaryEdgeEls(layout.secondaryEdges);
     buildOwnershipEdgeEls(layout.ownershipEdges);
-    buildNodeEls(layout.nodes, layout.childrenOf);
+    buildNodeEls(layout.nodes);
 
-    if (selected && currentById[selected]) select(selected, { silent: true });
-    else { selected = null; renderNamespaceHint(ns); }
+    if (selected && byId[selected] && layout.nodes.some(n => n.id === selected)) select(selected, { silent: true });
+    else { selected = null; renderEmpty(); }
   }
 
+  function buildRegionEls(regions){
+    const palette = G.nsPalette();
+    let i = 0;
+    regions.forEach(r => {
+      const color = r.cluster ? css("--ns-cluster") : palette[i++ % palette.length];
+      const box = el("rect",{ class:"region-box" + (r.empty ? " empty" : ""), x:r.x0, y:r.y0, width:r.x1-r.x0, height:r.y1-r.y0, rx:16, fill: color, stroke: color, "stroke-dasharray": (r.cluster && !r.empty)?"6 5":"none" });
+      const lbl = el("text",{ class:"region-label", x:r.x0+12, y:r.y0-8, fill: color });
+      lbl.textContent = r.cluster ? r.label : ("namespace · " + r.label + (r.empty ? "  ·  empty" : ""));
+      gRegions.appendChild(box); gRegions.appendChild(lbl);
+    });
+  }
   function buildOwnershipEdgeEls(edges){
     edges.forEach(e => {
-      const parent = currentById[e.to], child = currentById[e.from];
+      const parent = currentById(e.to), child = currentById(e.from);
       if (!parent || !child) return;
       const x1=parent.x, y1=parent.y+parent.h/2, x2=child.x, y2=child.y-child.h/2, midY=(y1+y2)/2;
       const path = el("path", { class:"edge", d:`M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
@@ -718,7 +665,7 @@
   }
   function buildSecondaryEdgeEls(edges){
     edges.forEach(e => {
-      const a = currentById[e.from], b = currentById[e.to];
+      const a = currentById(e.from), b = currentById(e.to);
       if (!a || !b) return;
       const fam = FAMILY[e.type] || "node", toGhost = b.resolved === false;
       const dashed = toGhost || e.type==="references" || e.type==="claims" || e.type==="bound-to";
@@ -730,7 +677,14 @@
       gSecondaryEdges.appendChild(path); gEdgeLabels.appendChild(lbl);
     });
   }
-  function buildNodeEls(list, childrenOf){
+  function currentById(id){ return currentLayout.nodes.find(n => n.id === id); }
+  function childrenCounts(ownershipEdges){
+    const counts = {};
+    ownershipEdges.forEach(e => { counts[e.to] = (counts[e.to]||0) + 1; });
+    return counts;
+  }
+  function buildNodeEls(list){
+    const kidCounts = childrenCounts(currentLayout.ownershipEdges);
     list.forEach(n => {
       const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"") + (n.collapsed?" collapsed":"");
       const g = el("g",{ class: cls, "data-id": n.id, transform:`translate(${n.x},${n.y})` });
@@ -743,8 +697,7 @@
       if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
       const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
 
-      const kids = childrenOf[n.id];
-      if (kids && kids.length){
+      if (n.collapsed || kidCounts[n.id]){
         const cx = n.w/2-11, cy = n.h/2-11;
         const toggle = el("g",{ class:"collapse-toggle", "data-toggle-id": n.id });
         toggle.appendChild(el("circle",{ cx, cy, r:8 }));
@@ -757,9 +710,9 @@
   }
   function toggleCollapse(id){
     if (collapsedIds.has(id)) collapsedIds.delete(id); else collapsedIds.add(id);
-    renderTree(viewState);
+    renderCluster();
   }
-  document.getElementById("expandAll").addEventListener("click", () => { if (viewState !== null) { collapsedIds = new Set(); renderTree(viewState); } });
+  document.getElementById("expandAll").addEventListener("click", () => { collapsedIds = new Set(); renderCluster(); });
 
   // ---- pan/zoom (no per-node dragging — positions are computed, not physics) ----
   const view = { x:0, y:0, k:1 };
@@ -826,10 +779,11 @@
     });
     if (isNewSelection || !opts.silent) renderNode(byId[id]);
   }
-  function renderNamespaceHint(ns){
-    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Namespace</div><div class="p-name">'+esc(ns||"Cluster resources")+'</div></div>'+
-      '<p class="hint">This namespace\'s ownership tree — <b>solid lines are ownership</b> (controlled-by), <b>faint curved lines</b> are other relationships.<br><br>'+
-      '<b>Search</b> or <b>click</b> a resource for details. <b>Drag empty space</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>'+
+  function renderEmpty(){
+    const cluster = document.getElementById("clusterName").textContent;
+    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
+      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>. Solid lines are ownership (controlled-by); faint curved lines are other relationships.<br><br>'+
+      '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>'+
       '<p class="hint pg-tip">👉 '+esc(scenario().tip)+'</p>';
   }
   const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
@@ -846,14 +800,12 @@
     const body = document.getElementById("tabbody");
     if (curTab==="yaml"){ renderYaml(n, body); return; }
     body.innerHTML = curTab==="summary" ? overviewHTML(n) : relHTML(n);
-    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => selectAnywhere(r.getAttribute("data-goto"))));
+    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => jumpTo(r.getAttribute("data-goto"))));
   }
-  function selectAnywhere(id){
-    const target = byId[id]; if (!target) return;
-    const targetNs = G.groupKey(target) === "__cluster" ? "" : target.ns;
-    if (viewState === null || targetNs !== viewState) setView(targetNs);
+  function jumpTo(id){
+    if (!byId[id]) return;
     select(id);
-    centerOn(currentById[id]);
+    centerOn(currentById(id));
   }
   // renderYaml reads the resource's captured manifest from
   // playground/data/<scenario>/resources/<sanitized-id>.yaml — the same
@@ -962,7 +914,6 @@
     if (ymodalOverlay.classList.contains("open")) { closeYamlModal(); return; }
     if (searchResults.classList.contains("open")) { closeSearch(); searchInput.blur(); return; }
     if (selected) select(null);
-    else if (viewState !== null) setView(null);
   });
   function splitAttr(a){
     const i = a.indexOf(": ");
@@ -999,7 +950,7 @@
   }
 
   // ---- controls ----
-  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y= viewState===null?0:200; view.k=1; applyView(); });
+  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
 
   // ---- theme toggle ----
   const THEME_KEY = "mantis-theme";
@@ -1013,9 +964,7 @@
     themeToggle.title = label;
     themeToggle.setAttribute("aria-label", label);
   }
-  function recolorForTheme(){
-    if (viewState === null) renderOverview(); else renderTree(viewState);
-  }
+  function recolorForTheme(){ renderCluster(); }
   applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
   themeToggle.addEventListener("click", () => {
     const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
@@ -1025,7 +974,7 @@
   });
 
   // ---- legend collapse ----
-  const legendToggle = document.getElementById("legendToggle");
+  const legend = document.getElementById("legend"), legendToggle = document.getElementById("legendToggle");
   legendToggle.addEventListener("click", () => {
     const collapsed = legend.classList.toggle("collapsed");
     const label = collapsed ? "Legend" : "Close legend";
@@ -1054,7 +1003,7 @@
     animateView((W - pw)/2 - n.x*tk, H/2 - n.y*tk, tk);
   }
 
-  // ---- live search — global across every namespace in the current scenario ----
+  // ---- live search ----
   const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
   const SEARCH_RESULT_CAP = 200;
   let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
@@ -1097,7 +1046,7 @@
       el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
   }
   function pickSearch(id){
-    selectAnywhere(id);
+    jumpTo(id);
     closeSearch();
   }
   function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
@@ -1187,17 +1136,10 @@
 
   // ---- guided product tour ----
   // A short, linear walkthrough of the actual UI — every step drives real app
-  // state (setView(), select(), tab switches, a scenario change) rather than
-  // pretending; the spotlight/card are the only bespoke bits, everything they
-  // point at is the same feature a real visitor would use afterward.
-  //
-  // Unlike the old force-directed layout, resources no longer keep drifting
-  // on their own (positions are computed once, not simulated) — so there is
-  // no need to "freeze" a node's position for a step's duration anymore, and
-  // a step that targets a resource inside a specific namespace must actively
-  // setView() into that namespace first, since only the current tree's nodes
-  // exist in the DOM at all (the old whole-cluster view rendered everything
-  // at once; this one deliberately doesn't).
+  // state (select(), tab switches, a scenario change) rather than pretending.
+  // Every namespace's resources are already on screen together, so unlike the
+  // earlier drill-down build, a step can target any node directly with no
+  // navigation step first.
   const tourBlock = document.createElement("div"); tourBlock.className = "pg-tour-block";
   const tourSpotlight = document.createElement("div"); tourSpotlight.className = "pg-tour-spotlight no-target";
   const tourCard = document.createElement("div"); tourCard.className = "pg-tour-card";
@@ -1211,17 +1153,15 @@
       body: "This is the real Mantis UI, running against real captured cluster graphs — nothing here is a mockup. This tour takes about a minute; press <b>Esc</b> anytime to stop, or <b>Ctrl F</b> afterward to search for a resource yourself." },
     { title: "Three real scenarios", target: () => document.getElementById("pgScenarios"),
       body: "Each of these is a graph Mantis actually produced against a real cluster — labeled kubeadm, GKE, and EKS so together they show Mantis working identically across distributions, which is the actual point." },
-    { title: "Open a namespace", target: () => document.querySelector('.ns-card[data-ns="shop-frontend"]'),
-      body: "Mantis groups resources by namespace — click one to open its resource tree. I opened <b>shop-frontend</b> for you; on your own, just click any card.",
+    { title: "Every namespace, connected", target: () => document.querySelector('g.node[data-id="shop-frontend/Deployment/storefront"]'),
+      body: "Every namespace's resources render together on one map, linked by their real relationships — not a separate screen per namespace. I selected the <b>storefront</b> Deployment for you — on your own, just click any resource.",
       onEnter: async () => {
         if (currentScenario !== "web-app") await tourSwitchScenario("web-app");
-        setView("shop-frontend");
+        const id = "shop-frontend/Deployment/storefront";
+        curTab = "summary"; select(id); centerOn(currentById(id));
       } },
-    { title: "Click any resource to inspect it", target: () => document.querySelector('g.node[data-id="shop-frontend/Deployment/storefront"]'),
-      body: "I selected the <b>storefront</b> Deployment for you — on your own, just click. The panel on the right shows its Summary: replicas, image, resource requests, all read straight from the cluster.",
-      onEnter: () => { const id = "shop-frontend/Deployment/storefront"; curTab = "summary"; select(id); } },
     { title: "Trace what it depends on", target: () => document.querySelector('.tab[data-tab="relationships"]'),
-      body: "The Relationships tab lists everything this resource depends on and everything that depends on it — click any line to jump straight to that resource. On the canvas, the trace dims everything unrelated.",
+      body: "The Relationships tab lists everything this resource depends on and everything that depends on it — click any line to jump straight to that resource, even in another namespace. On the canvas, the trace dims everything unrelated.",
       onEnter: () => { curTab = "relationships"; renderBody(byId["shop-frontend/Deployment/storefront"]); } },
     { title: "The real manifest, one click away", target: () => document.querySelector('.tab[data-tab="yaml"]'),
       body: "This is the actual YAML Mantis captured for this resource — not a summary of it. On a real cluster this is a live read of the API server; here it's the same file, just captured ahead of time.",
@@ -1232,9 +1172,8 @@
       body: "This Ingress routes to a Service that no longer exists. Most tools would just drop that edge. Mantis checked, couldn't find it, and drew it anyway — red, dashed, labeled <b>not found</b> — because a broken reference you can't see is worse than an ugly one you can.",
       onEnter: async () => {
         await tourSwitchScenario("broken-relationships");
-        setView("payments-api");
         const id = "payments-api/Service/payments-svc-old";
-        curTab = "summary"; select(id);
+        curTab = "summary"; select(id); centerOn(currentById(id));
       } },
     { title: "That's Mantis", target: null,
       body: "Real relationships, real dangling-reference detection, Secret values that never leave the API server. Explore the rest yourself, or install it against your own cluster." },

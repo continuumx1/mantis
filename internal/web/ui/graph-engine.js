@@ -6,10 +6,14 @@
 // which loads this file first and calls into it.
 //
 // v1: replaces the old force-directed whole-cluster graph with a
-// deterministic, per-namespace ownership tree (see computeTreeLayout) plus
-// a namespace-overview grid (see computeOverview) — no physics simulation,
-// no requestAnimationFrame loop. Positions are computed once per data load
-// or namespace switch, not recomputed every frame.
+// deterministic, single-screen layout (see computeClusterLayout) — every
+// namespace's resources are still visible together, connected by their real
+// relationships, exactly as before; the only thing that changed is *how*
+// they're positioned. Each namespace's resources form their own ownership
+// tree (real controlled-by edges, e.g. Deployment -> ReplicaSet -> Pod), and
+// every namespace's tree is laid out side by side on one shared canvas —
+// no physics simulation, no requestAnimationFrame loop, no per-frame
+// recomputation. Positions are computed once per data load.
 
 (function (global) {
   "use strict";
@@ -44,78 +48,49 @@
     return n;
   }
 
-  // ---- namespace overview ----
-  // computeOverview buckets nodes by namespace (Node.ns === "" — cluster-scoped
-  // resources like Node/PersistentVolume — becomes its own "__cluster" card,
-  // same convention the old region grouping used) and rolls up a health
-  // summary per bucket so the overview screen can read like ArgoCD's
-  // Applications grid: name, resource count, at-a-glance health.
-  function computeOverview(nodes, namespaceList) {
-    const groups = {};
-    (namespaceList || []).forEach(ns => { groups[ns] = groups[ns] || []; });
-    nodes.forEach(n => { const g = groupKey(n); (groups[g] = groups[g] || []).push(n); });
-    return Object.keys(groups).map(g => {
-      const members = groups[g];
-      const summary = { ns: g === "__cluster" ? "" : g, cluster: g === "__cluster", count: members.length, ok: 0, warn: 0, crit: 0, unresolved: 0 };
-      members.forEach(n => {
-        if (n.resolved === false) summary.unresolved++;
-        else if (n.status === "crit") summary.crit++;
-        else if (n.status === "warn") summary.warn++;
-        else if (n.status === "ok") summary.ok++;
-      });
-      return summary;
-    }).sort((a, b) => a.cluster ? 1 : b.cluster ? -1 : a.ns.localeCompare(b.ns));
-  }
-
-  // ---- per-namespace ownership tree ----
+  // ---- one namespace's ownership tree (internal — see computeClusterLayout,
+  // the public entry point, below) ----
   // TREE_NODE_GAP_X/TREE_ROOT_GAP_X/TREE_ROW_H are the only "spacing knobs" —
   // deliberately not a full Reingold-Tilford implementation, just post-order
   // subtree-width accumulation + pre-order centering, which is enough to
   // produce a clean, non-overlapping tree for the shapes this data actually
-  // has (shallow ownership chains, wide fan-outs handled by collapse, not by
-  // wrapping rows — see collapsedSet below).
-  const TREE_NODE_W = 160, TREE_NODE_GAP_X = 24, TREE_ROOT_GAP_X = 48, TREE_ROW_H = 110;
+  // has (shallow ownership chains, wide fan-outs handled by collapse).
+  const TREE_NODE_GAP_X = 24, TREE_ROOT_GAP_X = 48, TREE_ROW_H = 110;
+  const EMPTY_GROUP_W = 168, EMPTY_GROUP_H = 74; // placeholder box for a namespace with zero resources
 
-  // computeTreeLayout builds one namespace's ownership tree from the FULL
-  // edge list (not pre-filtered by the caller) — it does its own namespace
-  // filtering so callers can just pass the whole /api/graph payload.
-  //   namespace: "" for the cluster-scoped pseudo-namespace, else a real ns.
-  //   collapsedSet: a Set of node ids whose subtree should render as a single
-  //     collapsed node (see §5 of the plan — this is what keeps a Deployment
-  //     with 50 Pods from blowing out the screen, instead of row-wrapping).
-  // Returns { nodes, ownershipEdges, secondaryEdges, roots } — nodes carry
-  // x/y (relative, origin at the first root's top-left-ish center; caller
-  // positions the viewport). Cross-namespace edges are intentionally not
-  // returned here — they still show up in the resource drawer's
-  // Relationships tab (relHTML operates on the full graph, not the tree).
-  function computeTreeLayout(allNodes, allEdges, namespace, collapsedSet) {
-    collapsedSet = collapsedSet || new Set();
-    const nsNodes = allNodes.filter(n => groupKey(n) === (namespace || "__cluster"));
-    const byId = {}; nsNodes.forEach(n => byId[n.id] = sizeNode({ ...n }));
-    const idSet = new Set(nsNodes.map(n => n.id));
-    const nsEdges = allEdges.filter(e => idSet.has(e.from) && idSet.has(e.to));
+  // layoutGroup lays out ONE namespace's nodes (already filtered by the
+  // caller) as an ownership tree, local coordinates starting near (0,0).
+  // `groupEdges` must already be filtered to edges whose endpoints are both
+  // in `groupNodes` — computeClusterLayout does that once per group.
+  // Returns { nodes, ownershipEdges, childrenOf, minX, minY, maxX, maxY }.
+  function layoutGroup(groupNodes, groupEdges, collapsedSet) {
+    const byId = {}; groupNodes.forEach(n => byId[n.id] = sizeNode({ ...n }));
+
+    if (!groupNodes.length) {
+      return { nodes: [], ownershipEdges: [], childrenOf: {}, minX: 0, minY: 0, maxX: EMPTY_GROUP_W, maxY: EMPTY_GROUP_H };
+    }
 
     // Pick one tree parent per node — the first outgoing controlled-by edge,
     // in backend order (stable per load). Extra controlled-by edges (the
     // rare multi-owner case — see internal/graph/owner.go, which doesn't
-    // filter on Controller==true) fall through into secondaryEdges below
-    // rather than forking the tree.
+    // filter on Controller==true) fall through and are just left as
+    // ordinary secondary edges by the caller, rather than forking the tree.
     const parentOf = {}, chosen = new Set();
-    nsNodes.forEach(n => {
-      const outs = nsEdges.filter(e => e.from === n.id && e.type === "controlled-by");
+    groupNodes.forEach(n => {
+      const outs = groupEdges.filter(e => e.from === n.id && e.type === "controlled-by");
       if (outs.length) { parentOf[n.id] = outs[0].to; chosen.add(outs[0].from + "→" + outs[0].to); }
     });
 
     const childrenOf = {};
-    nsNodes.forEach(n => { const p = parentOf[n.id]; if (p) (childrenOf[p] = childrenOf[p] || []).push(n.id); });
+    groupNodes.forEach(n => { const p = parentOf[n.id]; if (p) (childrenOf[p] = childrenOf[p] || []).push(n.id); });
     Object.keys(childrenOf).forEach(k => childrenOf[k].sort((a, b) => cmpNode(byId[a], byId[b])));
 
-    let roots = nsNodes.filter(n => !parentOf[n.id]).map(n => n.id);
+    let roots = groupNodes.filter(n => !parentOf[n.id]).map(n => n.id);
     // Guard against malformed/cyclic ownership data: anything not reachable
     // from the root set becomes its own root rather than being dropped.
     const reachable = new Set(), stack = roots.slice();
     while (stack.length) { const id = stack.pop(); if (reachable.has(id)) continue; reachable.add(id); (childrenOf[id] || []).forEach(c => stack.push(c)); }
-    nsNodes.forEach(n => { if (!reachable.has(n.id)) roots.push(n.id); });
+    groupNodes.forEach(n => { if (!reachable.has(n.id)) roots.push(n.id); });
     roots = Array.from(new Set(roots)).sort((a, b) => cmpNode(byId[a], byId[b]));
 
     const depth = {};
@@ -133,9 +108,8 @@
       return n;
     }
     // Each subtree must be at least as wide as the node's own (name-length-
-    // dependent, see sizeNode) box — using the fixed TREE_NODE_W constant
-    // here instead of the real per-node width was the original bug: long
-    // resource names render wider than 160px, so fixed-width spacing let
+    // dependent, see sizeNode) box — a fixed constant here was the original
+    // bug: long resource names render wider than any fixed guess, which let
     // adjacent leaf siblings' actual boxes overlap.
     function subtreeWidth(id) {
       const own = byId[id].w;
@@ -157,24 +131,94 @@
     let cursor = 0;
     roots.forEach((r, i) => { if (i > 0) cursor += TREE_ROOT_GAP_X; assignX(r, cursor); cursor += subtreeWidth(r); });
 
-    // Prune nodes hidden under a collapsed ancestor from the render set (but
-    // they stay reachable conceptually via hiddenCount on the ancestor).
+    // Prune nodes hidden under a collapsed ancestor from the render set.
     const visible = new Set();
     function markVisible(id) { visible.add(id); if (!collapsedSet.has(id)) (childrenOf[id] || []).forEach(markVisible); }
     roots.forEach(markVisible);
 
-    const outNodes = nsNodes.map(n => byId[n.id]).filter(n => visible.has(n.id));
-    const ownershipEdges = nsEdges.filter(e => e.type === "controlled-by" && chosen.has(e.from + "→" + e.to) && visible.has(e.from) && visible.has(e.to));
-    const secondaryEdges = nsEdges.filter(e => !(e.type === "controlled-by" && chosen.has(e.from + "→" + e.to)) && visible.has(e.from) && visible.has(e.to));
+    const outNodes = groupNodes.map(n => byId[n.id]).filter(n => visible.has(n.id));
+    const ownershipEdges = groupEdges.filter(e => e.type === "controlled-by" && chosen.has(e.from + "→" + e.to) && visible.has(e.from) && visible.has(e.to));
 
-    return { nodes: outNodes, ownershipEdges, secondaryEdges, roots, childrenOf };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    outNodes.forEach(n => { minX = Math.min(minX, n.x - n.w / 2); maxX = Math.max(maxX, n.x + n.w / 2); minY = Math.min(minY, n.y - n.h / 2); maxY = Math.max(maxY, n.y + n.h / 2); });
+
+    return { nodes: outNodes, ownershipEdges, childrenOf, minX, minY, maxX, maxY };
+  }
+
+  // ---- whole-cluster layout: every namespace visible together, connected ----
+  // Namespace "regions" are packed shelf-style (left to right, wrapping to a
+  // new row once a row gets too wide) rather than a fixed grid — trees vary
+  // hugely in size (kube-system next to a three-resource namespace), so a
+  // fixed cell size would either waste space or overlap. REGION_MAX_ROW_W is
+  // a soft budget, not a hard viewport limit — the canvas pans/zooms.
+  const REGION_GAP_X = 56, REGION_GAP_Y = 64, REGION_PAD = 24, REGION_MAX_ROW_W = 2400;
+
+  // computeClusterLayout is the single public layout entry point: every
+  // namespace's ownership tree, side by side on one shared canvas, with
+  // every other relationship (selects/serves/mounts/references/... and any
+  // rare cross-namespace or multi-owner controlled-by edge) drawn as a
+  // secondary connector between the two now-fixed positions — including
+  // connectors that cross from one namespace's region into another's, since
+  // everything lives in the same coordinate space now.
+  //   collapsedIds: a Set of node ids anywhere in the cluster whose subtree
+  //     should render collapsed (§5 of the plan — keeps a Deployment with 50
+  //     Pods from dominating the screen). Persists across a data refresh;
+  //     the caller resets it only when it chooses to (e.g. "Expand all").
+  function computeClusterLayout(allNodes, allEdges, namespaceList, collapsedIds) {
+    collapsedIds = collapsedIds || new Set();
+    const groups = {};
+    (namespaceList || []).forEach(ns => { groups[ns] = groups[ns] || []; });
+    allNodes.forEach(n => { const g = groupKey(n); (groups[g] = groups[g] || []).push(n); });
+
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      if (a === "__cluster") return 1; if (b === "__cluster") return -1;
+      return a.localeCompare(b);
+    });
+
+    const globalById = {};
+    const regions = [];
+    const ownershipEdges = [];
+    let cursorX = 0, cursorY = 0, rowH = 0;
+
+    groupKeys.forEach(g => {
+      const groupNodes = groups[g];
+      const idSet = new Set(groupNodes.map(n => n.id));
+      const groupEdges = allEdges.filter(e => idSet.has(e.from) && idSet.has(e.to));
+      const local = layoutGroup(groupNodes, groupEdges, collapsedIds);
+      const w = Math.max(local.maxX - local.minX, EMPTY_GROUP_W);
+      const h = Math.max(local.maxY - local.minY, EMPTY_GROUP_H);
+
+      if (cursorX > 0 && cursorX + w > REGION_MAX_ROW_W) { cursorX = 0; cursorY += rowH + REGION_GAP_Y; rowH = 0; }
+      const ox = cursorX - (isFinite(local.minX) ? local.minX : 0), oy = cursorY - (isFinite(local.minY) ? local.minY : 0);
+      local.nodes.forEach(n => { n.x += ox; n.y += oy; globalById[n.id] = n; });
+      local.ownershipEdges.forEach(e => ownershipEdges.push(e));
+
+      regions.push({
+        key: g, label: g === "__cluster" ? "cluster-scoped · not namespaced" : g, cluster: g === "__cluster",
+        empty: local.nodes.length === 0,
+        x0: cursorX - REGION_PAD, y0: cursorY - REGION_PAD, x1: cursorX + w + REGION_PAD, y1: cursorY + h + REGION_PAD,
+      });
+
+      cursorX += w + REGION_GAP_X; rowH = Math.max(rowH, h);
+    });
+
+    // Every relation NOT already drawn as an ownership-tree edge — including
+    // genuinely cross-namespace edges (a shared PVC, a cross-namespace
+    // NetworkPolicy target, etc.) and any rare second controlled-by edge on
+    // a multi-owner node — becomes a secondary connector, drawn between
+    // whatever two global positions its endpoints ended up at.
+    const usedOwnershipKeys = new Set(ownershipEdges.map(e => e.from + "→" + e.to));
+    const secondaryEdges = allEdges.filter(e =>
+      globalById[e.from] && globalById[e.to] &&
+      !(e.type === "controlled-by" && usedOwnershipKeys.has(e.from + "→" + e.to)));
+
+    return { nodes: Object.values(globalById), ownershipEdges, secondaryEdges, regions };
   }
 
   global.MantisGraph = {
     SVGNS, el, esc, css, short,
     CAT, catColor, FAMILY, REVERSE, NS_PALETTE_DARK, NS_PALETTE_LIGHT, nsPalette,
     groupKey, cmpNode, sizeNode,
-    computeOverview, computeTreeLayout,
-    TREE_NODE_W, TREE_NODE_GAP_X, TREE_ROOT_GAP_X, TREE_ROW_H,
+    computeClusterLayout,
   };
 })(window);
