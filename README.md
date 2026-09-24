@@ -163,7 +163,7 @@ Endpoints:
 ```bash
 # No clone needed — the chart is published too:
 helm install mantis oci://registry-1.docker.io/cx1tech/mantis \
-  --version 0.3.0 --namespace mantis --create-namespace
+  --version 1.0.0 --namespace mantis --create-namespace
 
 # or, from a checkout of this repo:
 helm install mantis ./charts/mantis --namespace mantis --create-namespace
@@ -182,8 +182,8 @@ distroless nonroot base, no local build required. See
 full values reference. Full detail on the required permissions and the
 security model is on the **[docs site](https://continuumx1.github.io/mantis/)**.
 
-Images tag as `0.1.0-preview.1`, `0.1.0-preview.2`, … through preview
-iterations, then `0.1.0-rc.1`, then `0.1.0` for stable.
+Images tagged `0.1.0-preview.1` through `0.1.0-preview.3` during Public
+Preview; `1.0.0` is the current, stable image/chart tag.
 
 Building from source is still one command away if you're working on
 Mantis itself — each service has its own multi-stage, distroless,
