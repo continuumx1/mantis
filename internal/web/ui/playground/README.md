@@ -1,26 +1,27 @@
 # Mantis Playground
 
-`playground.html` (in the directory above this one) is a fork of the real
-`index.html` — same rendering engine, same force layout, same panel/search/YAML
-UI — with one difference: instead of fetching `/api/graph` and `/api/resource`
-from a live `mantis-engine`, it reads static JSON/YAML files from `data/`
-below. There is no server, no auth, and no live cluster behind it, which is
-also what the banner across the top of the page says.
+`playground.html` (in the directory above this one) runs the real Mantis UI —
+`graph-engine.js`, `graph-view.js` and `graph-view.css`, the exact files
+`index.html` uses — with one difference: instead of fetching `/api/graph` and
+`/api/resource` from a live `mantis-engine`, it reads static JSON/YAML files
+from `data/` below. There is no server, no auth, and no live cluster behind
+it, which is also what the banner across the top of the page says.
 
 It exists so someone can experience the actual Mantis UI — not a mockup of
 it — before installing anything.
 
 ## Keeping it in sync
 
-Because `playground.html` is a fork, not a build artifact, it does not pick up
-`index.html` changes automatically — UI-facing commits to `index.html` (search
-behavior, status colors, header, panel/YAML rendering, and so on) need their
-equivalent applied here by hand. One deliberate, permanent exception: the
-background-sync progress feature (`/api/sync/status` polling, the connecting
-overlay's live namespace/resource counts) is not mirrored — it reflects
-`mantis-engine`'s real progressive sync loop, which has no equivalent against
-a static, already-complete JSON fixture, so there is nothing genuine for it to
-show here.
+The graph UI is shared code, so UI changes reach the Playground
+automatically. Only page-specific parts live in `playground.html`: the
+banner, the scenario switcher, the guided tour and the static data source.
+The tour drives the app through the API `MantisApp.mount()` returns
+(`jumpTo`, `setTab`, `setView`), not through private state. Fixtures from
+older engines that lack edge `category`/`basis` fields still work — the UI
+derives them from the relation type.
+
+When copying the Playground to the website, copy `graph-engine.js`,
+`graph-view.js` and `graph-view.css` along with `playground.html`.
 
 ## Why static fixtures, not a live demo cluster
 

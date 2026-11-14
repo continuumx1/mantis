@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"sort"
@@ -128,8 +130,18 @@ func (s *Server) syncOnce(ctx context.Context) {
 	err := graph.BuildClusterGraphProgressive(ctx, s.client.Clientset, s.client.Dynamic, s.showAll,
 		func(snap graph.ClusterSnapshot) {
 			dto := s.dtoFor(base, snap)
-			s.cache.publish(dto)
 			s.progress.update(snap, dto)
+			// Partial snapshots are only published until the first pass has
+			// completed (see Server.published). After that, publishing the
+			// first namespace of a re-sync would make the whole rest of the
+			// cluster vanish from every client until the pass caught up.
+			if snap.Complete {
+				s.cache.publish(dto)
+				s.published.Store(true)
+			} else if !s.published.Load() {
+				dto.Meta.Partial = true
+				s.cache.publish(dto)
+			}
 		})
 
 	duration := time.Since(start)
@@ -157,6 +169,7 @@ func (s *Server) baseMeta(ctx context.Context) MetaDTO {
 	meta := MetaDTO{
 		Context:        s.client.Context,
 		Server:         s.client.Server,
+		ClusterID:      clusterID(s.client.Server),
 		NodeAutoscaler: graph.DetectNodeAutoscaler(ctx, s.client.Dynamic, s.client.Clientset),
 	}
 	if nsList, err := s.client.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
@@ -193,6 +206,17 @@ func (s *Server) dtoFor(base MetaDTO, snap graph.ClusterSnapshot) GraphDTO {
 		meta.Namespaces = countNamespaces(snap.Context)
 	}
 	return FromContext(snap.Context, meta)
+}
+
+// clusterID derives a short, stable, opaque identifier from the API server
+// address — the same cluster always gets the same ID, and the address itself
+// is not repeated in every resource reference a client keeps.
+func clusterID(server string) string {
+	if server == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(server))
+	return hex.EncodeToString(sum[:6])
 }
 
 // countNamespaces counts distinct namespaces represented among the graph's

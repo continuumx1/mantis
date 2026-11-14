@@ -4,10 +4,13 @@
 package engine
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +35,12 @@ type Server struct {
 	syncInterval time.Duration
 	cache        *snapshotCache
 	progress     *progressTracker
+	// published is set once the first complete pass has been published.
+	// Until then every partial snapshot is published (so a large cluster's
+	// first namespaces appear quickly); after it, only complete passes are,
+	// so a re-sync never briefly replaces the whole graph with a half-walked
+	// one.
+	published atomic.Bool
 	// syncing guards syncOnce against ever running twice at once. The
 	// scheduled loop (syncLoop) is already sequential by construction and
 	// can't overlap itself, but this makes that guarantee an explicit,
@@ -70,6 +79,8 @@ func (s *Server) Start(ctx context.Context) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/graph", s.handleGraph)
+	mux.HandleFunc("/api/graph/search", s.handleSearch)
+	mux.HandleFunc("/api/graph/neighbors", s.handleNeighbors)
 	mux.HandleFunc("/api/sync/status", s.handleSyncStatus)
 	mux.HandleFunc("/api/resource", s.handleResource)
 	mux.HandleFunc("/healthz", s.handleHealth)
@@ -101,10 +112,91 @@ func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ?since=<revision>: a client that already holds a snapshot gets only
+	// what changed (or "unchanged"). When the delta history no longer reaches
+	// back that far, it falls through to the full snapshot — always correct.
+	if v := r.URL.Query().Get("since"); v != "" {
+		if since, err := strconv.ParseUint(v, 10, 64); err == nil {
+			if delta, ok := s.cache.since(since); ok {
+				writeJSON(w, r, delta)
+				return
+			}
+		}
+	}
+	writeJSON(w, r, dto)
+}
+
+// handleSearch serves /api/graph/search?q=&limit= against the in-memory
+// index. See graphIndex.search for the query syntax.
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	limit := 50
+	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 1000 {
+		limit = v
+	}
+	var res SearchResult
+	if !s.cache.withIndex(func(ix *graphIndex) { res = ix.search(q, limit) }) {
+		http.Error(w, "no graph yet", http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, r, res)
+}
+
+// handleNeighbors serves /api/graph/neighbors?id=&direction=in|out|both
+// &depth=1..4&categories=ownership,storage — a resource's dependency
+// neighborhood, computed from the in-memory incoming/outgoing indexes.
+func (s *Server) handleNeighbors(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	if id == "" {
+		http.Error(w, "id is required", http.StatusBadRequest)
+		return
+	}
+	direction := q.Get("direction")
+	if direction != "in" && direction != "out" {
+		direction = "both"
+	}
+	depth := 1
+	if v, err := strconv.Atoi(q.Get("depth")); err == nil && v >= 1 && v <= 4 {
+		depth = v
+	}
+	cats := map[string]bool{}
+	for _, c := range strings.Split(q.Get("categories"), ",") {
+		if c = strings.TrimSpace(c); c != "" {
+			cats[c] = true
+		}
+	}
+	var res Neighborhood
+	found := false
+	if !s.cache.withIndex(func(ix *graphIndex) { res, found = ix.neighbors(id, direction, depth, cats) }) {
+		http.Error(w, "no graph yet", http.StatusServiceUnavailable)
+		return
+	}
+	if !found {
+		http.Error(w, "resource not found in graph", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, r, res)
+}
+
+// writeJSON encodes v, gzip-compressed when the client accepts it — a large
+// cluster's graph is a few megabytes of highly repetitive JSON that
+// compresses roughly tenfold.
+func writeJSON(w http.ResponseWriter, r *http.Request, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := json.NewEncoder(w).Encode(dto); err != nil {
-		http.Error(w, "encode graph: "+err.Error(), http.StatusInternalServerError)
+	w.Header().Add("Vary", "Accept-Encoding")
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		if err := json.NewEncoder(gz).Encode(v); err != nil {
+			slog.Error("encode", "event", "encode_failed", "error", err.Error())
+		}
+		return
+	}
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		http.Error(w, "encode: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 

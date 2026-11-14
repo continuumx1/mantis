@@ -40,6 +40,13 @@ var kindGVR = map[string]schema.GroupVersionResource{
 	"HorizontalPodAutoscaler": {Group: "autoscaling", Version: "v2", Resource: "horizontalpodautoscalers"},
 	"VerticalPodAutoscaler":   {Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"},
 	"NodePool":                {Group: "karpenter.sh", Version: "v1", Resource: "nodepools"},
+	"ServiceAccount":          {Group: "", Version: "v1", Resource: "serviceaccounts"},
+	"NetworkPolicy":           {Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"},
+	"StorageClass":            {Group: "storage.k8s.io", Version: "v1", Resource: "storageclasses"},
+	"Role":                    {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "roles"},
+	"RoleBinding":             {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "rolebindings"},
+	"ClusterRole":             {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"},
+	"ClusterRoleBinding":      {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterrolebindings"},
 }
 
 // handleResource serves the raw YAML manifest of a single resource, addressed by

@@ -96,6 +96,7 @@ nav:
   - Getting Started: getting-started.md
   - Core Concepts: core-concepts.md
   - Architecture: architecture.md
+  - "Graph: model, views & layout": graph-architecture.md
   - User Guide: user-guide.md
   - Security: security.md
   - Deployment: deployment.md

@@ -18,305 +18,7 @@
   } catch (e) { /* sessionStorage unavailable (private mode, etc.) — default theme is fine */ }
 </script>
 
-<style>
-  :root {
-    color-scheme: dark;
-    /* Neutral charcoal grey (not the near-black, blue-tinted canvas this used
-       to be) — matched to the reference dark-mode docs site: a true grey hue
-       with no blue cast, panels a step up, borders a step up from that. */
-    --ground: #18191c; --ground-2: #1d1e22; --panel: #222327; --panel-2: #292a2f; --line: #35363c; --dot: #3a3b41;
-    --ink: #e7eef6; --muted: #8595a6; --faint: #5a6b7d; --brand: #a6e22e;
-    --cat-workload: #6ea8fe; --cat-pod: #a6e22e; --cat-network: #d980fb; --cat-config: #e3b341; --cat-storage: #34d1bf; --cat-node: #96a4b5; --cat-autoscale: #f0883e;
-    --ns-cluster: #8595a6;
-    --ok: #3fb950; --warn: #d29922; --crit: #f85149;
-    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
-    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  }
-  /* Light theme — a manual, per-tab toggle (see #themeToggle and the
-     sessionStorage note up top), not prefers-color-scheme: Mantis opens dark
-     by default regardless of OS setting; this is what a toggle-to-light
-     session looks like. Every rule below already reads these tokens, so
-     redefining them here is the whole theme swap. */
-  :root[data-theme="light"] {
-    color-scheme: light;
-    --ground: #c9cdd4; --ground-2: #c0c4cc; --panel: #d6d9de; --panel-2: #cbcfd5; --line: #b0b6bf; --dot: #7c8794;
-    --ink: #161b22; --muted: #4b5563; --faint: #838f9d; --brand: #4f8a1c;
-    --cat-workload: #2f6fe0; --cat-pod: #4f8a1c; --cat-network: #a23fd1; --cat-config: #a06400; --cat-storage: #0a8f7c; --cat-node: #5b6670; --cat-autoscale: #b85c17;
-    --ns-cluster: #5b6670;
-    --ok: #1a7f37; --warn: #8a6200; --crit: #cf222e;
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { background: var(--ground); color: var(--ink); font-family: var(--font-ui); overflow: hidden; }
-  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
-
-  header { display: flex; align-items: center; gap: 18px; padding: 10px 22px; border-bottom: 1px solid var(--line);
-    background: linear-gradient(var(--ground-2), var(--ground)); z-index: 5; flex-wrap: wrap; }
-
-  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
-  .brand .mascot { height: 40px; width: auto; display: block; flex: none; }
-
-  .spacer { flex: 1 1 auto; min-width: 16px; }
-
-  .cluster-chip { display: flex; align-items: baseline; gap: 7px; font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; flex: none; }
-  .cluster-chip .cluster-label { color: var(--faint); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; }
-  .cluster-chip b { color: var(--ink); font-weight: 600; }
-
-  .hdr-divider { width: 1px; height: 18px; background: var(--line); flex: none; }
-
-  .stat-group { display: flex; align-items: center; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--faint); white-space: nowrap; flex: none; }
-  .stat-item { display: flex; align-items: baseline; gap: 5px; }
-  .stat-item b { color: var(--muted); font-weight: 600; }
-  .autoscale-badge { display: inline-flex; align-items: baseline; gap: 5px; }
-  .autoscale-badge b { color: var(--cat-autoscale); font-weight: 600; }
-
-  .icon-btn { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none;
-    color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; transition: color .15s, border-color .15s; }
-  .icon-btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .icon-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  .icon-btn svg { width: 16px; height: 16px; }
-  .icon-btn .i-sun { display: none; }
-  :root[data-theme="light"] .icon-btn .i-moon { display: none; }
-  :root[data-theme="light"] .icon-btn .i-sun { display: block; }
-
-  main { position: relative; flex: 1; min-height: 0; }
-  #canvas { position: absolute; inset: 0; width: 100%; height: 100%;
-    /* --dot is its own token, not --line: in light mode --line is close enough
-       to --ground that the dotted grid all but disappeared (read as a flat
-       white canvas); --dot is tuned per theme to stay visible-but-quiet against
-       its own background instead of inheriting a border color's contrast. */
-    background: radial-gradient(circle at center, color-mix(in srgb, var(--cat-pod) 4%, transparent), transparent 60%), radial-gradient(var(--dot) 0.6px, transparent 0.6px);
-    background-size: 100% 100%, 26px 26px; background-position: center, center; cursor: grab; touch-action: none; }
-  #canvas.panning { cursor: grabbing; }
-
-  /* Namespaces are regions, not walls: a whisper of tint and a thin edge,
-     never competing with the resources inside them. Empty namespaces are
-     dashed and fainter still — present as context, not as something to
-     look at. Every namespace's resources render together on one shared
-     canvas, connected by their real relationships (including across
-     namespaces) — a region is a visual grouping, not a separate screen. */
-  .region-box { fill-opacity: 0.032; stroke-width: 1; stroke-opacity: .32; }
-  .region-box.empty { fill-opacity: 0.016; stroke-dasharray: 3 4; stroke-opacity: .18; }
-  .region-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; opacity: .62; }
-
-  .edge, .secondary-edge { stroke-linecap: round; transition: stroke-opacity .18s, stroke-width .18s; }
-  .edge { fill: none; }
-  /* Secondary (non-ownership) relations render behind the bold ownership tree
-     lines, thinner and fainter, so each namespace's ownership skeleton reads
-     first even though every relation type is drawn. */
-  .secondary-edge { fill: none; stroke-width: 1.2; stroke-opacity: .22; }
-  .secondary-edge.dashed { stroke-dasharray: 4 4; }
-  .edge-label { font-family: var(--font-mono); font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: var(--ground); stroke-width: 3px; opacity: 0; transition: opacity .18s; pointer-events: none; }
-
-  .node { cursor: pointer; }
-  .node .chip-bg { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .18s, filter .18s; }
-  .node .kind { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .6px; text-transform: uppercase; }
-  .node .name { font-family: var(--font-mono); font-size: 11.5px; fill: var(--ink); }
-  .node .sub  { font-family: var(--font-mono); font-size: 8px; fill: var(--crit); letter-spacing: .5px; }
-  .node:hover .chip-bg { stroke: color-mix(in srgb, var(--brand) 55%, var(--line)); }
-  .node.selected .chip-bg { stroke: var(--brand); stroke-width: 1.6; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--brand) 45%, transparent)); }
-  .node.dim { opacity: .22; }
-  .node.ghost .chip-bg { stroke: var(--crit); stroke-dasharray: 4 3; fill: color-mix(in srgb, var(--crit) 8%, var(--panel-2)); }
-  .node.ghost .name { fill: var(--muted); }
-
-  .collapse-toggle { cursor: pointer; }
-  .collapse-toggle circle { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; transition: stroke .15s; }
-  .collapse-toggle:hover circle { stroke: var(--brand); }
-  .collapse-toggle text { font-family: var(--font-mono); font-size: 9px; fill: var(--muted); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
-
-  .status-ring { fill: none; stroke-width: 2; }
-  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
-  .status-crit .status-ring { stroke: var(--crit); animation: pulse 1.6s ease-in-out infinite; }
-  .status-ok .status-ring { stroke: var(--ok); opacity:.8; }
-  .status-warn .status-ring { stroke: var(--warn); opacity:.8; }
-  @media (prefers-reduced-motion: reduce) { .status-crit .status-ring { animation: none; opacity:.9; } }
-
-  .legend { position: absolute; left: 16px; bottom: 16px; z-index: 4; width: 240px;
-    background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
-    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 44px; font-size: 11.5px;
-    transition: width .15s, height .15s, padding .15s; }
-  .legend.collapsed { width: 46px; height: 46px; padding: 0; border: 0; background: none; }
-  .legend-toggle { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; justify-content: center;
-    width: 26px; height: 26px; border-radius: 50%;
-    color: var(--muted); background: none; border: 0; cursor: pointer; padding: 0; transition: color .15s, background .15s; }
-  .legend.collapsed .legend-toggle { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); }
-  .legend-toggle:hover { color: var(--brand); }
-  .legend-toggle svg { width: 15px; height: 15px; }
-  .legend-toggle .i-close { display: none; }
-  .legend:not(.collapsed) .legend-toggle .i-info { display: none; }
-  .legend:not(.collapsed) .legend-toggle .i-close { display: block; }
-  .legend.collapsed .legend-body { display: none; }
-  .legend h4 { margin: 0 0 8px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; }
-  .legend .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; color: var(--muted); font-family: var(--font-mono); }
-  .legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
-  .legend .ln { width: 16px; border-top-width: 2px; border-top-style: solid; flex: none; }
-  .legend .divider { height: 1px; background: var(--line); margin: 10px 0; }
-
-  .panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 320px; z-index: 6; background: color-mix(in srgb, var(--panel) 95%, transparent); backdrop-filter: blur(8px);
-    border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.35);
-    transition: transform .25s ease, opacity .25s ease; }
-  .panel .hint { color: var(--faint); font-size: 13px; line-height: 1.55; margin-top: 4px; }
-  .panel .hint b { color: var(--muted); }
-  .p-kind { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
-  .p-name { font-family: var(--font-mono); font-size: 15px; word-break: break-all; line-height: 1.35; color: var(--ink); }
-  .p-ns { font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
-
-  .badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; padding: 3px 9px; border-radius: 20px; border: 1px solid; width: fit-content; }
-  .badge::before { content:""; width:7px; height:7px; border-radius:50%; background: currentColor; }
-  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
-  .badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); background: color-mix(in srgb, var(--crit) 12%, transparent); }
-  .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
-
-  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
-  .tab { padding: 7px 11px; font-size: 11px; font-family: var(--font-mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .tab:hover { color: var(--ink); }
-  .tab.active { color: var(--brand); border-color: var(--brand); }
-
-  .kv { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
-  .kv > div { display: flex; gap: 8px; }
-  .kv .k { color: var(--faint); min-width: 84px; font-family: var(--font-mono); }
-  .kv .v { color: var(--muted); font-family: var(--font-mono); word-break: break-all; }
-
-  .sec-h { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; margin: 10px 0 4px; }
-
-  .detail { display: flex; flex-direction: column; }
-  .drow { display: grid; grid-template-columns: 40% 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent); align-items: baseline; }
-  .drow:last-child { border-bottom: 0; }
-  .dk { color: var(--faint); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .3px; text-transform: lowercase; word-break: break-word; }
-  .dv { color: var(--ink); font-family: var(--font-mono); font-size: 11.5px; word-break: break-word; line-height: 1.45; }
-  .dstat { display: inline-block; font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 4px; }
-
-  .yaml-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-  .yaml-head .sec-h { margin: 0; }
-  .copy-btn { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; cursor: pointer; transition: color .15s, border-color .15s; }
-  .copy-btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .copy-btn.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
-  .yaml { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre; max-height: 62vh; overflow-y: auto; }
-  .notice { border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; white-space: pre-line; }
-  .yaml-actions { display: flex; gap: 6px; align-items: center; }
-
-  .yaml-wrap { position: relative; }
-  .yaml-wrap .yaml { padding-top: 40px; }
-  .yaml-tools { position: absolute; top: 7px; right: 9px; z-index: 2; display: flex; gap: 6px; }
-  .yaml-tools .copy-btn { background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(4px); }
-
-  .ymodal-overlay { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 24px;
-    background: color-mix(in srgb, var(--ground) 74%, transparent); backdrop-filter: blur(3px); }
-  .ymodal-overlay.open { display: flex; }
-  .ymodal { width: min(1080px, 84vw); height: 84vh; display: flex; flex-direction: column; padding: 14px 14px 16px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
-  .ymodal-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
-  .ymodal-title { font-family: var(--font-mono); font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    flex: 1 1 auto; min-width: 60px; }
-  .ymodal-title b { color: var(--faint); font-weight: 400; }
-  .ymodal-pre { flex: 1; max-height: none; margin: 0; font-size: 12px; }
-  .ymodal-close { font-family: var(--font-mono); font-size: 13px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; }
-  .ymodal-close:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
-
-  .ymodal-search { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; position: relative; }
-  .ymodal-search .search-ico { position: static; transform: none; }
-  .ymodal-search input { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line);
-    border-radius: 6px; padding: 5px 8px; width: 160px; outline: none; transition: border-color .15s, width .15s; }
-  .ymodal-search input:focus { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); width: 200px; }
-  .ymodal-search input::placeholder { color: var(--faint); }
-  .ymodal-kbd { flex: none; }
-  .ymodal-match-count { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); min-width: 34px; text-align: center; }
-  .ymodal-nav { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line);
-    border-radius: 6px; width: 24px; height: 24px; cursor: pointer; }
-  .ymodal-nav:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .yaml mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; border-radius: 2px; }
-  .yaml mark.cur { background: var(--brand); color: var(--ground); }
-
-  .search-wrap { position: relative; display: flex; align-items: center; gap: 6px; }
-  .search { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px 6px 28px; width: 176px; outline: none; transition: border-color .15s, width .2s; }
-  .search::placeholder { color: var(--faint); }
-  .search:focus { border-color: color-mix(in srgb, var(--brand) 55%, var(--line)); width: 216px; }
-  .search-ico { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 12px; pointer-events: none; }
-  .search-kbd { position: static; flex: none; font-family: var(--font-mono); font-size: 10px; letter-spacing: .3px;
-    color: var(--faint); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; pointer-events: none; }
-  .search-results { position: absolute; top: calc(100% + 5px); left: 0; width: 300px; max-height: 340px; overflow-y: auto; z-index: 9;
-    background: color-mix(in srgb, var(--panel) 97%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 9px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.4); display: none; padding: 4px; }
-  .search-results.open { display: block; }
-  .sresult { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; cursor: pointer; font-family: var(--font-mono); font-size: 12px; }
-  .sresult:hover, .sresult.active { background: var(--panel-2); }
-  .sresult .sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-  .sresult .sr-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sresult .sr-kind { color: var(--faint); font-size: 10px; flex: none; }
-  .sresult .sr-ns { color: var(--faint); font-size: 10px; margin-left: auto; flex: none; }
-  .search-empty { padding: 10px; color: var(--faint); font-family: var(--font-mono); font-size: 11px; }
-
-  .panel-collapse { position: absolute; top: 12px; right: 12px; z-index: 2; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-    font-size: 14px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; transition: color .15s, border-color .15s; }
-  .panel-collapse:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
-  .panel-resizer { position: absolute; top: 0; left: -4px; width: 9px; height: 100%; cursor: ew-resize; z-index: 3; }
-  .panel-resizer::after { content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%); width: 3px; height: 42px; border-radius: 3px; background: var(--line); transition: background .15s; }
-  .panel-resizer:hover::after, .panel.resizing .panel-resizer::after { background: var(--brand); }
-  .panel-content { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 4px; }
-  .panel.collapsed { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
-  .panel.resizing { transition: none; user-select: none; }
-
-  .rel { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-family: var(--font-mono); font-size: 12px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
-  .rel:hover .rel-target { color: var(--brand); }
-  .rel .verb { color: var(--muted); } .rel .arrow { color: var(--faint); } .rel-target { color: var(--ink); }
-  .rel .cross-tag { color: var(--warn); font-size: 9px; margin-left: auto; } .rel .rk { font-size: 9px; }
-
-  .controls { position: absolute; top: 14px; left: 16px; z-index: 4; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .btn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s; }
-  .btn:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  .sync-wrap { position: relative; }
-  .sync-pill { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .3px;
-    color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer;
-    transition: color .15s, border-color .15s; }
-  .sync-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-  .sync-pill.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
-  .sync-pill.on .dot { animation: pulse 1.8s ease-in-out infinite; }
-  .sync-pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
-  .sync-pill.err { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
-  .sync-pill.err .dot { animation: pulse 1.3s ease-in-out infinite; }
-  .sync-pill:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .sync-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 9; min-width: 190px; padding: 6px; display: none;
-    background: color-mix(in srgb, var(--panel) 97%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 10px;
-    box-shadow: 0 12px 36px rgba(0,0,0,.35); }
-  .sync-menu.open { display: block; }
-  .sync-menu-title { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); font-weight: 600; padding: 6px 8px 4px; }
-  .sync-status { font-family: var(--font-mono); font-size: 11px; color: var(--faint); padding: 0 8px 6px; }
-  .sync-warn { display: none; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--crit);
-    background: color-mix(in srgb, var(--crit) 10%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 30%, transparent);
-    border-radius: 7px; padding: 6px 8px; margin: 0 2px 6px; }
-  .sync-warn.show { display: flex; }
-  .sync-menu-divider { height: 1px; background: var(--line); margin: 2px 2px 6px; }
-  .sync-opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font-family: var(--font-mono); font-size: 12px; color: var(--muted);
-    background: none; border: 0; border-radius: 6px; padding: 7px 8px; cursor: pointer; }
-  .sync-opt:hover { background: var(--panel-2); color: var(--ink); }
-  .sync-opt::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; box-sizing: border-box; }
-  .sync-opt.active { color: var(--ink); }
-  .sync-opt.active::before { border-color: var(--ok); background: var(--ok); }
-
-  .overlay { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; text-align: center;
-    background: color-mix(in srgb, var(--ground) 80%, transparent); backdrop-filter: blur(2px); }
-  .overlay .card { max-width: 460px; padding: 22px 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-  .overlay h3 { margin: 0 0 8px; font-family: var(--font-mono); font-size: 15px; color: var(--ink); }
-  .overlay p { margin: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
-  .overlay code { font-family: var(--font-mono); color: var(--brand); }
-  .overlay.err h3 { color: var(--crit); }
-
-  .sync-progress { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
-    display: flex; flex-direction: column; gap: 5px; font-family: var(--font-mono); font-size: 12px; text-align: left; }
-  .sync-progress .sp-row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
-  .sync-progress .sp-row b { color: var(--ink); font-weight: 600; }
-
-  .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 7;
-    display: none; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px;
-    padding: 9px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--crit) 45%, var(--line));
-    background: color-mix(in srgb, var(--crit) 14%, var(--panel)); color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,.35);
-    opacity: 0; transition: opacity .25s, transform .25s; }
-  .toast.show { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast .tdot { width: 8px; height: 8px; border-radius: 50%; background: var(--crit); flex: none; animation: pulse 1.6s ease-in-out infinite; }
-
-  @media (max-width: 780px) { .panel { width: auto; left: 14px; top: auto; height: 46%; } .legend { display: none; } }
-</style>
+<link rel="stylesheet" href="graph-view.css">
 </head>
 <body>
 
@@ -358,8 +60,9 @@
 
   <main>
     <div class="controls">
-      <button class="btn" id="reset">Reset view</button>
-      <button class="btn" id="expandAll">Expand all</button>
+      <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
+      <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
+      <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
       <div class="sync-wrap">
         <button class="sync-pill on" id="syncPill" aria-haspopup="true" aria-expanded="false">
           <span class="dot"></span><span id="syncPillLabel">LIVE</span>
@@ -370,9 +73,9 @@
           <div class="sync-warn" id="syncWarnLine">⚠ Connection lost — showing data from <span id="syncWarnTime">—</span>, retrying…</div>
           <div class="sync-menu-divider"></div>
           <button class="sync-opt" data-val="3000">3 sec</button>
-          <button class="sync-opt" data-val="10000">10 sec</button>
+          <button class="sync-opt active" data-val="10000">10 sec</button>
           <button class="sync-opt" data-val="30000">30 sec</button>
-          <button class="sync-opt active" data-val="60000">1 min</button>
+          <button class="sync-opt" data-val="60000">1 min</button>
           <button class="sync-opt" data-val="300000">5 min</button>
           <button class="sync-opt" data-val="manual">Manual</button>
         </div>
@@ -380,27 +83,11 @@
       <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <svg id="canvas"><defs></defs>
-      <g id="viewport"><g id="regions"></g><g id="secondaryEdges"></g><g id="edges"></g><g id="edgeLabels"></g><g id="nodes"></g></g>
-    </svg>
+    <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
+    <div class="viewbar" id="viewbar"></div>
 
     <div class="legend collapsed" id="legend">
-      <div class="legend-body">
-        <h4>Resource</h4>
-        <div class="row"><span class="sw" style="background:var(--cat-workload)"></span>Workload</div>
-        <div class="row"><span class="sw" style="background:var(--cat-pod)"></span>Pod</div>
-        <div class="row"><span class="sw" style="background:var(--cat-network)"></span>Service / Ingress</div>
-        <div class="row"><span class="sw" style="background:var(--cat-config)"></span>Config / Secret</div>
-        <div class="row"><span class="sw" style="background:var(--cat-storage)"></span>Storage</div>
-        <div class="row"><span class="sw" style="background:var(--cat-node)"></span>Node</div>
-        <div class="row"><span class="sw" style="background:var(--cat-autoscale)"></span>Autoscaler (HPA / VPA / NodePool)</div>
-        <div class="divider"></div>
-        <h4>Reading the map</h4>
-        <div class="row"><span class="ln" style="border-color:var(--cat-workload)"></span>ownership (controlled-by)</div>
-        <div class="row"><span class="ln" style="border-color:var(--cat-node);border-top-style:dashed"></span>other relationship</div>
-        <div class="row"><span class="sw" style="background:transparent;border:1px solid var(--ns-cluster)"></span>namespace region</div>
-        <div class="row"><span class="ln" style="border-color:var(--crit);border-top-style:dashed"></span>not found</div>
-      </div>
+      <div class="legend-body"></div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
         <svg class="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.75" fill="currentColor" stroke="none"/></svg>
         <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -438,665 +125,101 @@
 </div>
 
 <script src="graph-engine.js"></script>
+<script src="graph-view.js"></script>
 <script>
+// Page glue for the live app: where the graph comes from (mantis-engine via
+// mantis-web's /api proxy), the background-sync pill, and sign-out. The graph
+// UI itself is graph-view.js, shared with the playground.
 (function () {
   "use strict";
+  const $ = id => document.getElementById(id);
 
-  const G = window.MantisGraph;
-  const el = G.el, esc = G.esc, css = G.css, catColor = G.catColor, FAMILY = G.FAMILY, REVERSE = G.REVERSE;
-
-  const svg = document.getElementById("canvas"), gViewport = document.getElementById("viewport"),
-    gRegions = document.getElementById("regions"), gSecondaryEdges = document.getElementById("secondaryEdges"),
-    gEdges = document.getElementById("edges"), gEdgeLabels = document.getElementById("edgeLabels"), gNodes = document.getElementById("nodes"),
-    panel = document.getElementById("panel"), panelContent = document.getElementById("panelContent"),
-    overlay = document.getElementById("overlay"), toast = document.getElementById("toast");
-
-  // ---- state — everything renders together on one canvas; there is no
-  // separate "screen" per namespace. collapsedIds persists across a data
-  // refresh (only "Expand all" clears it) so background syncs don't keep
-  // re-expanding something the user just folded. ----
-  let allNodes = [], allEdges = [], byId = {}, namespaceList = [];
-  let collapsedIds = new Set();
-  let currentLayout = { nodes: [], ownershipEdges: [], secondaryEdges: [], regions: [] };
-  let nodeEls = {};
-  let W = svg.clientWidth || 1000, H = svg.clientHeight || 640;
-  let selected = null, curTab = "summary", yamlToken = 0;
-  let autoTimer = null, everLoaded = false;
-  let lastGraphData = null;
-  let lastSyncProgress = null;
-  let onSyncProgress = null;
-
-  // ---- overlay (blocking, first connect only) + toast (non-blocking failures) ----
-  function showOverlay(title, bodyHTML, isErr){
-    overlay.style.display = "flex";
-    overlay.className = "overlay" + (isErr ? " err" : "");
-    overlay.innerHTML = '<div class="card"><h3>'+title+'</h3>'+bodyHTML+'</div>';
-  }
-  const hideOverlay = () => { overlay.style.display = "none"; };
-  function showToast(msg){ document.getElementById("toastMsg").textContent = msg; toast.classList.add("show"); }
-  const hideToast = () => toast.classList.remove("show");
-
-  let connState = "live"; // "live" | "syncing" | "error"
-  let lastSyncedAt = null;
-  function timeAgo(date){
-    if (!date) return "never";
-    const s = Math.max(0, Math.round((Date.now()-date.getTime())/1000));
-    if (s < 5) return "just now";
-    if (s < 60) return s+"s ago";
-    const m = Math.round(s/60);
-    if (m < 60) return m+"m ago";
-    return Math.round(m/60)+"h ago";
-  }
-  function setConn(state){
-    connState = state;
-    if (state === "live") lastSyncedAt = new Date();
-    updateSyncPill();
-  }
-
-  // ---- data fetching ----
-  function fetchGraph(){
-    return fetch("/api/graph", { cache: "no-store" })
-      .then(r => {
-        if (r.status === 401) { window.location.href = "/login"; throw new Error("session expired"); }
-        return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP "+r.status)); });
-      });
-  }
-  function fetchSyncStatus(){
-    return fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject());
-  }
-  function overlayProgressHTML(p){
-    if (!p || !p.namespacesTotal) return "";
-    return '<div class="sync-progress">'+
-      '<div class="sp-row"><span>Namespaces</span><b>'+p.namespacesDone+' / '+p.namespacesTotal+'</b></div>'+
-      '<div class="sp-row"><span>Resources found so far</span><b>'+(p.resourcesSoFar||0)+'</b></div>'+
-      '<div class="sp-row"><span>Relationships so far</span><b>'+(p.relationshipsSoFar||0)+'</b></div>'+
-      '</div>';
-  }
-  function firstLoad(){
-    showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>", false);
-    onSyncProgress = p => showOverlay("Connecting to your cluster…",
-      "<p>Reading resources and relationships.</p>" + overlayProgressHTML(p), false);
-    fetchGraph()
-      .then(data => { onSyncProgress = null; hideOverlay(); everLoaded = true; applyData(data, true); setConn("live"); })
-      .catch(err => { onSyncProgress = null; showOverlay("Cannot read the cluster",
-        '<p>'+esc(String(err.message||err))+'</p><p>Is your cluster running and your kubeconfig pointing at it?</p>', true); });
-  }
-  function sync(){
-    if (!everLoaded) { firstLoad(); return; }
-    const slow = setTimeout(() => setConn("syncing"), 1500);
-    fetchGraph()
-      .then(data => { clearTimeout(slow); hideOverlay(); hideToast(); applyData(data, false); setConn("live"); })
-      .catch(err => { clearTimeout(slow); setConn("error"); showToast("Lost contact with the engine — showing last snapshot, retrying…"); });
-  }
-
-  // applyData reconciles global state with a fresh /api/graph payload, then
-  // recomputes the whole-cluster layout and redraws — camera pan/zoom,
-  // selection, and collapsed subtrees all persist across a refresh (the
-  // layout is deterministic, so unless the resource set actually changed,
-  // nothing visibly jumps).
-  function applyData(data, first){
-    lastGraphData = data;
-    W = svg.clientWidth||W; H = svg.clientHeight||H;
-    const meta = data.meta || {};
-    namespaceList = meta.namespaceList || [];
-    allNodes = (data.nodes || []).map(n => ({ ...n, cat: G.CAT[n.kind] || "node" }));
-    allEdges = (data.edges || []).slice();
-    byId = {}; allNodes.forEach(n => byId[n.id] = n);
-
-    document.getElementById("clusterName").textContent = meta.context || "unknown";
-    document.getElementById("nCount").textContent = allNodes.length;
-    document.getElementById("eCount").textContent = allEdges.length;
-    document.getElementById("nsCount").textContent = meta.namespaces != null ? meta.namespaces : namespaceList.length;
-    document.getElementById("autoscalerChip").innerHTML = meta.nodeAutoscaler
-      ? '<span class="autoscale-badge">autoscaler <b>'+esc(meta.nodeAutoscaler)+'</b></span>'
-      : '';
-
-    renderCluster();
-  }
-
-  // ---- whole-cluster render ----
-  function renderCluster(){
-    const layout = G.computeClusterLayout(allNodes, allEdges, namespaceList, collapsedIds);
-    currentLayout = layout;
-
-    gRegions.innerHTML = ""; gSecondaryEdges.innerHTML = ""; gEdges.innerHTML = ""; gEdgeLabels.innerHTML = ""; gNodes.innerHTML = "";
-    nodeEls = {};
-
-    buildRegionEls(layout.regions);
-    buildSecondaryEdgeEls(layout.secondaryEdges);
-    buildOwnershipEdgeEls(layout.ownershipEdges);
-    buildNodeEls(layout.nodes);
-
-    if (selected && byId[selected] && layout.nodes.some(n => n.id === selected)) select(selected, { silent: true });
-    else { selected = null; renderEmpty(); }
-  }
-
-  function buildRegionEls(regions){
-    const palette = G.nsPalette();
-    let i = 0;
-    regions.forEach(r => {
-      const color = r.cluster ? css("--ns-cluster") : palette[i++ % palette.length];
-      const box = el("rect",{ class:"region-box" + (r.empty ? " empty" : ""), x:r.x0, y:r.y0, width:r.x1-r.x0, height:r.y1-r.y0, rx:16, fill: color, stroke: color, "stroke-dasharray": (r.cluster && !r.empty)?"6 5":"none" });
-      const lbl = el("text",{ class:"region-label", x:r.x0+12, y:r.y0-8, fill: color });
-      lbl.textContent = r.cluster ? r.label : ("namespace · " + r.label + (r.empty ? "  ·  empty" : ""));
-      gRegions.appendChild(box); gRegions.appendChild(lbl);
+  function fetchJSON(url) {
+    return fetch(url, { cache: "no-store" }).then(r => {
+      if (r.status === 401) { window.location.href = "/login"; throw new Error("session expired"); }
+      return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP " + r.status)); });
     });
   }
-  function buildOwnershipEdgeEls(edges){
-    edges.forEach(e => {
-      const parent = currentById(e.to), child = currentById(e.from);
-      if (!parent || !child) return;
-      const x1=parent.x, y1=parent.y+parent.h/2, x2=child.x, y2=child.y-child.h/2, midY=(y1+y2)/2;
-      const path = el("path", { class:"edge", d:`M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
-        stroke: catColor("workload"), "stroke-opacity":.5, "stroke-width":1.8 });
-      e._path = path; e._baseOpacity = .5; e._baseWidth = 1.8; e._label = null;
-      gEdges.appendChild(path);
-    });
-  }
-  function buildSecondaryEdgeEls(edges){
-    edges.forEach(e => {
-      const a = currentById(e.from), b = currentById(e.to);
-      if (!a || !b) return;
-      const fam = FAMILY[e.type] || "node", toGhost = b.resolved === false;
-      const dashed = toGhost || e.type==="references" || e.type==="claims" || e.type==="bound-to";
-      const midY = (a.y+b.y)/2;
-      const path = el("path", { class:"secondary-edge"+(dashed?" dashed":""), d:`M${a.x},${a.y} C${a.x},${midY} ${b.x},${midY} ${b.x},${b.y}`,
-        stroke: toGhost?css("--crit"):catColor(fam) });
-      const lbl = el("text",{ class:"edge-label", "text-anchor":"middle", x:(a.x+b.x)/2, y:(a.y+b.y)/2-3 }); lbl.textContent = e.type;
-      e._path = path; e._baseOpacity = .22; e._baseWidth = 1.2; e._label = lbl;
-      gSecondaryEdges.appendChild(path); gEdgeLabels.appendChild(lbl);
-    });
-  }
-  function currentById(id){ return currentLayout.nodes.find(n => n.id === id); } // small N per redraw; a map isn't worth the bookkeeping here
-  // childrenOfMap is rebuilt per render purely to know which nodes get a
-  // collapse toggle drawn — computeClusterLayout already knows this per
-  // region internally but doesn't thread it back out; deriving it from the
-  // (already computed) ownership edges is cheap and keeps the return shape simple.
-  function childrenCounts(ownershipEdges){
-    const counts = {};
-    ownershipEdges.forEach(e => { counts[e.to] = (counts[e.to]||0) + 1; });
-    return counts;
-  }
-  function buildNodeEls(list){
-    const kidCounts = childrenCounts(currentLayout.ownershipEdges.concat(
-      // Collapsed nodes' own hiddenCount already reflects their subtree, but
-      // their *children* aren't in `list` (they were pruned) or in
-      // ownershipEdges (only edges between two visible nodes are returned)
-      // — so a collapsed node still needs its toggle drawn from `collapsed`
-      // alone, not from kidCounts. See the `n.collapsed ||` check below.
-      []));
-    list.forEach(n => {
-      const cls = "node" + (n.status?" status-"+n.status:"") + (n.resolved===false?" ghost":"") + (n.collapsed?" collapsed":"");
-      const g = el("g",{ class: cls, "data-id": n.id, transform:`translate(${n.x},${n.y})` });
-      g.appendChild(el("rect",{ class:"accent", x:-n.w/2, y:-n.h/2, width:4, height:n.h, rx:2, fill: catColor(n.cat) }));
-      g.appendChild(el("rect",{ class:"chip-bg", x:-n.w/2, y:-n.h/2, width:n.w, height:n.h, rx:9 }));
-      if (n.status) g.appendChild(el("circle",{ class:"status-ring", cx:n.w/2-11, cy:-n.h/2+11, r:4.5 }));
-      const kind = el("text",{ class:"kind", x:-n.w/2+12, y:n.resolved===false?-6:-3, fill: catColor(n.cat) }); kind.textContent = n.kind.toUpperCase();
-      const name = el("text",{ class:"name", x:-n.w/2+12, y:n.resolved===false?9:12 }); name.textContent = G.short(n.name);
-      g.appendChild(kind); g.appendChild(name);
-      if (n.resolved===false) { const sub = el("text",{ class:"sub", x:-n.w/2+12, y:20 }); sub.textContent = "NOT FOUND"; g.appendChild(sub); }
-      const title = el("title"); title.textContent = n.kind+"/"+n.name + (n.ns?"  (ns: "+n.ns+")":"  (cluster-scoped)"); g.appendChild(title);
-
-      if (n.collapsed || kidCounts[n.id]){
-        const cx = n.w/2-11, cy = n.h/2-11;
-        const toggle = el("g",{ class:"collapse-toggle", "data-toggle-id": n.id });
-        toggle.appendChild(el("circle",{ cx, cy, r:8 }));
-        const lbl = el("text",{ x:cx, y:cy+1 }); lbl.textContent = n.collapsed ? ("+"+n.hiddenCount) : "–";
-        toggle.appendChild(lbl);
-        g.appendChild(toggle);
-      }
-      gNodes.appendChild(g); nodeEls[n.id] = g;
-    });
-  }
-  function toggleCollapse(id){
-    if (collapsedIds.has(id)) collapsedIds.delete(id); else collapsedIds.add(id);
-    renderCluster();
-  }
-  document.getElementById("expandAll").addEventListener("click", () => { collapsedIds = new Set(); renderCluster(); });
-
-  // ---- pan/zoom (drag-to-move-a-node is gone — positions are computed, not
-  // physics; only the canvas itself pans) ----
-  const view = { x:0, y:0, k:1 };
-  const applyView = () => gViewport.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`); applyView();
-  svg.addEventListener("wheel", ev => { ev.preventDefault(); const r=svg.getBoundingClientRect(); const mx=ev.clientX-r.left,my=ev.clientY-r.top,f=Math.exp(-ev.deltaY*0.0016);
-    const nk=Math.min(2.6,Math.max(0.3,view.k*f)); view.x=mx-(mx-view.x)*(nk/view.k); view.y=my-(my-view.y)*(nk/view.k); view.k=nk; applyView(); }, {passive:false});
-  let drag=null;
-  svg.addEventListener("pointerdown", ev => {
-    const r=svg.getBoundingClientRect();
-    drag={sx:ev.clientX-r.left-view.x,sy:ev.clientY-r.top-view.y,moved:false,target:ev.target};
-    svg.classList.add("panning"); svg.setPointerCapture(ev.pointerId);
-  });
-  svg.addEventListener("pointermove", ev => { if(!drag) return; drag.moved=true;
-    const r=svg.getBoundingClientRect(); view.x=ev.clientX-r.left-drag.sx; view.y=ev.clientY-r.top-drag.sy; applyView(); });
-  svg.addEventListener("pointerup", () => { svg.classList.remove("panning");
-    if(drag && !drag.moved && !drag.target.closest(".node")) select(null); drag=null; });
-  gNodes.addEventListener("click", ev => {
-    const toggle = ev.target.closest(".collapse-toggle");
-    if (toggle){ toggleCollapse(toggle.getAttribute("data-toggle-id")); return; }
-    const g=ev.target.closest(".node"); if(g) select(g.getAttribute("data-id"));
+  const app = MantisApp.mount({
+    source: {
+      // since > 0 asks the engine for only what changed since that revision.
+      load: since => fetchJSON("/api/graph" + (since ? "?since=" + since : "")),
+      resource: n => {
+        const p = new URLSearchParams({ kind: n.kind, name: n.name });
+        if (n.ns) p.set("ns", n.ns);
+        return fetch("/api/resource?" + p.toString()).then(async r => ({ ok: r.ok, status: r.status, text: await r.text() }));
+      },
+    },
+    errorHint: "Is your cluster running and your kubeconfig pointing at it?",
   });
 
-  // ---- selection, focus/trace + drawer ----
-  const TABS = { summary:"Summary", relationships:"Relationships", yaml:"YAML" };
-  function traceFrom(id, maxDepth){
-    maxDepth = maxDepth == null ? 2 : maxDepth;
-    const viewEdges = currentLayout.ownershipEdges.concat(currentLayout.secondaryEdges);
-    const depth = new Map([[id, 0]]);
-    let frontier = [id];
-    for (let d = 0; d < maxDepth && frontier.length; d++){
-      const next = [];
-      frontier.forEach(cur => {
-        viewEdges.forEach(e => {
-          const other = e.from === cur ? e.to : (e.to === cur ? e.from : null);
-          if (other && !depth.has(other)) { depth.set(other, d + 1); next.push(other); }
-        });
-      });
-      frontier = next;
-    }
-    return depth;
+  // ---- sync: polling the engine's cached graph, plus its own progress ----
+  let connState = "live", lastSyncedAt = null, lastProgress = null, autoTimer = null, syncMode = "60000", firstDone = false;
+  const SYNC_LABELS = { "3000": "3s", "10000": "10s", "30000": "30s", "60000": "1m", "300000": "5m" };
+  const pill = $("syncPill"), pillLabel = $("syncPillLabel"), menu = $("syncMenu");
+  function timeAgo(d) {
+    if (!d) return "never";
+    const s = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+    if (s < 5) return "just now"; if (s < 60) return s + "s ago";
+    const m = Math.round(s / 60); return m < 60 ? m + "m ago" : Math.round(m / 60) + "h ago";
   }
-  function select(id, opts){
-    opts = opts || {};
-    const isNewSelection = id !== selected;
-    if (isNewSelection) curTab = "summary";
-    selected = id;
-    const viewEdges = currentLayout.ownershipEdges.concat(currentLayout.secondaryEdges);
-    if (!id){
-      Object.values(nodeEls).forEach(g => g.classList.remove("selected","dim"));
-      viewEdges.forEach(e => { e._path.setAttribute("stroke-opacity", e._baseOpacity); e._path.setAttribute("stroke-width", e._baseWidth); if (e._label) e._label.style.opacity=0; });
-      showPanel(false);
-      return;
-    }
-    showPanel(true);
-    const trace = traceFrom(id);
-    Object.keys(nodeEls).forEach(nid => { const g=nodeEls[nid]; g.classList.toggle("selected", nid===id); g.classList.toggle("dim", !trace.has(nid)); });
-    viewEdges.forEach(e => {
-      const da = trace.get(e.from), db = trace.get(e.to);
-      const inTrace = da !== undefined && db !== undefined;
-      const direct = inTrace && (da === 0 || db === 0);
-      e._path.setAttribute("stroke-opacity", direct ? 1 : (inTrace ? .55 : e._baseOpacity*0.4));
-      e._path.setAttribute("stroke-width", direct ? e._baseWidth+0.8 : e._baseWidth);
-      if (e._label) e._label.style.opacity = direct ? 1 : 0;
-    });
-    if (isNewSelection || !opts.silent) renderNode(byId[id]);
-  }
-  function renderEmpty(){
-    const cluster = document.getElementById("clusterName").textContent;
-    panelContent.innerHTML = '<div><div class="p-kind" style="color:var(--brand)">Cluster graph</div><div class="p-name">'+esc(cluster)+'</div></div>'+
-      '<p class="hint">Every resource Mantis understands, and how it connects — <b>namespaces are regions, not walls</b>. Solid lines are ownership (controlled-by); faint curved lines are other relationships.<br><br>'+
-      '<b>Search</b> or <b>click</b> a resource for its details and relationships. <b>Drag</b> to pan, <b>scroll</b> to zoom, click <b>–</b> on a box to collapse its subtree.</p>';
-  }
-  const badge = (n) => n.status==="ok"?'<span class="badge ok">healthy</span>':n.status==="crit"?'<span class="badge crit">needs attention</span>':n.status==="warn"?'<span class="badge warn">status unknown</span>':(n.resolved===false?'<span class="badge crit">not found</span>':"");
-  function renderNode(n){
-    const head = '<div><div class="p-kind" style="color:'+catColor(n.cat)+'">'+esc(n.kind)+'</div><div class="p-name">'+esc(n.name)+'</div>'+
-      '<div class="p-ns">'+(n.ns?"namespace · "+esc(n.ns):"cluster-scoped")+'</div></div>'+ badge(n);
-    const tabs = '<div class="tabs">'+Object.keys(TABS).map(t=>'<div class="tab'+(t===curTab?' active':'')+'" data-tab="'+t+'">'+TABS[t]+'</div>').join('')+'</div>';
-    panelContent.innerHTML = head + tabs + '<div id="tabbody"></div>';
-    panelContent.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { curTab=t.getAttribute("data-tab"); renderBody(n); }));
-    renderBody(n);
-  }
-  function renderBody(n){
-    panelContent.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-tab")===curTab));
-    const body = document.getElementById("tabbody");
-    if (curTab==="yaml"){ renderYaml(n, body); return; }
-    body.innerHTML = curTab==="summary" ? overviewHTML(n) : relHTML(n);
-    if (curTab==="relationships") body.querySelectorAll(".rel").forEach(r => r.addEventListener("click", () => jumpTo(r.getAttribute("data-goto"))));
-  }
-  // jumpTo is what the Relationships tab and search use to focus a resource
-  // — everything is already on the one screen, so this is just select + fly.
-  function jumpTo(id){
-    if (!byId[id]) return;
-    select(id);
-    centerOn(currentById(id));
-  }
-  function renderYaml(n, body){
-    if (n.resolved===false){ body.innerHTML = '<p class="hint">This resource was referenced but not found in the cluster, so there is no manifest to show.</p>'; return; }
-    body.innerHTML = '<p class="hint">Loading manifest…</p>';
-    const params = new URLSearchParams({ kind:n.kind, name:n.name });
-    if (n.ns) params.set("ns", n.ns);
-    const token = ++yamlToken;
-    fetch("/api/resource?"+params.toString())
-      .then(async r => ({ ok:r.ok, status:r.status, text:await r.text() }))
-      .then(res => {
-        if (token !== yamlToken) return;
-        if (res.ok) {
-          body.innerHTML = '<div class="yaml-wrap"><div class="yaml-tools">'+
-            '<button class="copy-btn" id="expandYaml" title="Open a large reader">⤢ Expand</button>'+
-            '<button class="copy-btn" id="copyYaml">Copy</button></div><pre class="yaml">'+esc(res.text)+'</pre></div>';
-          wireCopy(document.getElementById("copyYaml"), res.text);
-          const ex = document.getElementById("expandYaml");
-          if (ex) ex.addEventListener("click", () => openYamlModal(res.text, n));
-        }
-        else if (res.status === 403) body.innerHTML = '<div class="notice">'+esc(res.text)+'</div>';
-        else body.innerHTML = '<div class="notice">Could not load manifest — '+esc(res.text||("HTTP "+res.status))+'</div>';
-      })
-      .catch(e => { if (token === yamlToken) body.innerHTML = '<div class="notice">Could not load manifest — '+esc(String(e))+'</div>'; });
-  }
-  async function doCopy(btn, text){
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(text);
-      else { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
-      btn.textContent = "Copied ✓"; btn.classList.add("done");
-      setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
-    } catch { btn.textContent = "Copy failed"; setTimeout(() => btn.textContent = "Copy", 1600); }
-  }
-  function wireCopy(btn, text){ if (btn) btn.addEventListener("click", () => doCopy(btn, text)); }
-
-  // ---- expanded YAML reader ----
-  const ymodalOverlay = document.getElementById("ymodalOverlay"), ymodalPre = document.getElementById("ymodalPre"),
-        ymodalTitle = document.getElementById("ymodalTitle"), ymodalCopy = document.getElementById("ymodalCopy"),
-        ymodalClose = document.getElementById("ymodalClose"), ymodalSearch = document.getElementById("ymodalSearch"),
-        ymodalMatchCount = document.getElementById("ymodalMatchCount"), ymodalPrevBtn = document.getElementById("ymodalPrev"),
-        ymodalNextBtn = document.getElementById("ymodalNext");
-  let ymodalRawText = "", ymodalMatches = [], ymodalMatchIdx = -1;
-
-  function renderYamlSearch(){
-    const q = ymodalSearch.value;
-    if (!q){ ymodalPre.innerHTML = esc(ymodalRawText); ymodalMatchCount.textContent = ""; ymodalMatches = []; ymodalMatchIdx = -1; return; }
-    const rawLower = ymodalRawText.toLowerCase(), qLower = q.toLowerCase();
-    const offsets = [];
-    for (let i = rawLower.indexOf(qLower); i !== -1; i = rawLower.indexOf(qLower, i + q.length)) offsets.push(i);
-    ymodalMatches = offsets;
-    if (!offsets.length){ ymodalPre.innerHTML = esc(ymodalRawText); ymodalMatchCount.textContent = "0/0"; ymodalMatchIdx = -1; return; }
-    if (ymodalMatchIdx < 0 || ymodalMatchIdx >= offsets.length) ymodalMatchIdx = 0;
-    let html = "", last = 0;
-    offsets.forEach((off, i) => {
-      html += esc(ymodalRawText.slice(last, off));
-      html += '<mark'+(i===ymodalMatchIdx?' class="cur"':'')+'>'+esc(ymodalRawText.slice(off, off+q.length))+'</mark>';
-      last = off + q.length;
-    });
-    html += esc(ymodalRawText.slice(last));
-    ymodalPre.innerHTML = html;
-    ymodalMatchCount.textContent = (ymodalMatchIdx+1)+"/"+offsets.length;
-    const cur = ymodalPre.querySelector("mark.cur");
-    if (cur) cur.scrollIntoView({ block: "center" });
-  }
-  function ymodalStep(dir){
-    if (!ymodalMatches.length) return;
-    ymodalMatchIdx = (ymodalMatchIdx + dir + ymodalMatches.length) % ymodalMatches.length;
-    renderYamlSearch();
-  }
-  ymodalSearch.addEventListener("input", () => { ymodalMatchIdx = 0; renderYamlSearch(); });
-  ymodalSearch.addEventListener("keydown", ev => {
-    if (ev.key === "Enter"){ ev.preventDefault(); ymodalStep(ev.shiftKey ? -1 : 1); }
-    else if (ev.key === "Escape"){
-      if (ymodalSearch.value){ ev.stopPropagation(); ymodalSearch.value = ""; renderYamlSearch(); }
-      else ymodalSearch.blur();
-    }
-  });
-  ymodalPrevBtn.addEventListener("click", () => ymodalStep(-1));
-  ymodalNextBtn.addEventListener("click", () => ymodalStep(1));
-
-  function openYamlModal(text, n){
-    ymodalRawText = text;
-    ymodalSearch.value = ""; ymodalMatches = []; ymodalMatchIdx = -1;
-    ymodalPre.innerHTML = esc(text);
-    ymodalMatchCount.textContent = "";
-    ymodalTitle.innerHTML = '<b>'+esc(n.kind)+' · </b>'+esc(n.name)+(n.ns?' <b>· '+esc(n.ns)+'</b>':'');
-    ymodalCopy.textContent = "Copy"; ymodalCopy.classList.remove("done");
-    ymodalCopy.onclick = () => doCopy(ymodalCopy, text);
-    ymodalOverlay.classList.add("open");
-  }
-  function closeYamlModal(){ ymodalOverlay.classList.remove("open"); ymodalPre.textContent = ""; ymodalRawText = ""; }
-  ymodalClose.addEventListener("click", closeYamlModal);
-  ymodalOverlay.addEventListener("click", ev => { if (ev.target === ymodalOverlay) closeYamlModal(); });
-
-  document.addEventListener("keydown", ev => {
-    if (ev.ctrlKey && ev.key.toLowerCase() === "f"){
-      ev.preventDefault();
-      const target = ymodalOverlay.classList.contains("open") ? ymodalSearch : searchInput;
-      target.focus(); target.select();
-      return;
-    }
-    if (ev.key !== "Escape") return;
-    if (ymodalOverlay.classList.contains("open")) { closeYamlModal(); return; }
-    if (searchResults.classList.contains("open")) { closeSearch(); searchInput.blur(); return; }
-    if (selected) select(null);
-  });
-  function splitAttr(a){
-    const i = a.indexOf(": ");
-    if (i < 0) return { k:null, v:a };
-    return { k:a.slice(0,i), v:a.slice(i+2) };
-  }
-  function overviewHTML(n){
-    if (n.resolved===false){
-      return '<div class="dstat">not found in cluster</div>'+
-        '<p class="hint">This resource is referenced by another object, but Mantis could not find it in the cluster. It is flagged rather than hidden.</p>';
-    }
-    if (!n.attributes || !n.attributes.length){
-      return '<p class="hint">No extra detail read for this resource yet.</p>';
-    }
-    const parts = n.attributes.map(splitAttr);
-    let h = "";
-    const stats = parts.filter(p => p.k===null);
-    const rows = parts.filter(p => p.k!==null);
-    if (stats.length) h += stats.map(p => '<div class="dstat">'+esc(p.v)+'</div>').join("");
-    if (rows.length) h += '<div class="sec-h">Details</div><div class="detail">'+
-      rows.map(p => '<div class="drow"><span class="dk">'+esc(p.k)+'</span><span class="dv">'+esc(p.v)+'</span></div>').join("")+'</div>';
-    return h;
-  }
-  function relHTML(n){
-    const out=[], inc=[];
-    allEdges.forEach(e => { if(e.from===n.id){ const o=byId[e.to]; if(o) out.push({verb:e.type,arrow:"→",other:o,cross:o.ns&&n.ns&&o.ns!==n.ns}); }
-                         if(e.to===n.id){ const o=byId[e.from]; if(o) inc.push({verb:REVERSE[e.type]||e.type,arrow:"←",other:o,cross:o.ns&&n.ns&&o.ns!==n.ns}); } });
-    const row = r => '<div class="rel" data-goto="'+esc(r.other.id)+'"><span class="verb">'+esc(r.verb)+'</span><span class="arrow">'+r.arrow+'</span>'+
-      '<span class="rel-target"><span class="rk" style="color:'+catColor(r.other.cat)+'">'+esc(r.other.kind)+'/</span>'+esc(G.short(r.other.name))+'</span>'+(r.cross?'<span class="cross-tag">cross-ns</span>':'')+'</div>';
-    let h = "";
-    if (out.length) h += '<div class="sec-h">Depends on</div>'+out.map(row).join("");
-    if (inc.length) h += '<div class="sec-h">Used by</div>'+inc.map(row).join("");
-    return h || '<p class="hint">No relationships discovered.</p>';
-  }
-
-  // ---- controls ----
-  document.getElementById("reset").addEventListener("click", () => { view.x=0; view.y=0; view.k=1; applyView(); });
-  document.getElementById("signOut").addEventListener("click", () => {
-    fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; });
-  });
-
-  // ---- theme toggle ----
-  const THEME_KEY = "mantis-theme";
-  const themeToggle = document.getElementById("themeToggle");
-  function applyTheme(theme){
-    if (theme === "light") document.documentElement.setAttribute("data-theme", "light");
-    else document.documentElement.removeAttribute("data-theme");
-    const isLight = theme === "light";
-    themeToggle.setAttribute("aria-pressed", String(isLight));
-    const label = isLight ? "Switch to dark theme" : "Switch to light theme";
-    themeToggle.title = label;
-    themeToggle.setAttribute("aria-label", label);
-  }
-  // recolorForTheme re-renders from data already in hand — node/edge/region
-  // colors are resolved to literal values when drawn, so a theme switch
-  // needs a full rebuild, not a re-fetch.
-  function recolorForTheme(){ renderCluster(); }
-  applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
-  themeToggle.addEventListener("click", () => {
-    const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
-    try { sessionStorage.setItem(THEME_KEY, next); } catch (e) { /* private mode, etc. — theme just won't persist */ }
-    applyTheme(next);
-    recolorForTheme();
-  });
-
-  // ---- legend collapse ----
-  const legend = document.getElementById("legend"), legendToggle = document.getElementById("legendToggle");
-  legendToggle.addEventListener("click", () => {
-    const collapsed = legend.classList.toggle("collapsed");
-    const label = collapsed ? "Legend" : "Close legend";
-    legendToggle.title = label; legendToggle.setAttribute("aria-label", label);
-  });
-
-  // ---- fly-to-node ----
-  let viewAnimId = null;
-  function animateView(tx, ty, tk, duration){
-    if (viewAnimId) cancelAnimationFrame(viewAnimId);
-    const sx=view.x, sy=view.y, sk=view.k, start=performance.now();
-    duration = duration || 480;
-    function step(now){
-      const t = Math.min(1, (now-start)/duration);
-      const eased = 1 - Math.pow(1-t, 3);
-      view.x = sx + (tx-sx)*eased; view.y = sy + (ty-sy)*eased; view.k = sk + (tk-sk)*eased;
-      applyView();
-      viewAnimId = t < 1 ? requestAnimationFrame(step) : null;
-    }
-    viewAnimId = requestAnimationFrame(step);
-  }
-  function centerOn(n){
-    if (!n) return;
-    const tk = view.k < 0.85 ? 1 : view.k;
-    const pw = panel.classList.contains("collapsed") ? 0 : (panel.offsetWidth + 28);
-    animateView((W - pw)/2 - n.x*tk, H/2 - n.y*tk, tk);
-  }
-
-  // ---- live search ----
-  const searchInput = document.getElementById("search"), searchResults = document.getElementById("searchResults");
-  const SEARCH_RESULT_CAP = 200;
-  let searchMatches = [], searchActive = -1, searchMatchTotal = 0;
-  function matchNodes(q){
-    q = q.trim().toLowerCase();
-    if (!q) return { matches: [], total: 0 };
-    const scored = [];
-    for (const n of allNodes){
-      const name = n.name.toLowerCase(), kind = n.kind.toLowerCase(), ns = (n.ns||"").toLowerCase();
-      let score = -1;
-      if (name.startsWith(q)) score = 0;
-      else if (kind === q) score = 1;
-      else if (name.includes(q)) score = 2;
-      else if (kind.includes(q)) score = 3;
-      else if (ns.includes(q)) score = 4;
-      if (score >= 0) scored.push({ n, score });
-    }
-    scored.sort((a,b) => a.score-b.score || a.n.name.localeCompare(b.n.name));
-    return { matches: scored.slice(0,SEARCH_RESULT_CAP).map(s => s.n), total: scored.length };
-  }
-  function renderSearch(){
-    if (!searchMatches.length){
-      searchResults.innerHTML = searchInput.value.trim()
-        ? '<div class="search-empty">No matching resource.</div>' : "";
-      searchResults.classList.toggle("open", !!searchInput.value.trim());
-      return;
-    }
-    searchResults.innerHTML = searchMatches.map((n,i) =>
-      '<div class="sresult'+(i===searchActive?' active':'')+'" data-id="'+esc(n.id)+'">'+
-        '<span class="sw" style="background:'+catColor(n.cat)+'"></span>'+
-        '<span class="sr-name">'+esc(n.name)+'</span>'+
-        '<span class="sr-kind">'+esc(n.kind)+'</span>'+
-        '<span class="sr-ns">'+(n.ns?esc(n.ns):"cluster")+'</span>'+
-      '</div>').join("") +
-      (searchMatchTotal > searchMatches.length
-        ? '<div class="search-empty">+'+(searchMatchTotal-searchMatches.length)+' more — refine your search</div>'
-        : "");
-    searchResults.classList.add("open");
-    searchResults.querySelectorAll(".sresult").forEach(el =>
-      el.addEventListener("click", () => pickSearch(el.getAttribute("data-id"))));
-  }
-  function pickSearch(id){
-    jumpTo(id);
-    closeSearch();
-  }
-  function closeSearch(){ searchResults.classList.remove("open"); searchActive = -1; }
-  searchInput.addEventListener("input", () => {
-    const r = matchNodes(searchInput.value);
-    searchMatches = r.matches; searchMatchTotal = r.total;
-    searchActive = searchMatches.length ? 0 : -1;
-    renderSearch();
-  });
-  searchInput.addEventListener("keydown", ev => {
-    if (ev.key === "ArrowDown"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive+1)%searchMatches.length; renderSearch(); } }
-    else if (ev.key === "ArrowUp"){ ev.preventDefault(); if(searchMatches.length){ searchActive=(searchActive-1+searchMatches.length)%searchMatches.length; renderSearch(); } }
-    else if (ev.key === "Enter"){ if(searchActive>=0 && searchMatches[searchActive]) pickSearch(searchMatches[searchActive].id); }
-    else if (ev.key === "Escape"){ ev.stopPropagation(); searchInput.value=""; searchMatches=[]; searchMatchTotal=0; closeSearch(); searchInput.blur(); }
-  });
-  document.addEventListener("click", ev => { if(!ev.target.closest(".search-wrap")) closeSearch(); });
-
-  // ---- drawer open/close + resize ----
-  const panelCollapse = document.getElementById("panelCollapse"), panelResizer = document.getElementById("panelResizer");
-  function showPanel(show){ panel.classList.toggle("collapsed", !show); }
-  panelCollapse.addEventListener("click", () => select(null));
-
-  let resizing = null;
-  panelResizer.addEventListener("pointerdown", ev => {
-    resizing = { startX: ev.clientX, startW: panel.offsetWidth };
-    panel.classList.add("resizing"); panelResizer.setPointerCapture(ev.pointerId); ev.preventDefault();
-  });
-  panelResizer.addEventListener("pointermove", ev => {
-    if (!resizing) return;
-    const w = resizing.startW + (resizing.startX - ev.clientX);
-    panel.style.width = Math.max(300, Math.min(window.innerWidth - 80, w)) + "px";
-  });
-  const endResize = () => { if(resizing){ resizing=null; panel.classList.remove("resizing"); } };
-  panelResizer.addEventListener("pointerup", endResize);
-  panelResizer.addEventListener("pointercancel", endResize);
-
-  const SYNC_LABELS = { "3000":"3s", "10000":"10s", "30000":"30s", "60000":"1m", "300000":"5m" };
-  const syncPill = document.getElementById("syncPill"), syncPillLabel = document.getElementById("syncPillLabel"),
-        syncMenu = document.getElementById("syncMenu"), syncStatusLine = document.getElementById("syncStatusLine"),
-        syncWarnLine = document.getElementById("syncWarnLine"), syncWarnTime = document.getElementById("syncWarnTime");
-  let syncMode = "60000";
-
-  function formatSyncProgress(p){
-    return "Namespaces "+p.namespacesDone+"/"+p.namespacesTotal+" · "+
-      (p.resourcesSoFar||0)+" resources · "+(p.relationshipsSoFar||0)+" relationships";
-  }
-  function updateSyncPill(){
-    syncPill.classList.remove("on","warn","err");
-    const backgroundSyncing = !!(lastSyncProgress && lastSyncProgress.running);
-    if (connState === "error"){
-      syncPill.classList.add("err"); syncPillLabel.textContent = "OFFLINE";
-    } else if (syncMode === "manual"){
-      syncPillLabel.textContent = "MANUAL";
-    } else if (connState === "syncing" || backgroundSyncing){
-      syncPill.classList.add("warn"); syncPillLabel.textContent = "SYNCING";
-    } else {
-      syncPill.classList.add("on"); syncPillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE";
-    }
-    syncStatusLine.textContent = backgroundSyncing
-      ? formatSyncProgress(lastSyncProgress)
+  function setConn(state) { connState = state; if (state === "live") lastSyncedAt = new Date(); updatePill(); }
+  function updatePill() {
+    pill.classList.remove("on", "warn", "err");
+    const bg = !!(lastProgress && lastProgress.running);
+    if (connState === "error") { pill.classList.add("err"); pillLabel.textContent = "OFFLINE"; }
+    else if (syncMode === "manual") pillLabel.textContent = "MANUAL";
+    else if (connState === "syncing" || bg) { pill.classList.add("warn"); pillLabel.textContent = "SYNCING"; }
+    else { pill.classList.add("on"); pillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE"; }
+    $("syncStatusLine").textContent = bg
+      ? "Namespaces " + lastProgress.namespacesDone + "/" + lastProgress.namespacesTotal + " · " + (lastProgress.resourcesSoFar || 0) + " resources"
       : "Last synced " + timeAgo(lastSyncedAt);
     const stale = connState === "error";
-    syncWarnLine.classList.toggle("show", stale);
-    if (stale) syncWarnTime.textContent = timeAgo(lastSyncedAt);
-    syncPill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
+    $("syncWarnLine").classList.toggle("show", stale);
+    if (stale) $("syncWarnTime").textContent = timeAgo(lastSyncedAt);
+    pill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
   }
-  setInterval(updateSyncPill, 5000);
-
-  function pollSyncStatus(){
-    fetchSyncStatus().then(p => {
-      lastSyncProgress = p;
-      updateSyncPill();
-      if (onSyncProgress) onSyncProgress(p);
+  setInterval(updatePill, 5000);
+  function progressHTML(p) {
+    if (!p || !p.namespacesTotal) return "";
+    return '<div class="sync-progress"><div class="sp-row"><span>Namespaces</span><b>' + p.namespacesDone + ' / ' + p.namespacesTotal + '</b></div>' +
+      '<div class="sp-row"><span>Resources found so far</span><b>' + (p.resourcesSoFar || 0) + '</b></div>' +
+      '<div class="sp-row"><span>Relationships so far</span><b>' + (p.relationshipsSoFar || 0) + '</b></div></div>';
+  }
+  function pollStatus() {
+    fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject()).then(p => {
+      lastProgress = p; updatePill();
+      if (!firstDone) app.showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>" + progressHTML(p), false);
     }).catch(() => {});
   }
-  setInterval(pollSyncStatus, 1000);
-  pollSyncStatus();
+  setInterval(pollStatus, 1000); pollStatus();
 
-  function setSync(val, immediate){
-    if (immediate === undefined) immediate = true;
-    if (autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+  function sync() {
+    if (!firstDone) return;
+    const slow = setTimeout(() => setConn("syncing"), 1500);
+    app.load(false)
+      .then(() => { clearTimeout(slow); setConn("live"); })
+      .catch(() => { clearTimeout(slow); setConn("error"); app.showToast("Lost contact with the engine — showing last snapshot, retrying…"); });
+  }
+  function setSync(val, immediate) {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
     syncMode = val;
-    const btn = document.getElementById("syncNow");
-    syncMenu.querySelectorAll(".sync-opt").forEach(o => o.classList.toggle("active", o.getAttribute("data-val")===val));
-    if (val === "manual"){ btn.style.display = ""; updateSyncPill(); return; }
-    const ms = parseInt(val,10) || 60000;
-    btn.style.display = "none";
-    autoTimer = setInterval(sync, ms);
-    updateSyncPill();
+    menu.querySelectorAll(".sync-opt").forEach(o => o.classList.toggle("active", o.getAttribute("data-val") === val));
+    $("syncNow").style.display = val === "manual" ? "" : "none";
+    if (val !== "manual") autoTimer = setInterval(sync, parseInt(val, 10) || 60000);
+    updatePill();
     if (immediate) sync();
   }
-  syncPill.addEventListener("click", ev => {
-    ev.stopPropagation();
-    const open = syncMenu.classList.toggle("open");
-    syncPill.setAttribute("aria-expanded", String(open));
-    if (open) updateSyncPill();
-  });
-  syncMenu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => {
-    setSync(o.getAttribute("data-val"), true);
-    syncMenu.classList.remove("open"); syncPill.setAttribute("aria-expanded","false");
-  }));
-  document.addEventListener("click", ev => { if (!ev.target.closest(".sync-wrap")) { syncMenu.classList.remove("open"); syncPill.setAttribute("aria-expanded","false"); } });
-  document.getElementById("syncNow").addEventListener("click", () => sync());
+  pill.addEventListener("click", ev => { ev.stopPropagation(); const open = menu.classList.toggle("open"); pill.setAttribute("aria-expanded", String(open)); if (open) updatePill(); });
+  menu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => { setSync(o.getAttribute("data-val"), true); menu.classList.remove("open"); pill.setAttribute("aria-expanded", "false"); }));
+  document.addEventListener("click", ev => { if (!ev.target.closest(".sync-wrap")) { menu.classList.remove("open"); pill.setAttribute("aria-expanded", "false"); } });
+  $("syncNow").addEventListener("click", sync);
+  $("signOut").addEventListener("click", () => { fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; }); });
 
-  firstLoad();
-  setSync("60000", false);
+  // Graph deltas are cheap now (only what changed crosses the wire), so the
+  // default poll is 10s rather than a minute.
+  app.firstLoad().then(() => { firstDone = true; setConn("live"); }).catch(() => {});
+  setSync("10000", false);
 })();
 </script>
 </body>

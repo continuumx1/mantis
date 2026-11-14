@@ -17,7 +17,10 @@ standard in-cluster config); outside a cluster it falls back to your local
 kubeconfig, so the exact same binary works as a deployed service or as a
 local dev tool. It exposes:
 
-- `GET /api/graph` — the whole cluster, as JSON
+- `GET /api/graph` — the whole cluster, as JSON (or, with `?since=<revision>`,
+  only what changed — see [the graph architecture page](graph-architecture.md))
+- `GET /api/graph/search`, `GET /api/graph/neighbors` — indexed search and
+  dependency-neighbourhood queries
 - `GET /api/resource` — one resource's YAML manifest, fetched on demand
 - `GET /healthz`, `GET /readyz` — liveness/readiness probes
 

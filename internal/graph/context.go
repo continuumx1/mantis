@@ -23,6 +23,13 @@ type Node struct {
 	Resolved   bool
 	Attributes []string
 	Hidden     bool
+	// Unverified marks an unresolved node whose existence could not actually
+	// be checked — its kind was not listed (RBAC forbade it, or it is listed
+	// elsewhere in the pass) — so a renderer must not call it "not found".
+	Unverified bool
+	// Meta is the identity metadata of a resource Mantis listed. It is the
+	// zero value for an unresolved (dangling) node, which was never seen.
+	Meta ResourceMeta
 }
 
 // Context is the structured investigation result for a subject resource: the

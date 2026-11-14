@@ -9,7 +9,8 @@ import (
 
 // GraphDTO is the JSON payload the web UI fetches: cluster metadata plus a flat
 // list of nodes and edges. It is a pure presentation projection of a
-// graph.Context — the engine stays unaware of the transport.
+// graph.Context — the engine stays unaware of the transport. It is the
+// canonical graph: one entry per resource, whatever view the UI draws it in.
 type GraphDTO struct {
 	Meta  MetaDTO   `json:"meta"`
 	Nodes []NodeDTO `json:"nodes"`
@@ -32,87 +33,150 @@ type MetaDTO struct {
 	// NodeAutoscaler names the cluster-level node autoscaler in use ("Karpenter",
 	// "cluster-autoscaler") or is empty when none is detected.
 	NodeAutoscaler string `json:"nodeAutoscaler,omitempty"`
+	// ClusterID is a stable, opaque identifier for the cluster this graph was
+	// read from (derived from the API server address), so a client holding
+	// graphs from more than one cluster can never mix their resource IDs.
+	ClusterID string `json:"clusterId,omitempty"`
+	// Revision increases by one every time the published graph's content
+	// changes. A client passes the revision it holds as ?since= to receive
+	// only what changed (see GraphDeltaDTO).
+	Revision uint64 `json:"revision"`
+	// Partial is true while the very first sync pass is still walking
+	// namespaces — the graph is real but not yet the whole cluster.
+	Partial bool `json:"partial,omitempty"`
 }
 
 // NodeDTO is one resource in the graph. ID is namespace-qualified so resources
 // that share a kind and name across namespaces never collide.
+//
+// ID ("<namespace>/<Kind>/<name>") rather than UID is the graph identity on
+// purpose: every reference in a Kubernetes spec is by name, a dangling
+// reference has no UID at all, and a resource deleted and recreated under the
+// same name should keep its place on the map. UID is still reported, so a
+// recreate is visible as a UID change.
 type NodeDTO struct {
-	ID         string   `json:"id"`
-	Kind       string   `json:"kind"`
-	Name       string   `json:"name"`
-	Namespace  string   `json:"ns"`
-	Status     string   `json:"status,omitempty"`
-	Resolved   bool     `json:"resolved"`
-	Attributes []string `json:"attributes,omitempty"`
+	ID         string            `json:"id"`
+	Kind       string            `json:"kind"`
+	Name       string            `json:"name"`
+	Namespace  string            `json:"ns"`
+	Scope      string            `json:"scope"`
+	Status     string            `json:"status,omitempty"`
+	Resolved   bool              `json:"resolved"`
+	Unverified bool              `json:"unverified,omitempty"`
+	Attributes []string          `json:"attributes,omitempty"`
+	UID        string            `json:"uid,omitempty"`
+	APIVersion string            `json:"apiVersion,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	Created    string            `json:"created,omitempty"`
+	RV         string            `json:"rv,omitempty"`
 }
 
 // EdgeDTO is one directed relationship, referencing nodes by their DTO IDs.
+// Category is the family it is styled and filtered by; Basis is the kind of
+// evidence it rests on (ownership, reference, selector, endpoint, inferred) and
+// Evidence the API field it was read from — so the UI can say exactly why an
+// edge exists, and never present a selector match as observed traffic.
 type EdgeDTO struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-	Type string `json:"type"`
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Type     string `json:"type"`
+	Category string `json:"category"`
+	Basis    string `json:"basis"`
+	Evidence string `json:"evidence,omitempty"`
+	Inferred bool   `json:"inferred,omitempty"`
 }
+
+// key identifies an edge for set operations (deltas, deduplication).
+func (e EdgeDTO) key() string { return e.From + "|" + e.Type + "|" + e.To }
 
 // refID builds a stable, collision-free identifier for a resource reference:
 // "<namespace>/<Kind>/<Name>". Cluster-scoped resources carry an empty namespace
 // segment, which is still unique because namespaces themselves are unique.
 func refID(ref graph.ResourceRef) string {
-	return ref.Namespace + "/" + ref.Kind + "/" + ref.Name
+	return ref.String()
 }
 
 // FromContext projects a resolved graph.Context into the wire format. Hidden
 // nodes (system-managed noise) and any edges touching them are dropped so the
 // live map stays as clean as possible; upstream showAll controls whether
 // anything is hidden at all.
+//
+// It runs in O(nodes + edges): hidden-ness is looked up in a map built once,
+// not by rescanning (and re-sorting) every node for every edge, which made a
+// 10,000-resource cluster cost hundreds of millions of comparisons per sync.
 func FromContext(gctx *graph.Context, meta MetaDTO) GraphDTO {
-	visible := map[graph.ResourceRef]bool{}
-
-	nodes := make([]NodeDTO, 0)
-	for _, n := range gctx.Nodes() {
+	all := gctx.Nodes()
+	hidden := make(map[graph.ResourceRef]bool, len(all))
+	for _, n := range all {
 		if n.Hidden {
+			hidden[n.Ref] = true
+		}
+	}
+	// A dangling reference is only worth showing if something visible makes
+	// it: a missing ServiceAccount named only by a hidden system: binding is
+	// control-plane noise, not a broken reference anyone can act on.
+	referenced := make(map[graph.ResourceRef]bool)
+	for _, r := range gctx.Relations {
+		if !hidden[r.From] {
+			referenced[r.To] = true
+		}
+	}
+
+	nodes := make([]NodeDTO, 0, len(all))
+	for _, n := range all {
+		if n.Hidden || (!n.Resolved && !referenced[n.Ref]) {
 			continue
 		}
-		visible[n.Ref] = true
+		scope := "Namespaced"
+		if n.Ref.IsClusterScoped() {
+			scope = "Cluster"
+		}
 		nodes = append(nodes, NodeDTO{
 			ID:         refID(n.Ref),
 			Kind:       n.Ref.Kind,
 			Name:       n.Ref.Name,
 			Namespace:  n.Ref.Namespace,
+			Scope:      scope,
 			Status:     statusFor(n.Ref.Kind, n.Attributes),
 			Resolved:   n.Resolved,
+			Unverified: !n.Resolved && n.Unverified,
 			Attributes: n.Attributes,
+			UID:        n.Meta.UID,
+			APIVersion: n.Meta.APIVersion,
+			Labels:     n.Meta.Labels,
+			Created:    n.Meta.CreatedAt,
+			RV:         n.Meta.ResourceVersion,
 		})
 	}
 
 	edges := make([]EdgeDTO, 0, len(gctx.Relations))
+	seen := make(map[string]struct{}, len(gctx.Relations))
 	for _, r := range gctx.Relations {
 		// An unresolved target is never a node in the visible set but is still a
 		// real edge worth drawing as a "not found" ghost, so only hidden
 		// endpoints suppress an edge.
-		if isHidden(gctx, r.From) || isHidden(gctx, r.To) {
+		if hidden[r.From] || hidden[r.To] {
 			continue
 		}
-		edges = append(edges, EdgeDTO{
-			From: refID(r.From),
-			To:   refID(r.To),
-			Type: string(r.Type),
-		})
+		e := EdgeDTO{
+			From:     refID(r.From),
+			To:       refID(r.To),
+			Type:     string(r.Type),
+			Category: string(r.Type.Category()),
+			Basis:    string(r.Basis()),
+			Evidence: r.Type.Evidence(),
+			Inferred: r.IsInferred(),
+		}
+		if _, dup := seen[e.key()]; dup {
+			continue
+		}
+		seen[e.key()] = struct{}{}
+		edges = append(edges, e)
 	}
 
 	meta.NodeCount = len(nodes)
 	meta.EdgeCount = len(edges)
 	return GraphDTO{Meta: meta, Nodes: nodes, Edges: edges}
-}
-
-// isHidden reports whether a reference is a node the graph marked hidden. A
-// reference that is not a node at all (a dangling target) is not hidden.
-func isHidden(gctx *graph.Context, ref graph.ResourceRef) bool {
-	for _, n := range gctx.Nodes() {
-		if n.Ref == ref {
-			return n.Hidden
-		}
-	}
-	return false
 }
 
 // statusFor derives a coarse health signal for the status ring. Pods and

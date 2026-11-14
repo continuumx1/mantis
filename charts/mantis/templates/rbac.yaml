@@ -39,6 +39,7 @@ rules:
       - resourcequotas
       - limitranges
       - nodes
+      - serviceaccounts
     verbs: ["get", "list"]
   # Enumerated only — see the note above.
   - apiGroups: [""]
@@ -64,6 +65,24 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
+      - networkpolicies
+    verbs: ["get", "list"]
+
+  # StorageClasses resolve the storage-class edge from PVCs and PVs.
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["get", "list"]
+
+  # RBAC objects are read to draw who-can-do-what relationships
+  # (binds-role, grants-to). Read-only, like everything else here: Mantis can
+  # see Roles and bindings, it can never create or change one.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
     verbs: ["get", "list"]
 
   - apiGroups: ["autoscaling"]

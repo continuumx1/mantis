@@ -40,6 +40,11 @@ func BuildNamespaceGraph(
 	nodeSet := map[ResourceRef]struct{}{}
 	attrs := map[ResourceRef][]string{}
 	hidden := map[ResourceRef]struct{}{}
+	meta := map[ResourceRef]ResourceMeta{}
+	// forbiddenKinds records which kinds RBAC would not let us list, so a
+	// reference to one of them is reported as unverified rather than as a
+	// resource that does not exist.
+	forbiddenKinds := map[string]struct{}{}
 
 	ref := func(kind, name, ns string) ResourceRef {
 		r := ResourceRef{Kind: kind, Name: name, Namespace: ns}
@@ -54,6 +59,9 @@ func BuildNamespaceGraph(
 	forbidden := func(kind string, err error) bool {
 		if apierrors.IsForbidden(err) {
 			skipped = append(skipped, kind)
+			if k, ok := kindForResource[kind]; ok {
+				forbiddenKinds[k] = struct{}{}
+			}
 			return true
 		}
 		return false
@@ -69,6 +77,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			d := &list.Items[i]
 			dRef := ref("Deployment", d.Name, namespace)
+			meta[dRef] = metaOf("apps/v1", &d.ObjectMeta)
 			attrs[dRef] = deploymentAttributes(d)
 			relations = append(relations, ownerEdges(dRef, d.OwnerReferences, namespace)...)
 		}
@@ -82,6 +91,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			rs := &list.Items[i]
 			rsRef := ref("ReplicaSet", rs.Name, namespace)
+			meta[rsRef] = metaOf("apps/v1", &rs.ObjectMeta)
 			attrs[rsRef] = replicaSetAttributes(rs)
 			relations = append(relations, ownerEdges(rsRef, rs.OwnerReferences, namespace)...)
 		}
@@ -95,6 +105,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			sts := &list.Items[i]
 			stsRef := ref("StatefulSet", sts.Name, namespace)
+			meta[stsRef] = metaOf("apps/v1", &sts.ObjectMeta)
 			attrs[stsRef] = statefulSetAttributes(sts)
 			relations = append(relations, ownerEdges(stsRef, sts.OwnerReferences, namespace)...)
 		}
@@ -108,6 +119,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			ds := &list.Items[i]
 			dsRef := ref("DaemonSet", ds.Name, namespace)
+			meta[dsRef] = metaOf("apps/v1", &ds.ObjectMeta)
 			attrs[dsRef] = daemonSetAttributes(ds)
 			relations = append(relations, ownerEdges(dsRef, ds.OwnerReferences, namespace)...)
 		}
@@ -121,6 +133,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			j := &list.Items[i]
 			jRef := ref("Job", j.Name, namespace)
+			meta[jRef] = metaOf("batch/v1", &j.ObjectMeta)
 			attrs[jRef] = jobAttributes(j)
 			relations = append(relations, ownerEdges(jRef, j.OwnerReferences, namespace)...)
 		}
@@ -134,6 +147,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			cj := &list.Items[i]
 			cjRef := ref("CronJob", cj.Name, namespace)
+			meta[cjRef] = metaOf("batch/v1", &cj.ObjectMeta)
 			attrs[cjRef] = cronJobAttributes(cj)
 			relations = append(relations, ownerEdges(cjRef, cj.OwnerReferences, namespace)...)
 		}
@@ -150,6 +164,7 @@ func BuildNamespaceGraph(
 		for i := range podItems {
 			p := &podItems[i]
 			podRef := ref("Pod", p.Name, namespace)
+			meta[podRef] = metaOf("v1", &p.ObjectMeta)
 			attrs[podRef] = podAttributes(p)
 			relations = append(relations, ownerEdges(podRef, p.OwnerReferences, namespace)...)
 			if p.Spec.NodeName != "" {
@@ -157,6 +172,9 @@ func BuildNamespaceGraph(
 			}
 			relations = append(relations, podConfigurationRelations(podRef, p)...)
 			relations = append(relations, podStorageRelations(podRef, p)...)
+			if sa := podServiceAccount(p); sa != "" {
+				relations = append(relations, Relation{From: podRef, Type: UsesServiceAccount, To: ResourceRef{Kind: "ServiceAccount", Name: sa, Namespace: namespace}})
+			}
 		}
 	}
 
@@ -178,6 +196,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			s := &list.Items[i]
 			svcRef := ref("Service", s.Name, namespace)
+			meta[svcRef] = metaOf("v1", &s.ObjectMeta)
 			attrs[svcRef] = serviceAttributes(s, sliceItems)
 			relations = append(relations, selectsRelations(svcRef, s.Spec.Selector, podItems)...)
 			relations = append(relations, servesFromSlices(svcRef, sliceItems)...)
@@ -191,7 +210,8 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			ing := &list.Items[i]
-			ref("Ingress", ing.Name, namespace)
+			ingRef := ref("Ingress", ing.Name, namespace)
+			meta[ingRef] = metaOf("networking.k8s.io/v1", &ing.ObjectMeta)
 			edges, err := ResolveIngress(ctx, clientset, ing)
 			if err != nil {
 				return nil, nil, err
@@ -207,6 +227,7 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			cmRef := ref("ConfigMap", list.Items[i].Name, namespace)
+			meta[cmRef] = metaOf("v1", &list.Items[i].ObjectMeta)
 			if !showAll && isSystemConfigMap(list.Items[i].Name) {
 				hidden[cmRef] = struct{}{}
 			}
@@ -231,6 +252,7 @@ func BuildNamespaceGraph(
 			s.Data = nil
 			s.StringData = nil
 			secretRef := ref("Secret", s.Name, namespace)
+			meta[secretRef] = metaOf("v1", &s.ObjectMeta)
 			if !showAll && isSystemSecret(s) {
 				hidden[secretRef] = struct{}{}
 			}
@@ -245,12 +267,35 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			pvc := &list.Items[i]
 			pvcRef := ref("PersistentVolumeClaim", pvc.Name, namespace)
+			meta[pvcRef] = metaOf("v1", &pvc.ObjectMeta)
 			attrs[pvcRef] = pvcAttributes(pvc)
+			if sc := pvc.Spec.StorageClassName; sc != nil && *sc != "" {
+				relations = append(relations, Relation{From: pvcRef, Type: UsesStorageClass, To: ResourceRef{Kind: "StorageClass", Name: *sc}})
+			}
 			if pvc.Spec.VolumeName != "" {
 				relations = append(relations, Relation{From: pvcRef, Type: BoundTo, To: ResourceRef{Kind: "PersistentVolume", Name: pvc.Spec.VolumeName}})
 			}
 		}
 	}
+
+	// ServiceAccounts, namespaced RBAC and NetworkPolicies (see security.go).
+	extra, err := collectNamespaceSecurity(ctx, clientset, namespace, podItems, showAll, forbidden)
+	if err != nil {
+		return nil, nil, err
+	}
+	for r := range extra.nodes {
+		nodeSet[r] = struct{}{}
+	}
+	for r, m := range extra.meta {
+		meta[r] = m
+	}
+	for r, a := range extra.attrs {
+		attrs[r] = a
+	}
+	for r := range extra.hidden {
+		hidden[r] = struct{}{}
+	}
+	relations = append(relations, extra.relations...)
 
 	// ResourceQuota and LimitRange capture the namespace-level requests/limits
 	// governance (how much the namespace may consume, and the defaults applied to
@@ -262,7 +307,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			rq := &list.Items[i]
-			attrs[ref("ResourceQuota", rq.Name, namespace)] = resourceQuotaAttributes(rq)
+			rqRef := ref("ResourceQuota", rq.Name, namespace)
+			attrs[rqRef] = resourceQuotaAttributes(rq)
+			meta[rqRef] = metaOf("v1", &rq.ObjectMeta)
 		}
 	}
 
@@ -273,7 +320,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			lr := &list.Items[i]
-			attrs[ref("LimitRange", lr.Name, namespace)] = limitRangeAttributes(lr)
+			lrRef := ref("LimitRange", lr.Name, namespace)
+			attrs[lrRef] = limitRangeAttributes(lr)
+			meta[lrRef] = metaOf("v1", &lr.ObjectMeta)
 		}
 	}
 
@@ -287,6 +336,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			hpa := &list.Items[i]
 			hpaRef := ref("HorizontalPodAutoscaler", hpa.Name, namespace)
+			meta[hpaRef] = metaOf("autoscaling/v2", &hpa.ObjectMeta)
 			attrs[hpaRef] = hpaAttributes(hpa)
 			target := hpa.Spec.ScaleTargetRef
 			relations = append(relations, Relation{
@@ -314,7 +364,9 @@ func BuildNamespaceGraph(
 	} else {
 		for i := range list.Items {
 			node := &list.Items[i]
-			attrs[ref("Node", node.Name, "")] = nodeAttributes(node)
+			nodeRef := ref("Node", node.Name, "")
+			attrs[nodeRef] = nodeAttributes(node)
+			meta[nodeRef] = metaOf("v1", &node.ObjectMeta)
 		}
 	}
 
@@ -326,6 +378,7 @@ func BuildNamespaceGraph(
 		for i := range list.Items {
 			pv := &list.Items[i]
 			pvRef := ref("PersistentVolume", pv.Name, "")
+			meta[pvRef] = metaOf("v1", &pv.ObjectMeta)
 			attrs[pvRef] = pvAttributes(pv)
 		}
 	}
@@ -333,7 +386,7 @@ func BuildNamespaceGraph(
 	nodes := make([]Node, 0, len(nodeSet))
 	for r := range nodeSet {
 		_, isHidden := hidden[r]
-		nodes = append(nodes, Node{Ref: r, Resolved: true, Attributes: attrs[r], Hidden: isHidden})
+		nodes = append(nodes, Node{Ref: r, Resolved: true, Attributes: attrs[r], Hidden: isHidden, Meta: meta[r]})
 	}
 	// Dangling targets: referenced but never listed → verified absent.
 	danglingSeen := map[ResourceRef]struct{}{}
@@ -345,7 +398,11 @@ func BuildNamespaceGraph(
 			continue
 		}
 		danglingSeen[rel.To] = struct{}{}
-		nodes = append(nodes, Node{Ref: rel.To, Resolved: false})
+		// A reference to a kind this pass never lists (or was forbidden from
+		// listing) has not been checked, so it is unverified — not missing.
+		_, wasForbidden := forbiddenKinds[rel.To.Kind]
+		unverified := wasForbidden || !namespaceListedKinds[rel.To.Kind]
+		nodes = append(nodes, Node{Ref: rel.To, Resolved: false, Unverified: unverified})
 	}
 
 	subject := ResourceRef{Kind: "Namespace", Name: namespace}

@@ -154,6 +154,24 @@ func BuildClusterGraphProgressive(
 	for r, a := range collectNodePools(ctx, dyn) {
 		mergeNode(merged, Node{Ref: r, Resolved: true, Attributes: a})
 	}
+
+	// StorageClasses, ClusterRoles and ClusterRoleBindings, likewise once.
+	cs := collectClusterScoped(ctx, clientset, showAll)
+	for _, kind := range cs.skipped {
+		skippedSet[kind] = struct{}{}
+	}
+	for r := range cs.nodes {
+		_, hide := cs.hidden[r]
+		mergeNode(merged, Node{Ref: r, Resolved: true, Attributes: cs.attrs[r], Hidden: hide, Meta: cs.meta[r]})
+	}
+	relations = append(relations, cs.relations...)
+	for _, rel := range cs.relations {
+		if _, ok := merged[rel.To]; !ok {
+			merged[rel.To] = Node{Ref: rel.To, Resolved: false}
+		}
+	}
+	finalizeClusterScoped(merged, relations, cs.forbiddenKinds, showAll)
+	relations = dedupeRelations(relations)
 	publish(total, true)
 
 	return nil
@@ -173,7 +191,65 @@ func mergeNode(merged map[ResourceRef]Node, n Node) {
 		merged[n.Ref] = n
 		return
 	}
+	// Two unresolved sightings: one that was actually checked (verified
+	// absent) is stronger evidence than one that never could be.
+	if !n.Resolved && !existing.Resolved && existing.Unverified && !n.Unverified {
+		merged[n.Ref] = n
+		return
+	}
 	if n.Resolved == existing.Resolved && len(existing.Attributes) == 0 && len(n.Attributes) > 0 {
 		merged[n.Ref] = n
 	}
+}
+
+// finalizeClusterScoped settles what only the end of a pass can know.
+//
+//   - Every unresolved reference to a kind the cluster pass lists (a
+//     StorageClass, a ClusterRole) was unverified while namespaces were being
+//     walked; now that the kind has been listed it is verified absent —
+//     unless listing it was forbidden, in which case it stays unverified.
+//   - A ClusterRole is hidden unless a visible binding grants it: a cluster
+//     carries dozens of aggregated and controller roles nothing in the
+//     visible graph uses, and drawing them all would bury the ones that are.
+func finalizeClusterScoped(merged map[ResourceRef]Node, relations []Relation, forbiddenKinds map[string]bool, showAll bool) {
+	for r, n := range merged {
+		if !n.Resolved && clusterListedKinds[r.Kind] {
+			n.Unverified = forbiddenKinds[r.Kind]
+			merged[r] = n
+		}
+	}
+	if showAll {
+		return
+	}
+	used := map[ResourceRef]bool{}
+	for _, rel := range relations {
+		if rel.Type != BindsRole || rel.To.Kind != "ClusterRole" {
+			continue
+		}
+		if from, ok := merged[rel.From]; ok && !from.Hidden {
+			used[rel.To] = true
+		}
+	}
+	for r, n := range merged {
+		if r.Kind == "ClusterRole" && n.Resolved && !used[r] {
+			n.Hidden = true
+			merged[r] = n
+		}
+	}
+}
+
+// dedupeRelations drops repeated edges (same from, type and to), keeping the
+// first occurrence so output order stays deterministic.
+func dedupeRelations(relations []Relation) []Relation {
+	seen := make(map[string]struct{}, len(relations))
+	out := relations[:0:0]
+	for _, r := range relations {
+		k := r.Key()
+		if _, dup := seen[k]; dup {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, r)
+	}
+	return out
 }
