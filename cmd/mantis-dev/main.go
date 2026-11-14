@@ -44,6 +44,7 @@ func main() {
 	churn := flag.Duration("churn", 0, "if set, mutate the cluster this often (reschedules, scale-ups, crashes)")
 	syncEvery := flag.Duration("sync", 3*time.Second, "engine sync interval")
 	dump := flag.String("dump", "", "write the built graph (GraphDTO JSON) to this file and exit")
+	syncMode := flag.String("sync-mode", "watch", "watch (list once, then follow changes) or poll (re-list every -sync)")
 	kube := flag.Bool("kube", false, "read your current kubeconfig context instead of a synthetic cluster (read-only, like the real engine)")
 	flag.Parse()
 
@@ -52,7 +53,9 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		serve(engine.New(client, false, *syncEvery), *uiDir, *addr)
+		srv := engine.New(client, false, *syncEvery)
+		srv.SetSyncMode(*syncMode)
+		serve(srv, *uiDir, *addr)
 		return
 	}
 
@@ -82,7 +85,9 @@ func main() {
 	if *churn > 0 {
 		go churnLoop(cs, *churn, *seed)
 	}
-	serve(engine.New(client, false, *syncEvery), *uiDir, *addr)
+	srv := engine.New(client, false, *syncEvery)
+	srv.SetSyncMode(*syncMode)
+	serve(srv, *uiDir, *addr)
 }
 
 // serve runs the engine's sync loop and serves its API plus the UI, with no

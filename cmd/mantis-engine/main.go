@@ -7,7 +7,8 @@
 //
 //	MANTIS_ENGINE_ADDR     listen address                             (default ":8080")
 //	MANTIS_SHOW_ALL        include system-managed ConfigMaps/Secrets  (default "false")
-//	MANTIS_SYNC_INTERVAL   background cluster-read interval, e.g. "20s" (default "20s")
+//	MANTIS_SYNC_MODE       "watch" (default: list once, then follow watch streams) or "poll"
+//	MANTIS_SYNC_INTERVAL   poll mode only: re-read interval, e.g. "20s" (default "20s")
 //
 // The engine reads the cluster on its own background schedule (see
 // internal/engine/sync.go), not on demand per request — MANTIS_SYNC_INTERVAL
@@ -57,6 +58,7 @@ func main() {
 	}
 
 	server := engine.New(client, showAll, syncInterval)
+	server.SetSyncMode(httpx.EnvOr("MANTIS_SYNC_MODE", engine.SyncModeWatch))
 	server.Start(context.Background())
 
 	slog.Info("startup", "event", "ready_to_serve", "addr", addr, "sync_interval", syncInterval.String(),

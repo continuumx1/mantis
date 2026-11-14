@@ -61,6 +61,37 @@ binding uses, the root-CA ConfigMap and service-account/Helm Secrets are kept
 in the graph (so references to them resolve) but hidden from the payload unless
 `MANTIS_SHOW_ALL=true`.
 
+### Keeping the graph current: watch, not poll
+
+By default (`MANTIS_SYNC_MODE=watch`) the engine uses the Kubernetes
+list/watch protocol through client-go informers:
+
+1. At startup, one `LIMIT=1` list per kind checks what this identity may read
+   (kinds it may not are reported as `skipped`, exactly as before).
+2. One list per permitted kind fills an in-memory cache, then a watch per kind
+   streams every change. Lost or expired watches are re-established by
+   client-go, with resourceVersion handling built in.
+3. The graph is rebuilt **from the cache** — no API calls — when changes
+   arrive, coalesced (750 ms debounce, at most one rebuild every 2 s), and
+   published as a new revision with a delta.
+
+The graph builder is unchanged: it is handed a client whose list calls are
+answered from the cache (`internal/engine/cachedclient.go`), so watch and poll
+mode produce identical graphs (tested). Before storing, every object has
+`managedFields` and `last-applied-configuration` removed, and Secrets have
+their `data`/`stringData` removed — Secret values never enter Mantis's memory.
+
+Measured on a synthetic 10,000-resource cluster: poll mode issues 1,259 list
+calls every pass; watch mode issues 52 lists and 26 watches once, then none.
+On a real cluster a new Pod appears in Mantis about a second after it is
+created.
+
+Watch mode needs the read-only `watch` verb (the Helm chart grants it). If the
+API server allows list but refuses watch, or the cache cannot sync after three
+attempts, the engine falls back to `poll` on its own and says so in its logs
+and in `/api/sync/status` (`"mode"`). `MANTIS_SYNC_MODE=poll` selects the old
+periodic re-list explicitly (for RBAC that only allows per-namespace reads).
+
 ### Revisions and deltas
 
 The engine's background sync publishes a snapshot when a pass completes. The
@@ -166,9 +197,10 @@ specific picture, which is useful for bug reports and screenshots.
 
 ## Known limitations
 
-- Collection is still a periodic full list, not list/watch. Deltas are
-  computed by diffing successive snapshots, so clients receive incremental
-  updates, but the engine still re-lists every 20 seconds.
+- Watch mode watches cluster-wide; an identity that may only read some
+  namespaces needs `MANTIS_SYNC_MODE=poll`. The graph is still rebuilt as a
+  whole from the cache on change (about 0.1 s at 10,000 resources) rather than
+  patched in place.
 - Not yet resolved: Gateway API routes, EndpointSlices as their own nodes
   (folded into `serves`), VolumeAttachments, NetworkPolicy peer selectors
   (only `podSelector`), and RBAC subjects other than ServiceAccounts (Users

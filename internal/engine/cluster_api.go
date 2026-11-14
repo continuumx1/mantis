@@ -189,7 +189,7 @@ func (s *Server) handleCapacity(w http.ResponseWriter, r *http.Request) {
 func (s *Server) readCapacity(ctx context.Context) (CapacityDTO, error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), getTimeout)
 	defer cancel()
-	nodes, err := s.client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := s.readClient().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return CapacityDTO{}, err
 	}

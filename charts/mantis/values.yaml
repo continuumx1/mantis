@@ -21,6 +21,12 @@ image:
 # RBAC, see rbac.create below). Never exposed outside the cluster.
 engine:
   replicaCount: 1
+  # How the engine keeps its graph current. "watch" (default): one paginated
+  # list per kind at startup, then Kubernetes watch streams — near-zero steady
+  # load on the API server, changes visible in about a second. "poll": re-list
+  # every syncInterval (needs only get/list; heavier on large clusters).
+  syncMode: watch
+  syncInterval: 20s   # poll mode only
   showAll: false   # MANTIS_SHOW_ALL — include system-managed ConfigMaps/Secrets
 
   service:

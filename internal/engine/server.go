@@ -41,6 +41,10 @@ type Server struct {
 	// so a re-sync never briefly replaces the whole graph with a half-walked
 	// one.
 	published atomic.Bool
+	// mode is SyncModeWatch (default) or SyncModePoll; watch holds the
+	// watch-mode state once its cache has synced.
+	mode  atomic.Value // string: SyncModeWatch or SyncModePoll
+	watch atomic.Pointer[watchState]
 	// Short-lived caches for the application pages' live reads.
 	events   ttlCache[EventsDTO]
 	capacity ttlCache[CapacityDTO]
@@ -68,13 +72,35 @@ func New(client *mantiskube.Client, showAll bool, syncInterval time.Duration) *S
 	}
 }
 
+// SetSyncMode selects how the engine keeps its graph current: SyncModeWatch
+// (default) or SyncModePoll. Call before Start.
+func (s *Server) SetSyncMode(mode string) {
+	if mode == SyncModePoll {
+		s.mode.Store(SyncModePoll)
+	} else {
+		s.mode.Store(SyncModeWatch)
+	}
+}
+
+// syncMode reports the current mode (watch unless set or fallen back).
+func (s *Server) syncMode() string {
+	if m, ok := s.mode.Load().(string); ok && m != "" {
+		return m
+	}
+	return SyncModeWatch
+}
+
 // Start launches the background sync loop that keeps the cache warm. It
 // returns immediately; the loop runs until ctx is cancelled (or, in
 // practice, until the process exits — see cmd/mantis-engine, which never
 // cancels the context it passes here, the same "runs until the Pod dies"
 // lifetime every other piece of this service already has).
 func (s *Server) Start(ctx context.Context) {
-	go s.syncLoop(ctx, s.syncInterval)
+	if s.syncMode() == SyncModePoll {
+		go s.syncLoop(ctx, s.syncInterval)
+		return
+	}
+	go s.watchLoop(ctx)
 }
 
 // Handler returns the backend's routes: the graph projection, the
@@ -213,7 +239,9 @@ func writeJSON(w http.ResponseWriter, r *http.Request, v any) {
 func (s *Server) handleSyncStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(s.progress.snapshot())
+	p := s.progress.snapshot()
+	p.Mode = s.syncMode()
+	_ = json.NewEncoder(w).Encode(p)
 }
 
 // handleHealth is the liveness probe: the process is up. It does not touch the

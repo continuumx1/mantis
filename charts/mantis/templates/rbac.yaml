@@ -1,6 +1,8 @@
 {{/*
 This ClusterRole grants exactly what internal/graph and internal/engine
-issue calls for — every rule below traces back to a real List or Get call
+issue calls for. "watch" is what the default sync mode (MANTIS_SYNC_MODE=watch)
+uses to follow changes instead of re-listing the cluster; like get and list it
+is read-only. Without it the engine falls back to polling on its own — every rule below traces back to a real List or Get call
 in the Go source, not a generic "just in case" grant. No write verb
 (create/update/patch/delete) appears anywhere: Mantis is structurally
 read-only, and this RBAC is the enforcement of that at the API server, not
@@ -40,13 +42,13 @@ rules:
       - limitranges
       - nodes
       - serviceaccounts
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
   # Enumerated only — see the note above.
   - apiGroups: [""]
     resources:
       - namespaces
       - secrets
-    verbs: ["list"]
+    verbs: ["list", "watch"]
 
   - apiGroups: ["apps"]
     resources:
@@ -54,25 +56,25 @@ rules:
       - replicasets
       - statefulsets
       - daemonsets
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   - apiGroups: ["batch"]
     resources:
       - jobs
       - cronjobs
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
       - networkpolicies
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   # StorageClasses resolve the storage-class edge from PVCs and PVs.
   - apiGroups: ["storage.k8s.io"]
     resources:
       - storageclasses
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   # RBAC objects are read to draw who-can-do-what relationships
   # (binds-role, grants-to). Read-only, like everything else here: Mantis can
@@ -83,32 +85,32 @@ rules:
       - rolebindings
       - clusterroles
       - clusterrolebindings
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   - apiGroups: ["autoscaling"]
     resources:
       - horizontalpodautoscalers
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   # EndpointSlices resolve which Pods a Service actually serves; only ever
   # listed, never fetched by name.
   - apiGroups: ["discovery.k8s.io"]
     resources:
       - endpointslices
-    verbs: ["list"]
+    verbs: ["list", "watch"]
 
   # VerticalPodAutoscaler — optional CRD, read via the dynamic client.
   - apiGroups: ["autoscaling.k8s.io"]
     resources:
       - verticalpodautoscalers
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   # Karpenter NodePool — optional CRD, same API group across the v1 and
   # v1beta1 versions the code tries.
   - apiGroups: ["karpenter.sh"]
     resources:
       - nodepools
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "watch"]
 
   # Events back the dashboard's recent-activity panel and each resource's
   # Events tab (GET /api/events). Listed only, never fetched by name.
