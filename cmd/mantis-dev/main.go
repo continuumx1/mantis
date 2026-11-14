@@ -91,7 +91,7 @@ func serve(srv *engine.Server, uiDir, addr string) {
 	srv.Start(context.Background())
 	var static http.Handler
 	if uiDir != "" {
-		static = http.FileServer(http.Dir(uiDir))
+		static = web.NoCache(http.FileServer(http.Dir(uiDir)))
 	} else {
 		h, err := web.StaticHandler()
 		if err != nil {

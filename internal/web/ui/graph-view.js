@@ -385,7 +385,7 @@
         g.appendChild(el("rect", { x: -w / 2, y: -h / 2, width: 4, height: h, rx: 2, style: "fill:var(--cat-" + v.cat + ")" }));
         const k = el("text", { class: "kind", x: -w / 2 + 14, y: -4, style: "fill:var(--cat-" + v.cat + ")" }); k.textContent = "Group · click to expand";
         const n = el("text", { class: "name", x: -w / 2 + 14, y: 13 }); n.textContent = G.shorten(v.label, 30);
-        const lg = el("text", { class: "name-lg", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(v.label, Math.max(6, Math.floor((w - 24) / 8.4)));
+        const lg = el("text", { class: "name-lg", display: "none", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(v.label, Math.max(6, Math.floor((w - 24) / 8.4)));
         g.appendChild(k); g.appendChild(n); g.appendChild(lg);
         if (v.bad) { const b = el("text", { class: "flag", x: w / 2 - 8, y: -h / 2 + 12, "text-anchor": "end", style: "fill:var(--crit)" }); b.textContent = v.bad + " failing"; g.appendChild(b); }
         const t = el("title"); t.textContent = v.label + " — click to show each one"; g.appendChild(t);
@@ -404,7 +404,7 @@
       const k = el("text", { class: "kind", x: -w / 2 + 14, y: top + 17, style: "fill:var(--cat-" + n.cat + ")" }); k.textContent = n.kind;
       const nm = el("text", { class: "name", x: -w / 2 + 14, y: top + 34 }); nm.textContent = G.shorten(n.name, 30);
       // Shown instead of kind/name/badge when zoomed out (see lod-mid).
-      const lg = el("text", { class: "name-lg", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(n.name, Math.max(6, Math.floor((w - 24) / 8.4)));
+      const lg = el("text", { class: "name-lg", display: "none", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(n.name, Math.max(6, Math.floor((w - 24) / 8.4)));
       g.appendChild(k); g.appendChild(nm); g.appendChild(lg);
       if (ghost || unver) { const f = el("text", { class: "flag", x: w / 2 - 10, y: top + 15, "text-anchor": "end" }); f.textContent = ghost ? "NOT FOUND" : "UNVERIFIED"; g.appendChild(f); }
       else if (n.status) g.appendChild(el("circle", { class: "dot", cx: w / 2 - 12, cy: top + 12, r: 4 }));

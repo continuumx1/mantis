@@ -377,7 +377,7 @@
      name, badge) for one large, shorter name, so it stays legible; further
      out, cards become color blocks and group titles carry the reading. */
   #canvas.lod-mid .rnode .kind, #canvas.lod-mid .rnode .badge-t, #canvas.lod-mid .rnode .name, #canvas.lod-mid .rnode .flag { display: none; }
-  #canvas.lod-mid .rnode .name-lg { display: block; }
+  #canvas.lod-mid .rnode .name-lg { display: inline; } /* overrides the display="none" attribute */
   #canvas.lod-mid .grp-title { font-size: 17px; }
   #canvas.lod-far .rnode text, #canvas.lod-far .ecount, #canvas.lod-far .gcard .gc-line { display: none; }
   #canvas.lod-far .grp-title { font-size: 30px; }

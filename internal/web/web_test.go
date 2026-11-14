@@ -160,3 +160,17 @@ func TestNewHandler_RejectsBadEngineURL(t *testing.T) {
 		}
 	}
 }
+
+func TestStaticHandler_UIIsNotCachedStale(t *testing.T) {
+	h, err := StaticHandler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/", "/graph-view.css", "/app-shell.js"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-cache" {
+			t.Errorf("%s: status %d Cache-Control %q, want 200 and no-cache", path, rec.Code, rec.Header().Get("Cache-Control"))
+		}
+	}
+}

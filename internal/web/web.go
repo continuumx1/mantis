@@ -30,8 +30,22 @@ func StaticHandler() (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mount ui assets: %w", err)
 	}
-	return http.FileServer(http.FS(ui)), nil
+	return noCache(http.FileServer(http.FS(ui))), nil
 }
+
+// noCache makes browsers revalidate UI files on every load. Without it a
+// browser can keep an old stylesheet while picking up new JavaScript after an
+// upgrade, and render a mix of the two. The files are small and embedded, so
+// always fetching current ones costs little.
+func noCache(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		h.ServeHTTP(w, r)
+	})
+}
+
+// NoCache is noCache for other binaries serving the same UI (cmd/mantis-dev).
+func NoCache(h http.Handler) http.Handler { return noCache(h) }
 
 // NewHandler builds the frontend service: it serves the UI at / and reverse-
 // proxies every /api/ request to the engine at engineURL. Keeping the browser
