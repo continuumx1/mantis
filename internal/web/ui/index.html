@@ -1,105 +1,87 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-<meta charset="utf8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mantis — Cluster Resource Graph</title>
+<title>Mantis</title>
 <link rel="icon" type="image/webp" href="mantis-mascot.webp">
 <script>
-  // Set the saved theme before first paint — a toggle applied later (after the
-  // rest of the page loads) would show a flash of the wrong theme first.
-  //
-  // sessionStorage, not localStorage: Mantis opens in dark by default, full
-  // stop — a toggle to light only holds for the current tab (surviving a
-  // reload/nav within it, so it doesn't feel like the toggle "didn't work"),
-  // never carrying over into a new tab or the next time the app is opened.
+  // Apply the saved theme before first paint, so there is no flash.
   try {
-    if (sessionStorage.getItem("mantis-theme") === "light") document.documentElement.setAttribute("data-theme", "light");
-  } catch (e) { /* sessionStorage unavailable (private mode, etc.) — default theme is fine */ }
+    var t = localStorage.getItem("mantis-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+  } catch (e) {}
 </script>
-
+<!-- graph-view.css styles the Topology page; app-shell.css (loaded after it)
+     is the Mantis design system for everything else, and maps the topology's
+     color tokens onto the same palette. -->
 <link rel="stylesheet" href="graph-view.css">
+<link rel="stylesheet" href="app-shell.css">
 </head>
 <body>
+<div class="m-shell" id="shell">
+  <aside class="m-sidebar" aria-label="Main navigation">
+    <div class="m-brand"><img src="mantis-mascot.webp" alt=""><b>Mantis</b><span>preview</span></div>
+    <nav class="m-nav" id="mNav"></nav>
+    <div class="m-side-foot"><button id="mRail" aria-label="Collapse sidebar"></button></div>
+  </aside>
 
-<div id="app">
-  <header>
-    <div class="brand">
-      <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
-    </div>
-
-    <div class="search-wrap">
-      <span class="search-ico">⌕</span>
-      <input class="search" id="search" type="text" placeholder="Search resources…" autocomplete="off" spellcheck="false" />
-      <kbd class="search-kbd">Ctrl F</kbd>
-      <div class="search-results" id="searchResults"></div>
-    </div>
-
-    <div class="spacer"></div>
-
-    <div class="cluster-chip"><span class="cluster-label">cluster</span><b id="clusterName">…</b></div>
-
-    <div class="hdr-divider"></div>
-
-    <div class="stat-group">
-      <div class="stat-item"><b id="nCount">0</b><span>resources</span></div>
-      <div class="stat-item"><b id="eCount">0</b><span>relationships</span></div>
-      <div class="stat-item"><b id="nsCount">0</b><span>namespaces</span></div>
-      <span id="autoscalerChip"></span>
-    </div>
-
-    <div class="hdr-divider"></div>
-
-    <button class="icon-btn" id="themeToggle" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
-      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
-      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-    </button>
-
-    <button class="btn" id="signOut" title="Sign out">Sign out</button>
-  </header>
-
-  <main>
-    <div class="controls">
-      <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
-      <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
-      <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
-      <div class="sync-wrap">
-        <button class="sync-pill on" id="syncPill" aria-haspopup="true" aria-expanded="false">
-          <span class="dot"></span><span id="syncPillLabel">LIVE</span>
-        </button>
-        <div class="sync-menu" id="syncMenu">
-          <div class="sync-menu-title">Sync</div>
-          <div class="sync-status" id="syncStatusLine">Last synced —</div>
-          <div class="sync-warn" id="syncWarnLine">⚠ Connection lost — showing data from <span id="syncWarnTime">—</span>, retrying…</div>
-          <div class="sync-menu-divider"></div>
-          <button class="sync-opt" data-val="3000">3 sec</button>
-          <button class="sync-opt active" data-val="10000">10 sec</button>
-          <button class="sync-opt" data-val="30000">30 sec</button>
-          <button class="sync-opt" data-val="60000">1 min</button>
-          <button class="sync-opt" data-val="300000">5 min</button>
-          <button class="sync-opt" data-val="manual">Manual</button>
+  <div class="m-main">
+    <div class="m-topbar">
+      <button class="m-iconbtn m-hamburger" id="mHamburger" aria-label="Open navigation"><svg class="m-ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <div class="m-title" id="mTitle"></div>
+      <div class="m-grow"></div>
+      <div class="m-ctx m-cluster" id="mCluster" title="Mantis reads one cluster per engine"></div>
+      <select class="m-ctx" id="mNs" aria-label="Namespace"><option value="">All namespaces</option></select>
+      <div class="m-gsearch" role="search">
+        <svg class="m-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="mSearch" type="search" placeholder="Search resources…" autocomplete="off" spellcheck="false" aria-label="Search resources" aria-controls="mSearchResults">
+        <kbd>Ctrl K</kbd>
+        <div class="m-gresults" id="mSearchResults" role="listbox"></div>
+      </div>
+      <button class="m-sync" id="mSync" aria-label="Sync status — click to refresh"></button>
+      <button class="m-iconbtn" id="mThemeBtn"></button>
+      <div class="m-menu-wrap">
+        <button class="m-iconbtn" id="mUserBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account"><span class="m-avatar">A</span></button>
+        <div class="m-menu" id="mUserMenu" role="menu">
+          <div class="m-menu-h"><b>admin</b><small>Public Preview account</small></div>
+          <a href="#/access" role="menuitem">Access &amp; authentication</a>
+          <a href="#/settings" role="menuitem">Settings</a>
+          <button id="mSignOut" role="menuitem">Sign out</button>
         </div>
       </div>
-      <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
-    <div class="viewbar" id="viewbar"></div>
+    <div class="m-content" id="mContent" tabindex="-1"></div>
 
-    <div class="legend collapsed" id="legend">
+    <!-- Topology: the graph renderer (graph-view.js) mounts here unchanged. -->
+    <main class="m-topo" id="topoPage" hidden>
+      <div class="controls">
+        <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
+        <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
+        <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
+      </div>
+      <div class="m-topo-search search-wrap">
+        <span class="search-ico">⌕</span>
+        <input class="search" id="search" type="text" placeholder="Find in graph…" autocomplete="off" spellcheck="false" aria-label="Find in graph" />
+        <kbd class="search-kbd">Ctrl F</kbd>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
+      <div class="viewbar" id="viewbar"></div>
+      <div class="legend collapsed" id="legend">
       <div class="legend-body"></div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
         <svg class="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.75" fill="currentColor" stroke="none"/></svg>
         <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-
-    <aside class="panel collapsed" id="panel">
+      <aside class="panel collapsed" id="panel">
       <div class="panel-resizer" id="panelResizer" title="Drag to resize"></div>
       <button class="panel-collapse" id="panelCollapse" title="Clear focus (Esc)" aria-label="Clear focus">✕</button>
       <div class="panel-content" id="panelContent"></div>
     </aside>
-    <div class="ymodal-overlay" id="ymodalOverlay">
+      <div class="ymodal-overlay" id="ymodalOverlay">
       <div class="ymodal">
         <div class="ymodal-head">
           <div class="ymodal-title" id="ymodalTitle"></div>
@@ -119,108 +101,14 @@
         <pre class="yaml ymodal-pre" id="ymodalPre"></pre>
       </div>
     </div>
-    <div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
-    <div class="overlay" id="overlay"><div class="card"><h3>Connecting to your cluster…</h3><p>Reading resources and relationships.</p></div></div>
-  </main>
+      <div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
+      <div class="overlay" id="overlay" style="display:none"></div>
+    </main>
+  </div>
 </div>
 
 <script src="graph-engine.js"></script>
 <script src="graph-view.js"></script>
-<script>
-// Page glue for the live app: where the graph comes from (mantis-engine via
-// mantis-web's /api proxy), the background-sync pill, and sign-out. The graph
-// UI itself is graph-view.js, shared with the playground.
-(function () {
-  "use strict";
-  const $ = id => document.getElementById(id);
-
-  function fetchJSON(url) {
-    return fetch(url, { cache: "no-store" }).then(r => {
-      if (r.status === 401) { window.location.href = "/login"; throw new Error("session expired"); }
-      return r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP " + r.status)); });
-    });
-  }
-  const app = MantisApp.mount({
-    source: {
-      // since > 0 asks the engine for only what changed since that revision.
-      load: since => fetchJSON("/api/graph" + (since ? "?since=" + since : "")),
-      resource: n => {
-        const p = new URLSearchParams({ kind: n.kind, name: n.name });
-        if (n.ns) p.set("ns", n.ns);
-        return fetch("/api/resource?" + p.toString()).then(async r => ({ ok: r.ok, status: r.status, text: await r.text() }));
-      },
-    },
-    errorHint: "Is your cluster running and your kubeconfig pointing at it?",
-  });
-
-  // ---- sync: polling the engine's cached graph, plus its own progress ----
-  let connState = "live", lastSyncedAt = null, lastProgress = null, autoTimer = null, syncMode = "60000", firstDone = false;
-  const SYNC_LABELS = { "3000": "3s", "10000": "10s", "30000": "30s", "60000": "1m", "300000": "5m" };
-  const pill = $("syncPill"), pillLabel = $("syncPillLabel"), menu = $("syncMenu");
-  function timeAgo(d) {
-    if (!d) return "never";
-    const s = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
-    if (s < 5) return "just now"; if (s < 60) return s + "s ago";
-    const m = Math.round(s / 60); return m < 60 ? m + "m ago" : Math.round(m / 60) + "h ago";
-  }
-  function setConn(state) { connState = state; if (state === "live") lastSyncedAt = new Date(); updatePill(); }
-  function updatePill() {
-    pill.classList.remove("on", "warn", "err");
-    const bg = !!(lastProgress && lastProgress.running);
-    if (connState === "error") { pill.classList.add("err"); pillLabel.textContent = "OFFLINE"; }
-    else if (syncMode === "manual") pillLabel.textContent = "MANUAL";
-    else if (connState === "syncing" || bg) { pill.classList.add("warn"); pillLabel.textContent = "SYNCING"; }
-    else { pill.classList.add("on"); pillLabel.textContent = SYNC_LABELS[syncMode] || "LIVE"; }
-    $("syncStatusLine").textContent = bg
-      ? "Namespaces " + lastProgress.namespacesDone + "/" + lastProgress.namespacesTotal + " · " + (lastProgress.resourcesSoFar || 0) + " resources"
-      : "Last synced " + timeAgo(lastSyncedAt);
-    const stale = connState === "error";
-    $("syncWarnLine").classList.toggle("show", stale);
-    if (stale) $("syncWarnTime").textContent = timeAgo(lastSyncedAt);
-    pill.title = stale ? "Connection lost" : "Connected to Kubernetes API";
-  }
-  setInterval(updatePill, 5000);
-  function progressHTML(p) {
-    if (!p || !p.namespacesTotal) return "";
-    return '<div class="sync-progress"><div class="sp-row"><span>Namespaces</span><b>' + p.namespacesDone + ' / ' + p.namespacesTotal + '</b></div>' +
-      '<div class="sp-row"><span>Resources found so far</span><b>' + (p.resourcesSoFar || 0) + '</b></div>' +
-      '<div class="sp-row"><span>Relationships so far</span><b>' + (p.relationshipsSoFar || 0) + '</b></div></div>';
-  }
-  function pollStatus() {
-    fetch("/api/sync/status", { cache: "no-store" }).then(r => r.ok ? r.json() : Promise.reject()).then(p => {
-      lastProgress = p; updatePill();
-      if (!firstDone) app.showOverlay("Connecting to your cluster…", "<p>Reading resources and relationships.</p>" + progressHTML(p), false);
-    }).catch(() => {});
-  }
-  setInterval(pollStatus, 1000); pollStatus();
-
-  function sync() {
-    if (!firstDone) return;
-    const slow = setTimeout(() => setConn("syncing"), 1500);
-    app.load(false)
-      .then(() => { clearTimeout(slow); setConn("live"); })
-      .catch(() => { clearTimeout(slow); setConn("error"); app.showToast("Lost contact with the engine — showing last snapshot, retrying…"); });
-  }
-  function setSync(val, immediate) {
-    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-    syncMode = val;
-    menu.querySelectorAll(".sync-opt").forEach(o => o.classList.toggle("active", o.getAttribute("data-val") === val));
-    $("syncNow").style.display = val === "manual" ? "" : "none";
-    if (val !== "manual") autoTimer = setInterval(sync, parseInt(val, 10) || 60000);
-    updatePill();
-    if (immediate) sync();
-  }
-  pill.addEventListener("click", ev => { ev.stopPropagation(); const open = menu.classList.toggle("open"); pill.setAttribute("aria-expanded", String(open)); if (open) updatePill(); });
-  menu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => { setSync(o.getAttribute("data-val"), true); menu.classList.remove("open"); pill.setAttribute("aria-expanded", "false"); }));
-  document.addEventListener("click", ev => { if (!ev.target.closest(".sync-wrap")) { menu.classList.remove("open"); pill.setAttribute("aria-expanded", "false"); } });
-  $("syncNow").addEventListener("click", sync);
-  $("signOut").addEventListener("click", () => { fetch("/logout", { method: "POST" }).finally(() => { window.location.href = "/login"; }); });
-
-  // Graph deltas are cheap now (only what changed crosses the wire), so the
-  // default poll is 10s rather than a minute.
-  app.firstLoad().then(() => { firstDone = true; setConn("live"); }).catch(() => {});
-  setSync("10000", false);
-})();
-</script>
+<script src="app-shell.js"></script>
 </body>
 </html>

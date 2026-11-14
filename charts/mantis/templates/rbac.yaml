@@ -110,6 +110,21 @@ rules:
       - nodepools
     verbs: ["get", "list"]
 
+  # Events back the dashboard's recent-activity panel and each resource's
+  # Events tab (GET /api/events). Listed only, never fetched by name.
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["list"]
+
+  # Node usage for the dashboard's capacity panel, read from metrics-server
+  # when it is installed. Without metrics-server this rule is harmless and the
+  # UI says "metrics not configured" rather than showing invented numbers.
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - nodes
+    verbs: ["list"]
+
   # mantis-engine reports the cluster's Kubernetes version in the graph
   # header via Discovery().ServerVersion(), which hits this non-resource
   # URL. Most clusters allow this by default for any authenticated

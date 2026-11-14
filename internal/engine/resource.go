@@ -106,6 +106,13 @@ func (s *Server) handleResource(w http.ResponseWriter, r *http.Request) {
 	// Drop server-managed noise so the manifest reads like something a human wrote.
 	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 
+	// ?format=json returns the same object as JSON, so the UI can read
+	// status.conditions, annotations and spec fields without a YAML parser.
+	if r.URL.Query().Get("format") == "json" {
+		writeJSON(w, r, obj.Object)
+		return
+	}
+
 	out, err := yaml.Marshal(obj.Object)
 	if err != nil {
 		http.Error(w, "encode yaml: "+err.Error(), http.StatusInternalServerError)

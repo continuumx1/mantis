@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -327,3 +328,50 @@ func TestFromContext_DropsDanglingRefsOnlyHiddenResourcesMake(t *testing.T) {
 		t.Error("a missing ConfigMap referenced by a visible Pod must still be shown as not found")
 	}
 }
+
+func TestEventsAndCapacity(t *testing.T) {
+	now := metav1.Now()
+	cs := fake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n1"}, Status: corev1.NodeStatus{
+			Conditions:  []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}},
+			Allocatable: corev1.ResourceList{corev1.ResourceCPU: resourceMust("4"), corev1.ResourceMemory: resourceMust("8Gi"), corev1.ResourcePods: resourceMust("110")},
+			Capacity:    corev1.ResourceList{corev1.ResourceCPU: resourceMust("4"), corev1.ResourceMemory: resourceMust("8Gi")},
+		}},
+		&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "e1", Namespace: "shop"}, Type: "Warning", Reason: "BackOff", Message: "restarting",
+			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "web-1", Namespace: "shop"}, LastTimestamp: now, Count: 3},
+		&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "e2", Namespace: "shop"}, Type: "Normal", Reason: "Pulled",
+			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "web-1", Namespace: "shop"}, LastTimestamp: now},
+	)
+	s := newTestServerWithClient(cs)
+
+	rec := httptest.NewRecorder()
+	s.handleEvents(rec, httptest.NewRequest("GET", "/api/events?type=Warning", nil))
+	var ev EventsDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.Total != 2 || ev.Warnings != 1 || len(ev.Events) != 1 || ev.Events[0].ObjectID != "shop/Pod/web-1" || ev.Events[0].Count != 3 {
+		t.Errorf("events = %+v", ev)
+	}
+
+	rec = httptest.NewRecorder()
+	s.handleCapacity(rec, httptest.NewRequest("GET", "/api/cluster/capacity", nil))
+	var c CapacityDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil {
+		t.Fatal(err)
+	}
+	if c.Nodes != 1 || c.ReadyNodes != 1 || c.CPUAllocatable != 4000 || c.PodCapacity != 110 {
+		t.Errorf("capacity = %+v", c)
+	}
+	// No metrics-server in a fake cluster: usage must be absent, not invented.
+	if c.Metrics || c.CPUUsage != 0 || c.MetricsReason == "" {
+		t.Errorf("metrics without metrics-server = %+v, want unavailable with a reason", c)
+	}
+	for _, a := range cs.Actions() {
+		if a.GetVerb() != "list" && a.GetVerb() != "get" {
+			t.Errorf("non-read call %s", a.GetVerb())
+		}
+	}
+}
+
+func resourceMust(s string) resource.Quantity { return resource.MustParse(s) }

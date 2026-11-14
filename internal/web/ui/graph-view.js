@@ -743,6 +743,9 @@
     });
     document.addEventListener("click", ev => { if (!ev.target.closest(".search-wrap")) closeSearch(); });
     document.addEventListener("keydown", ev => {
+      // Only while the graph is on screen: inside the application shell the
+      // Topology page can be hidden behind other pages without unmounting.
+      if (!svg.getClientRects().length) return;
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "f") {
         ev.preventDefault();
         const t = ym.overlay.classList.contains("open") ? ym.search : searchInput; t.focus(); t.select(); return;

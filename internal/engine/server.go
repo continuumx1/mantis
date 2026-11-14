@@ -41,6 +41,9 @@ type Server struct {
 	// so a re-sync never briefly replaces the whole graph with a half-walked
 	// one.
 	published atomic.Bool
+	// Short-lived caches for the application pages' live reads.
+	events   ttlCache[EventsDTO]
+	capacity ttlCache[CapacityDTO]
 	// syncing guards syncOnce against ever running twice at once. The
 	// scheduled loop (syncLoop) is already sequential by construction and
 	// can't overlap itself, but this makes that guarantee an explicit,
@@ -81,6 +84,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/graph", s.handleGraph)
 	mux.HandleFunc("/api/graph/search", s.handleSearch)
 	mux.HandleFunc("/api/graph/neighbors", s.handleNeighbors)
+	mux.HandleFunc("/api/events", s.handleEvents)
+	mux.HandleFunc("/api/cluster/capacity", s.handleCapacity)
 	mux.HandleFunc("/api/sync/status", s.handleSyncStatus)
 	mux.HandleFunc("/api/resource", s.handleResource)
 	mux.HandleFunc("/healthz", s.handleHealth)
