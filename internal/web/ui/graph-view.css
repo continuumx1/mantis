@@ -456,3 +456,23 @@
   .statusbar { left: auto; right: 16px; transform: none; max-width: calc(100% - 520px); white-space: normal; text-align: right; line-height: 1.6; }
   .panel:not(.collapsed) ~ .statusbar { right: 350px; max-width: calc(100% - 380px); }
   @media (max-width: 1100px) { .statusbar { display: none; } }
+
+  /* Zoom bar: right edge by default, steps aside for the inspector; once
+     dragged it stays where the user put it (.moved). */
+  .zoombar { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    width: 40px; padding: 4px 0 6px; background: color-mix(in srgb, var(--panel) 96%, transparent); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.12); transition: right .2s ease, opacity .15s; user-select: none; }
+  .panel:not(.collapsed) ~ .zoombar:not(.moved) { right: 352px; }
+  .zoombar.moved { right: auto; transform: none; transition: none; }
+  .zoombar.dragging { opacity: .85; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+  .zoombar button { display: flex; align-items: center; justify-content: center; width: 30px; height: 28px; border: 0; border-radius: 6px; background: none;
+    color: var(--muted); font-family: var(--font-ui); font-size: 17px; line-height: 1; cursor: pointer; }
+  .zoombar button:hover { background: var(--panel-2); color: var(--ink); }
+  .zoombar button:focus-visible, .zoombar input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  .zoombar button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .zoombar .zb-grip { height: 16px; cursor: grab; color: var(--faint); }
+  .zoombar .zb-grip svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+  .zoombar.dragging .zb-grip { cursor: grabbing; }
+  .zoombar .zb-pct { width: 36px; height: 20px; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .zoombar .zb-range { writing-mode: vertical-lr; direction: rtl; width: 18px; height: 110px; margin: 4px 0; accent-color: var(--brand); cursor: pointer; }
+  @media (max-width: 760px) { .zoombar .zb-range { display: none; } }

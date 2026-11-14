@@ -453,7 +453,97 @@
       svg.classList.toggle("lod-mid", view.k < 0.55 && view.k >= 0.3);
       svg.classList.toggle("lod-far", view.k < 0.3);
       if (!cullTimer) cullTimer = setTimeout(() => { cullTimer = null; cull(false); }, 60);
+      zoomBar.sync();
     };
+    // ---- zoom bar: + / slider / − / fit, draggable, position remembered ----
+    const ZOOM_MIN = 0.06, ZOOM_MAX = 2.6;
+    const zoomBar = (() => {
+      const host = svg.parentNode;
+      const bar = document.createElement("div");
+      bar.className = "zoombar";
+      bar.setAttribute("role", "toolbar");
+      bar.setAttribute("aria-label", "Zoom");
+      bar.innerHTML =
+        '<button class="zb-grip" type="button" aria-label="Move zoom controls (drag, or use arrow keys; double-click to reset)" title="Drag to move · double-click to reset">' +
+          '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="4" cy="3" r="1"/><circle cx="8" cy="3" r="1"/><circle cx="4" cy="6" r="1"/><circle cx="8" cy="6" r="1"/><circle cx="4" cy="9" r="1"/><circle cx="8" cy="9" r="1"/></svg></button>' +
+        '<button type="button" data-z="in" aria-label="Zoom in" title="Zoom in (+)">+</button>' +
+        '<input class="zb-range" type="range" min="0" max="1000" step="1" aria-label="Zoom level" title="Zoom level">' +
+        '<button type="button" data-z="out" aria-label="Zoom out" title="Zoom out (−)">−</button>' +
+        '<button type="button" class="zb-pct" data-z="reset" aria-label="Reset zoom to 100%" title="Reset to 100%">100%</button>' +
+        '<button type="button" data-z="fit" aria-label="Fit graph to screen" title="Fit to screen (0)">' +
+          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>';
+      host.appendChild(bar);
+      const range = bar.querySelector(".zb-range"), pct = bar.querySelector(".zb-pct");
+      // The slider is logarithmic, so every step feels like the same amount of zoom.
+      const toSlider = k => Math.round(1000 * Math.log(k / ZOOM_MIN) / Math.log(ZOOM_MAX / ZOOM_MIN));
+      const fromSlider = v => ZOOM_MIN * Math.pow(ZOOM_MAX / ZOOM_MIN, v / 1000);
+
+      bar.addEventListener("click", ev => {
+        const b = ev.target.closest("[data-z]"); if (!b) return;
+        const z = b.getAttribute("data-z");
+        if (z === "in") zoomBy(1.25); else if (z === "out") zoomBy(0.8);
+        else if (z === "reset") zoomTo(1, true); else if (z === "fit") fit(true);
+      });
+      range.addEventListener("input", () => zoomTo(fromSlider(+range.value), false));
+      // Keep wheel and drag gestures on the bar from panning or zooming the canvas.
+      ["pointerdown", "wheel", "dblclick"].forEach(t => bar.addEventListener(t, ev => ev.stopPropagation()));
+
+      // Dragging. Position is stored in px from the host's top-left; with no
+      // stored position the bar sits at the right edge, clear of the inspector.
+      const KEY = "mantis-zoombar-pos";
+      let pos = null;
+      try { pos = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { pos = null; }
+      const place = () => {
+        bar.classList.toggle("moved", !!pos);
+        if (!pos) { bar.style.left = ""; bar.style.top = ""; return; }
+        const hw = host.clientWidth, hh = host.clientHeight;
+        const x = Math.max(6, Math.min(hw - bar.offsetWidth - 6, pos.x));
+        const y = Math.max(6, Math.min(hh - bar.offsetHeight - 6, pos.y));
+        bar.style.left = x + "px"; bar.style.top = y + "px";
+      };
+      const save = () => { try { if (pos) localStorage.setItem(KEY, JSON.stringify(pos)); else localStorage.removeItem(KEY); } catch (e) { /* not persisted */ } };
+      const grip = bar.querySelector(".zb-grip");
+      let drag = null;
+      grip.addEventListener("pointerdown", ev => {
+        const r = bar.getBoundingClientRect(), h = host.getBoundingClientRect();
+        drag = { dx: ev.clientX - r.left, dy: ev.clientY - r.top, hx: h.left, hy: h.top };
+        grip.setPointerCapture(ev.pointerId); bar.classList.add("dragging"); ev.preventDefault();
+      });
+      grip.addEventListener("pointermove", ev => {
+        if (!drag) return;
+        pos = { x: ev.clientX - drag.hx - drag.dx, y: ev.clientY - drag.hy - drag.dy }; place();
+      });
+      const end = () => { if (!drag) return; drag = null; bar.classList.remove("dragging"); pos = { x: parseFloat(bar.style.left), y: parseFloat(bar.style.top) }; save(); };
+      grip.addEventListener("pointerup", end); grip.addEventListener("pointercancel", end);
+      grip.addEventListener("dblclick", () => { pos = null; save(); place(); });
+      grip.addEventListener("keydown", ev => {
+        const d = { ArrowUp: [0, -12], ArrowDown: [0, 12], ArrowLeft: [-12, 0], ArrowRight: [12, 0] }[ev.key];
+        if (!d) return;
+        ev.preventDefault();
+        const r = bar.getBoundingClientRect(), h = host.getBoundingClientRect();
+        pos = { x: (pos ? pos.x : r.left - h.left) + d[0], y: (pos ? pos.y : r.top - h.top) + d[1] };
+        place(); save();
+      });
+      window.addEventListener("resize", place);
+      requestAnimationFrame(place);
+      return {
+        sync() {
+          range.value = String(toSlider(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, view.k))));
+          pct.textContent = Math.round(view.k * 100) + "%";
+        },
+      };
+    })();
+    // zoomTo keeps the point at the centre of the visible canvas (left of the
+    // inspector when it is open) fixed while the zoom changes.
+    function zoomTo(k, animate) {
+      k = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, k));
+      const pw = panel.classList.contains("collapsed") ? 0 : panel.offsetWidth + 28;
+      const cx = (W() - pw) / 2, cy = H() / 2;
+      const wx = (cx - view.x) / view.k, wy = (cy - view.y) / view.k;
+      const tx = cx - wx * k, ty = cy - wy * k;
+      if (animate) animateView(tx, ty, k, 220); else { view.x = tx; view.y = ty; view.k = k; applyView(); }
+    }
+    const zoomBy = f => zoomTo(view.k * f, true);
     function cull(force) {
       const pad = 0.6;
       const vw = W() / view.k, vh = H() / view.k;
@@ -502,7 +592,7 @@
     svg.addEventListener("wheel", ev => {
       ev.preventDefault();
       const r = svg.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, f = Math.exp(-ev.deltaY * 0.0016);
-      const nk = Math.min(2.6, Math.max(0.06, view.k * f));
+      const nk = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.k * f));
       view.x = mx - (mx - view.x) * (nk / view.k); view.y = my - (my - view.y) * (nk / view.k); view.k = nk; applyView();
     }, { passive: false });
     let drag = null;
@@ -811,6 +901,12 @@
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "f") {
         ev.preventDefault();
         const t = ym.overlay.classList.contains("open") ? ym.search : searchInput; t.focus(); t.select(); return;
+      }
+      const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "") && !(document.activeElement || {}).classList.contains("zb-range");
+      if (!typing && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        if (ev.key === "+" || ev.key === "=") { ev.preventDefault(); zoomBy(1.25); return; }
+        if (ev.key === "-" || ev.key === "_") { ev.preventDefault(); zoomBy(0.8); return; }
+        if (ev.key === "0") { ev.preventDefault(); fit(true); return; }
       }
       if (ev.key !== "Escape") return;
       if (ym.overlay.classList.contains("open")) { closeYamlModal(); return; }
