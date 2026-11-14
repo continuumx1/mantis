@@ -56,7 +56,11 @@ func NoCache(h http.Handler) http.Handler { return noCache(h) }
 // a public-preview login gate (see auth.go) — a hardcoded admin/admin and an
 // in-memory session, not a real auth story, but enough to stand a login screen
 // up in front of the graph.
-func NewHandler(engineURL string) (http.Handler, error) {
+//
+// /api/report goes to mantis-report instead (reportURL), behind the same gate.
+// An empty reportURL means the report service is not deployed: report
+// requests then get a clear 503 instead of reaching the engine.
+func NewHandler(engineURL string, reportURL ...string) (http.Handler, error) {
 	target, err := url.Parse(engineURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse engine url %q: %w", engineURL, err)
@@ -89,6 +93,7 @@ func NewHandler(engineURL string) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", proxy)
+	mux.Handle("/api/report", reportHandler(firstOr(reportURL, "")))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteText(w, "ok")
 	})
@@ -115,4 +120,37 @@ func NewHandler(engineURL string) (http.Handler, error) {
 	mux.HandleFunc("/logout", sess.handleLogout)
 	mux.Handle("/", static)
 	return sess.gate(mux), nil
+}
+
+func firstOr(v []string, d string) string {
+	if len(v) > 0 {
+		return v[0]
+	}
+	return d
+}
+
+// reportHandler proxies report requests to mantis-report. Responses stream
+// (progress events, then the document), so they are flushed immediately.
+func reportHandler(reportURL string) http.Handler {
+	if reportURL == "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"Reports are not available: the mantis-report service is not deployed."}`))
+		})
+	}
+	target, err := url.Parse(reportURL)
+	if err != nil || target.Scheme == "" || target.Host == "" {
+		slog.Error("startup", "event", "bad_report_url", "report_url", reportURL)
+		return reportHandler("")
+	}
+	p := httputil.NewSingleHostReverseProxy(target)
+	p.FlushInterval = -1
+	p.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Error("proxy", "event", "report_proxy_failure", "error", err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"error":"The report service is unreachable."}`))
+	}
+	return p
 }

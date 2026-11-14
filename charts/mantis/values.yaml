@@ -102,6 +102,42 @@ web:
     capabilities:
       drop: ["ALL"]
 
+# mantis-report: builds password-protected (AES-256) PDF infrastructure
+# reports. No Kubernetes access — it reads mantis-engine's snapshot API.
+# Stateless; scale with replicaCount. Set enabled: false to remove reports.
+report:
+  enabled: true
+  replicaCount: 1
+  maxConcurrent: 2   # simultaneous reports per replica (each holds one cluster snapshot in memory)
+
+  service:
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 512Mi   # a report for ~10,000 resources peaks around 250Mi
+
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
 serviceAccount:
   create: true   # only mantis-engine uses this; mantis-web needs no Kubernetes access
   name: ""

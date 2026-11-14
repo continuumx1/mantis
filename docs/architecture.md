@@ -1,15 +1,15 @@
 # Architecture
 
-Mantis runs as **two independent services** in your cluster, plus your
-browser as the client. There is no database, no separate storage, and no
-third component — every graph you see is built live from a fresh read of
-the Kubernetes API.
+Mantis runs as **three independent services** in your cluster, plus your
+browser as the client: `mantis-web`, `mantis-engine` and `mantis-report`.
+There is no database and no separate storage — every graph you see is built
+from the engine's live view of the Kubernetes API.
 
 <div markdown style="background: #fff; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
 ![Mantis architecture: browser → mantis-web → mantis-engine → Kubernetes API server](images/mantis-arch-white-bg.png)
 </div>
 
-## The two services
+## The three services
 
 **`mantis-engine` (backend)** is the only service that talks to Kubernetes.
 On startup it builds a client using its Pod's ServiceAccount token (the
@@ -22,16 +22,29 @@ local dev tool. It exposes:
 - `GET /api/graph/search`, `GET /api/graph/neighbors` — indexed search and
   dependency-neighbourhood queries
 - `GET /api/resource` — one resource's YAML manifest, fetched on demand
+- `GET /internal/v1/snapshot` — the graph plus trimmed, value-free resource
+  objects, for `mantis-report` only (not proxied by `mantis-web`)
 - `GET /healthz`, `GET /readyz` — liveness/readiness probes
 
-It renders no UI.
+It renders no UI and generates no reports.
 
 **`mantis-web` (frontend)** serves the embedded single-page UI and
 reverse-proxies every `/api/*` request straight through to `mantis-engine`.
 Your browser only ever talks to `mantis-web`; it never makes a direct
 request to the engine or to the Kubernetes API. This is also what lets
 `mantis-engine` stay a private `ClusterIP` service with no public exposure
-at all — only `mantis-web` needs an Ingress or LoadBalancer.
+at all — only `mantis-web` needs an Ingress or LoadBalancer. The one
+exception to "everything goes to the engine" is `POST /api/report`, which
+`mantis-web` proxies to `mantis-report`.
+
+**`mantis-report` (reports)** generates the password-protected
+[Infrastructure Report](reports.md) PDFs. It never talks to Kubernetes: it
+reads one snapshot from the engine's internal API per report, checks the
+browser's topology layout against it, renders the PDF and encrypts it with
+AES-256. It is stateless — nothing about a report outlives the request — so
+it scales independently of the engine (`report.replicaCount`), and its Pod
+mounts no ServiceAccount token. Network policies allow only
+`mantis-web → mantis-report → mantis-engine`.
 
 ## What happens on a page load
 

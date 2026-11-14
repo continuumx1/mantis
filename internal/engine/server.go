@@ -16,6 +16,7 @@ import (
 
 	"github.com/continuumx1/mantis/internal/httpx"
 	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
+	"github.com/continuumx1/mantis/internal/snapshotapi"
 )
 
 // buildTimeout bounds a single graph build so a hung API server cannot hang a
@@ -112,6 +113,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/graph/neighbors", s.handleNeighbors)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/cluster/capacity", s.handleCapacity)
+	mux.HandleFunc(snapshotapi.Path, s.handleInternalSnapshot)
 	mux.HandleFunc("/api/sync/status", s.handleSyncStatus)
 	mux.HandleFunc("/api/resource", s.handleResource)
 	mux.HandleFunc("/healthz", s.handleHealth)

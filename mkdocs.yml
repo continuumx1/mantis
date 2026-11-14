@@ -99,6 +99,7 @@ nav:
   - "Graph: model, views & layout": graph-architecture.md
   - Application UI: application-ui.md
   - User Guide: user-guide.md
+  - Infrastructure Reports: reports.md
   - Security: security.md
   - Deployment: deployment.md
   - Troubleshooting: troubleshooting.md

@@ -48,6 +48,7 @@
           <div class="m-menu-h"><b>admin</b><small>Public Preview account</small></div>
           <a href="#/access" role="menuitem">Access &amp; authentication</a>
           <a href="#/settings" role="menuitem">Settings</a>
+          <button data-report role="menuitem">Download report…</button>
           <button id="mSignOut" role="menuitem">Sign out</button>
         </div>
       </div>
@@ -61,6 +62,7 @@
         <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
         <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
         <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
+        <button class="btn" data-report title="Download a password-protected PDF report of the cluster">Report</button>
       </div>
       <div class="m-topo-search search-wrap">
         <span class="search-ico">⌕</span>
@@ -110,6 +112,7 @@
 
 <script src="graph-engine.js"></script>
 <script src="graph-view.js"></script>
+<script src="report-layout.js"></script>
 <script src="app-shell.js"></script>
 </body>
 </html>

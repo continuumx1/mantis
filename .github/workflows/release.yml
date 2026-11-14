@@ -113,6 +113,16 @@ jobs:
           build-args: VERSION=${{ env.APP_VERSION }}
           tags: cx1tech/mantis:${{ env.APP_VERSION }}-web
 
+      - name: Build and push mantis-report
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile.report
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ env.APP_VERSION }}
+          tags: cx1tech/mantis:${{ env.APP_VERSION }}-report
+
       - uses: azure/setup-helm@v4
       - name: Package and push the Helm chart
         run: |

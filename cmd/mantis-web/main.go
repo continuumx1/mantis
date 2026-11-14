@@ -31,7 +31,9 @@ func main() {
 	addr := httpx.EnvOr("MANTIS_WEB_ADDR", ":8080")
 	engineURL := httpx.EnvOr("MANTIS_ENGINE_URL", "http://mantis-engine:8080")
 
-	handler, err := web.NewHandler(engineURL)
+	// Empty disables reports (the UI then explains the service is not deployed).
+	reportURL := httpx.EnvOr("MANTIS_REPORT_URL", "")
+	handler, err := web.NewHandler(engineURL, reportURL)
 	if err != nil {
 		slog.Error("startup failed", "event", "handler_init_failed", "error", err.Error())
 		os.Exit(1)

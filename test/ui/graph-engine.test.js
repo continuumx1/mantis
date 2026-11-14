@@ -271,3 +271,27 @@ test("real captured fixtures: every scenario lays out without overlap", () => {
     }
   }
 });
+
+test("report layout: small clusters get one diagram, large ones an overview plus every namespace, nothing dropped", () => {
+  const R = require("../../internal/web/ui/report-layout.js");
+  const small = storeOf(synth(2, 2, 2));
+  const one = R.build(small);
+  assert.equal(one.partitioned, false);
+  assert.equal(one.pages.length, 1);
+  assert.equal(one.pages[0].nodes.filter(n => n.type === "resource").length, small.nodes.size, "every resource drawn on the single diagram");
+
+  const big = storeOf(synth(12, 8, 6));
+  const many = R.build(big);
+  assert.equal(many.partitioned, true);
+  assert.equal(many.pages[0].kind, "overview");
+  const covered = new Set();
+  many.pages.slice(1).forEach(p => p.nodes.forEach(n => {
+    if (n.type === "resource") covered.add(n.id);
+    if (n.type === "aggregate") n.members.forEach(m => covered.add(m));
+  }));
+  big.nodes.forEach(n => { if (n.ns) assert.ok(covered.has(n.id), n.id + " missing from every namespace diagram"); });
+  many.pages.forEach(p => {
+    p.edges.forEach(e => e.keys.forEach(k => assert.ok(big.edges.has(k), "edge key " + k + " not canonical")));
+    assert.ok(p.bounds[2] > p.bounds[0] && p.bounds[3] > p.bounds[1]);
+  });
+});

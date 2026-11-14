@@ -51,6 +51,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-web" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "mantis.report.fullname" -}}
+{{- printf "%s-report" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "mantis.report.selectorLabels" -}}
+{{ include "mantis.selectorLabels" . }}
+app.kubernetes.io/component: report
+{{- end -}}
+
+{{- define "mantis.report.labels" -}}
+{{ include "mantis.labels" . }}
+app.kubernetes.io/component: report
+{{- end -}}
+
+{{- define "mantis.report.image" -}}
+{{- printf "%s:%s-report" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+
 {{- define "mantis.engine.selectorLabels" -}}
 {{ include "mantis.selectorLabels" . }}
 app.kubernetes.io/component: engine

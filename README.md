@@ -67,8 +67,9 @@ specific distro.
 
 ## How it works
 
-Mantis runs as **two small services**, plus your browser — no database, no
-extra storage. Every graph you see is built live from a fresh read of the
+Mantis runs as **three small services** — `mantis-web`, `mantis-engine` and
+`mantis-report` — plus your browser. There is no database and no extra
+storage. Every graph you see is built from the engine's live view of the
 Kubernetes API.
 
 <p align="center">
@@ -85,18 +86,26 @@ Kubernetes API.
 4. The UI renders it, and re-polls on an interval you control from the
    header (down to every 3 seconds, or manual).
 
-Because only `mantis-web` needs to be reachable, `mantis-engine` can stay a
-private, internal-only service with no exposure at all.
+5. **Download report** asks **`mantis-report`** (via `mantis-web`) for a
+   password-protected PDF [Infrastructure Report](docs/reports.md). It reads
+   one snapshot from the engine's internal API, so it never talks to
+   Kubernetes and can be scaled on its own.
+
+Because only `mantis-web` needs to be reachable, `mantis-engine` and
+`mantis-report` stay private, internal-only services.
 
 ```
 cmd/
   mantis-engine/      backend service entry point (main.go)
   mantis-web/         frontend service entry point (main.go)
+  mantis-report/      report service entry point (main.go)
 internal/
   graph/              relationship model — ResourceRef, typed Relation,
                        resolvers, Context, and the whole-cluster graph builder
   engine/              backend: graph JSON projection (dto.go) + HTTP handlers
                        (server.go): /api/graph, /api/resource, /healthz, /readyz
+  snapshotapi/         internal engine → report snapshot contract
+  report/              report service: health, findings, PDF rendering, AES-256
   web/                 frontend: embedded UI, login gate, /api reverse-proxy
     ui/                the interactive graph (single-page, no external assets)
   kubernetes/          read-only client (in-cluster ServiceAccount OR kubeconfig)
@@ -104,6 +113,7 @@ internal/
 build/
   Dockerfile.engine    backend image (distroless, nonroot)
   Dockerfile.web       frontend image (distroless, nonroot)
+  Dockerfile.report    report image (distroless, nonroot)
 ```
 
 For the full picture — every UI feature, the security/permissions model, and
@@ -144,7 +154,7 @@ just this example; use whatever's free on your machine.
 
 ## Configuration
 
-Both services are configured entirely through environment variables.
+All three services are configured entirely through environment variables.
 
 | Service | Env var | Default | Meaning |
 |---------|---------|---------|---------|
@@ -152,11 +162,16 @@ Both services are configured entirely through environment variables.
 | `mantis-engine` | `MANTIS_SHOW_ALL` | `false` | include system-managed ConfigMaps/Secrets |
 | `mantis-web` | `MANTIS_WEB_ADDR` | `:8080` | listen address |
 | `mantis-web` | `MANTIS_ENGINE_URL` | `http://mantis-engine:8080` | engine base URL to proxy `/api` to |
+| `mantis-web` | `MANTIS_REPORT_URL` | *(empty)* | report service URL for `/api/report`; empty disables reports |
+| `mantis-report` | `MANTIS_REPORT_ADDR` | `:8080` | listen address |
+| `mantis-report` | `MANTIS_ENGINE_URL` | `http://mantis-engine:8080` | engine base URL for snapshots |
+| `mantis-report` | `MANTIS_REPORT_MAX_CONCURRENT` | `2` | simultaneous reports per replica |
 
 Endpoints:
 
 - `mantis-engine`: `GET /api/graph`, `GET /api/resource`, `GET /healthz` (liveness), `GET /readyz` (readiness)
-- `mantis-web`: `GET /` (UI), `GET /login`, `GET /api/*` (proxied to the engine), `GET /healthz`
+- `mantis-web`: `GET /` (UI), `GET /login`, `GET /api/*` (proxied to the engine), `POST /api/report` (proxied to `mantis-report`), `GET /healthz`
+- `mantis-report`: `POST /api/report` (NDJSON progress, then the encrypted PDF), `GET /healthz`, `GET /readyz`
 
 ## Running in a cluster
 

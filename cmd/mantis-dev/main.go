@@ -32,6 +32,8 @@ import (
 	"github.com/continuumx1/mantis/internal/engine"
 	"github.com/continuumx1/mantis/internal/graph"
 	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
+	"github.com/continuumx1/mantis/internal/report"
+	"github.com/continuumx1/mantis/internal/snapshotapi"
 	"github.com/continuumx1/mantis/internal/synth"
 	"github.com/continuumx1/mantis/internal/web"
 )
@@ -106,6 +108,10 @@ func serve(srv *engine.Server, uiDir, addr string) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/", srv.Handler())
+	// The engine's internal snapshot API and, in-process, the mantis-report
+	// service reading it — the same three-service flow as a real install.
+	mux.Handle(snapshotapi.Path, srv.Handler())
+	mux.Handle("/api/report", report.NewService("http://"+addr, 2).Handler())
 	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/", http.StatusSeeOther) })
 	mux.Handle("/", static)
 	slog.Info("mantis-dev listening", "url", "http://"+addr+"/")

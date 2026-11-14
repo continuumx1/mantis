@@ -39,6 +39,8 @@
     expand: '<path d="m9 18 6-6-6-6"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/>',
+    report: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9.5 14.5 12 17l2.5-2.5"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   };
   const icon = (name, extra) => '<svg class="m-ico' + (extra ? " " + extra : "") + '" viewBox="0 0 24 24" aria-hidden="true">' + IC[name] + '</svg>';
 
@@ -416,7 +418,7 @@
     const scope = S.ns ? 'namespace <b class="m-mono">' + esc(S.ns) + '</b>' : "the whole cluster";
     const stat = (k, v, s, href, cls) => '<div class="m-card m-stat">' + (href ? '<a href="' + href + '">' : "") + '<div class="m-stat-k">' + k + '</div><div class="m-stat-v"' + (cls ? ' style="color:var(--m-' + cls + ')"' : "") + '>' + v + '</div><div class="m-stat-s">' + s + '</div>' + (href ? "</a>" : "") + '</div>';
 
-    let h = '<div class="m-page"><div class="m-page-h"><div><h1>Cluster overview</h1><p>What is happening in ' + scope + ' right now — every number below is read from the Kubernetes API.</p></div><div class="m-grow"></div><a class="m-btn primary" href="#/topology">' + icon("topology") + 'Open topology</a></div>';
+    let h = '<div class="m-page"><div class="m-page-h"><div><h1>Cluster overview</h1><p>What is happening in ' + scope + ' right now — every number below is read from the Kubernetes API.</p></div><div class="m-grow"></div><button class="m-btn" data-report>' + icon("report") + 'Download report</button><a class="m-btn primary" href="#/topology">' + icon("topology") + 'Open topology</a></div>';
 
     // A. cluster overview
     h += '<div class="m-card" style="margin-bottom:14px"><div class="m-card-b" style="display:flex;flex-wrap:wrap;gap:10px 28px;align-items:center">' +
@@ -782,6 +784,134 @@
     rerender();
   }
   function signOut() { fetch("/logout", { method: "POST" }).finally(() => { location.href = "/login"; }); }
+
+  // ---------------------------------------------------------------- reports
+  // Infrastructure Report: the browser lays out the topology with the same
+  // engine the Topology page uses (report-layout.js), then mantis-report
+  // validates it against the engine's snapshot, builds the PDF and encrypts
+  // it (AES-256). Progress events stream back; closing the dialog cancels.
+  const REPORT_STAGES = [
+    ["prepare", "Preparing cluster data"], ["topology", "Building topology"], ["inventory", "Generating inventory"],
+    ["render", "Rendering PDF"], ["encrypt", "Applying encryption"], ["ready", "Report ready"],
+  ];
+  let reportAbort = null, reportURL = null;
+  function openReportDialog() {
+    closeReportDialog();
+    const wrap = document.createElement("div");
+    wrap.className = "m-modal-wrap"; wrap.id = "reportModal";
+    const cluster = esc((store.meta || {}).context || "this cluster");
+    wrap.innerHTML = '<div class="m-modal" role="dialog" aria-modal="true" aria-labelledby="rpTitle">' +
+      '<div class="m-modal-h"><h2 id="rpTitle">' + icon("report") + 'Infrastructure report</h2><button class="m-iconbtn" data-close aria-label="Close">✕</button></div>' +
+      '<div class="m-modal-b" id="rpBody">' +
+        '<div class="m-field"><div class="m-field-l">Scope</div><label class="m-check"><input type="radio" checked disabled> Entire cluster <span class="m-muted">(' + cluster + ')</span></label></div>' +
+        '<div class="m-field"><div class="m-field-l">Contents</div>' +
+          [["topology", "Complete cluster topology"], ["inventory", "Resource inventory"], ["health", "Cluster health summary"], ["findings", "Findings and anomalies"]]
+            .map(([k, l]) => '<label class="m-check"><input type="checkbox" data-c="' + k + '" checked> ' + l + '</label>').join("") +
+          '<div class="m-muted" style="font-size:12px;margin-top:2px">A cluster overview and report metadata are always included.</div></div>' +
+        '<div class="m-field"><div class="m-field-l">' + icon("lock") + 'Password protection <span class="m-badge ok" style="margin-left:6px">AES-256</span></div>' +
+          '<input class="m-input" id="rpPw" type="password" autocomplete="new-password" placeholder="PDF password (8+ characters)" aria-label="PDF password" style="width:100%">' +
+          '<input class="m-input" id="rpPw2" type="password" autocomplete="new-password" placeholder="Confirm password" aria-label="Confirm PDF password" style="width:100%;margin-top:8px">' +
+          '<div class="m-muted" style="font-size:12px;margin-top:6px">Needed to open the PDF. Mantis never stores or logs it, and it is separate from your Mantis sign-in — keep it somewhere safe, it cannot be recovered.</div>' +
+          '<div class="m-note crit" id="rpErr" hidden style="margin-top:8px"></div></div>' +
+      '</div>' +
+      '<div class="m-modal-f" id="rpFoot"><button class="m-btn" data-close>Cancel</button><button class="m-btn primary" id="rpGo">' + icon("report") + 'Generate report</button></div></div>';
+    document.body.appendChild(wrap);
+    wrap.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeReportDialog));
+    wrap.addEventListener("click", ev => { if (ev.target === wrap) closeReportDialog(); });
+    wrap.addEventListener("keydown", ev => { if (ev.key === "Escape") closeReportDialog(); });
+    $("rpGo").addEventListener("click", startReport);
+    [$("rpPw"), $("rpPw2")].forEach(i => i.addEventListener("keydown", ev => { if (ev.key === "Enter") startReport(); }));
+    setTimeout(() => $("rpPw").focus(), 30);
+  }
+  function closeReportDialog() {
+    if (reportAbort) { reportAbort.abort(); reportAbort = null; }
+    if (reportURL) { URL.revokeObjectURL(reportURL); reportURL = null; }
+    const m = $("reportModal"); if (m) m.remove();
+  }
+  function reportError(msg) { const e = $("rpErr"); if (e) { e.textContent = msg; e.hidden = false; } }
+  function renderStages(state, detail) {
+    const body = $("rpBody"); if (!body) return;
+    body.innerHTML = '<ol class="m-steps">' + REPORT_STAGES.map(([k, l]) => {
+      const st = state[k] || "pending";
+      const mark = st === "done" ? "✓" : st === "active" ? '<span class="m-spin" aria-hidden="true"></span>' : st === "error" ? "!" : "";
+      return '<li class="m-step ' + st + '"><span class="m-step-i">' + mark + '</span>' + esc(l) + (st === "active" && detail ? ' <span class="m-muted">' + esc(detail) + '</span>' : "") + '</li>';
+    }).join("") + '</ol><div class="m-note crit" id="rpErr" hidden style="margin-top:10px"></div><div id="rpDone"></div>';
+  }
+  async function startReport() {
+    const pw = $("rpPw").value, pw2 = $("rpPw2").value;
+    const contents = {};
+    document.querySelectorAll("#reportModal [data-c]").forEach(c => { contents[c.getAttribute("data-c")] = c.checked; });
+    if (pw.length < 8) { reportError("The password must be at least 8 characters."); return; }
+    if (pw !== pw2) { reportError("The two passwords do not match."); return; }
+    const state = { prepare: "active" };
+    renderStages(state);
+    $("rpFoot").innerHTML = '<button class="m-btn" data-close>Cancel</button>';
+    $("rpFoot").querySelector("[data-close]").addEventListener("click", closeReportDialog);
+    reportAbort = new AbortController();
+    const signal = reportAbort.signal;
+    const fail = msg => {
+      Object.keys(state).forEach(k => { if (state[k] === "active") state[k] = "error"; });
+      renderStages(state); reportError(msg);
+      $("rpFoot").innerHTML = '<button class="m-btn" data-close>Close</button><button class="m-btn primary" id="rpRetry">Try again</button>';
+      $("rpFoot").querySelector("[data-close]").addEventListener("click", closeReportDialog);
+      $("rpRetry").addEventListener("click", () => { closeReportDialog(); openReportDialog(); });
+    };
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await syncGraph();
+        state.prepare = "done"; state.topology = "active"; renderStages(state, contents.topology ? "laying out the graph" : "");
+        await new Promise(r => setTimeout(r, 30)); // let the progress paint before layout work
+        const layout = contents.topology ? MantisReportLayout.build(store) : { revision: store.revision, pages: [] };
+        const resp = await fetch("/api/report", {
+          method: "POST", signal, headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revision: layout.revision, password: pw, contents, pages: layout.pages }),
+        });
+        if (resp.status === 409) { state.topology = undefined; state.prepare = "active"; renderStages(state, "the cluster changed — refreshing"); continue; }
+        if (resp.status === 401) { location.href = "/login"; return; }
+        if (!resp.ok) { let m = "HTTP " + resp.status; try { m = (await resp.json()).error || m; } catch (e) { /* not JSON */ } fail(m); return; }
+        await readReportStream(resp, state);
+        return;
+      }
+      fail("The cluster kept changing while the report was prepared. Try again.");
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      fail("The report could not be generated: " + (e && e.message || e));
+    }
+  }
+  async function readReportStream(resp, state) {
+    const order = REPORT_STAGES.map(s => s[0]);
+    const advance = k => { const i = order.indexOf(k); order.slice(0, i).forEach(x => { state[x] = "done"; }); state[k] = "active"; renderStages(state); };
+    const stageMap = { "building-topology": "topology", "rendering-topology": "topology", "generating-inventory": "inventory", "rendering-pdf": "render", "encrypting": "encrypt" };
+    const reader = resp.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (value) buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.stage === "error") throw new Error(ev.error || "report failed");
+        if (ev.stage === "ready") { finishReport(ev, state); return; }
+        if (stageMap[ev.stage]) advance(stageMap[ev.stage]);
+      }
+      if (done) throw new Error("the connection closed before the report was complete");
+    }
+  }
+  function finishReport(ev, state) {
+    REPORT_STAGES.forEach(([k]) => { state[k] = "done"; });
+    renderStages(state);
+    const bin = atob(ev.pdf), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    reportURL = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const a = document.createElement("a"); a.href = reportURL; a.download = ev.filename; document.body.appendChild(a); a.click(); a.remove();
+    $("rpDone").innerHTML = '<div class="m-note neutral" style="margin-top:12px">Your download has started: <b>' + esc(ev.filename) + '</b> (' + (ev.bytes / 1048576).toFixed(1) + ' MB). It opens with the password you set.</div>';
+    $("rpFoot").innerHTML = '<a class="m-btn" href="' + reportURL + '" download="' + esc(ev.filename) + '">Download again</a><button class="m-btn primary" data-close>Done</button>';
+    $("rpFoot").querySelector("[data-close]").addEventListener("click", closeReportDialog);
+    reportAbort = null;
+  }
+  document.addEventListener("click", ev => { if (ev.target.closest("[data-report]")) { ev.preventDefault(); openReportDialog(); } });
 
   // ---------------------------------------------------------------- wiring
   buildSidebar();

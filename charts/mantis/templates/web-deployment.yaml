@@ -43,6 +43,10 @@ spec:
               value: ":8080"
             - name: MANTIS_ENGINE_URL
               value: "http://{{ include "mantis.engine.fullname" . }}:{{ .Values.engine.service.port }}"
+            {{- if .Values.report.enabled }}
+            - name: MANTIS_REPORT_URL
+              value: "http://{{ include "mantis.report.fullname" . }}:{{ .Values.report.service.port }}"
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
