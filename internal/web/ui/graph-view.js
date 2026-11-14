@@ -106,15 +106,16 @@
       if (!body) return;
       const row = (sw, label) => '<div class="row">' + sw + esc(label) + '</div>';
       const ln = (c, cls) => '<span class="ln ' + (cls || "") + '" style="border-color:var(--rel-' + c + ')"></span>';
-      body.innerHTML = '<h4>Resource</h4>' +
+      body.innerHTML = '<h4>Relationships</h4>' +
+        row(ln("ownership"), "owns") + row(ln("networking"), "selects / serves / routes") +
+        row(ln("configuration", "dash"), "config / secret / identity") + row(ln("storage", "dash"), "storage") +
+        row(ln("scheduling", "dot"), "runs on") + row(ln("security", "dot"), "RBAC") +
+        row(ln("autoscaling", "dash"), "scales") +
+        row('<span class="ln dash" style="border-color:var(--crit)"></span>', "missing target") +
+        '<details class="legend-more"><summary>Resource colours</summary>' +
         [["workload", "Workload"], ["pod", "Pod"], ["network", "Service / Ingress / Policy"], ["config", "ConfigMap / Secret"], ["storage", "Storage"], ["node", "Node"], ["security", "Identity / RBAC"], ["autoscale", "Autoscaler"]]
           .map(([c, l]) => row('<span class="sw" style="background:var(--cat-' + c + ')"></span>', l)).join("") +
-        '<div class="divider"></div><h4>Relationship</h4>' +
-        row(ln("ownership"), "ownership (ownerReference)") + row(ln("networking"), "networking (selector / endpoints / routes)") +
-        row(ln("configuration", "dash"), "configuration (env, volumes, identity)") + row(ln("storage", "dash"), "storage (claims, binds, class)") +
-        row(ln("scheduling", "dot"), "scheduling (runs on)") + row(ln("security", "dot"), "RBAC (binds role, grants to)") +
-        row('<span class="ln dash" style="border-color:var(--crit)"></span>', "reference to something not found") +
-        '<div class="divider"></div><p class="hint" style="font-size:11px;margin:0">Lines show what the Kubernetes API declares — ownership, references, selector matches and endpoint records. Mantis does not observe network traffic.</p>';
+        '<p class="hint" style="font-size:11px;margin:6px 0 0">Lines are what the Kubernetes API declares. Hover one for its source field. Mantis does not observe traffic.</p></details>';
     }
 
     // ------------------------------------------------------------ data
@@ -201,18 +202,42 @@
       updateStatus(t1 - t0);
       if (opts.onRender) opts.onRender();
     }
+    // updateStatus explains visibility: of every resource in the cluster,
+    // how many are drawn, folded into "N Pods"-style aggregates, inside
+    // collapsed groups, or outside the current view/filters — each count a
+    // button that undoes that particular kind of hiding.
     function updateStatus(ms) {
-      const s = P.stats;
-      const drawn = P.vedges.length, canon = P.vedges.reduce((a, e) => a + e.count, 0);
-      const folded = P.groups.filter(g => g.collapsed).length;
-      let h = (s.rendered === 0 && folded
-        ? 'Overview · <b>' + fmt(s.total) + '</b> resources in <b>' + folded + '</b> groups — click one to open it'
-        : '<b>' + fmt(s.rendered) + '</b> of <b>' + fmt(s.total) + '</b> resources drawn' + (s.hidden ? ' · ' + fmt(s.hidden) + ' summarized or filtered' : '')) +
-        ' · <b>' + fmt(drawn) + '</b> lines for ' + fmt(canon) + ' relationships' +
-        (store.revision ? ' · rev ' + store.revision : '') + ' · layout ' + Math.round(ms) + ' ms';
+      const total = store.nodes.size;
+      let drawn = 0, folded = 0, collapsed = 0;
+      const gByKey = new Map(P.groups.map(g => [g.key, g]));
+      P.member.forEach(m => {
+        const g = gByKey.get(m.group);
+        if (g && g.collapsed) collapsed++;
+        else if (m.vid.startsWith("agg:")) folded++;
+        else drawn++;
+      });
+      const outside = Math.max(0, total - drawn - folded - collapsed);
+      const lines = P.vedges.length, rels = P.vedges.reduce((a, e) => a + e.count, 0), hub = P.summarized.reduce((a, e) => a + e.count, 0);
+      const btn = (act, txt, title) => '<button class="sb-btn" data-sb="' + act + '" title="' + esc(title) + '">' + txt + '</button>';
+      const parts = ['<b>' + fmt(drawn) + '</b> of ' + fmt(total) + ' resources drawn'];
+      if (collapsed) parts.push(btn("expand", fmt(collapsed) + " in collapsed groups", "Expand every group in this view"));
+      if (folded) parts.push(btn("unfold", fmt(folded) + " folded", "Resources folded into “N Pods”-style stacks — click to show each one"));
+      if (outside) parts.push(st.view === "dependency"
+        ? '<span title="Not connected to the selected resource within the chosen hops">' + fmt(outside) + ' outside this neighbourhood</span>'
+        : btn("filters", fmt(outside) + " filtered", "Hidden by the namespace, kind or view filters — click to review them"));
+      let h = parts.join('<span class="sb-sep">·</span>') + '<span class="sb-sep">|</span>' + fmt(lines) + ' lines for ' + fmt(rels) + ' relationships' +
+        (hub ? '<span class="sb-sep">·</span><span title="Many lines from one resource are summarized on its card (→ N Pods); select it to highlight them">' + fmt(hub) + ' summarized on cards</span>' : "") +
+        '<span class="sb-sep">|</span>layout ' + Math.round(ms) + ' ms' + (store.revision ? ' · rev ' + store.revision : '');
       if (lastChange && Date.now() - lastChange.at < 8000) h += ' · <span class="chg">' + lastChange.n + ' changed</span>';
       if (store.meta && store.meta.partial) h += ' · <span class="chg">still reading the cluster…</span>';
       statusbar.innerHTML = h;
+      statusbar.querySelectorAll("[data-sb]").forEach(b => b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const a = b.getAttribute("data-sb");
+        if (a === "expand") { P.groups.forEach(g => st.expanded[st.view].set(g.key, true)); render({ fit: true }); }
+        else if (a === "unfold") { P.vnodes.forEach(v => { if (v.type === "aggregate") st.unfolded.add(v.vid); }); render(); }
+        else if (a === "filters") { renderFilters(); $("vbPop").classList.add("open"); }
+      }));
     }
 
     // Items are plain descriptors with a bounding box; DOM elements are only
@@ -224,6 +249,7 @@
     }
     function buildItems() {
       clearScene();
+      placeCountLabels();
       const palette = document.documentElement.getAttribute("data-theme") === "light" ? G.NS_PALETTE_LIGHT : G.NS_PALETTE_DARK;
       const groupColor = g => (g.type === "infra" ? css("--ns-cluster") : g.type === "node" ? css("--cat-node") : G.hashColor(g.ns || g.label, palette));
       Lay.groups.forEach(gb => {
@@ -247,18 +273,19 @@
     function makeGroupFrame(gb, color) {
       const g = el("g", { class: "grp " + gb.g.type, style: "--grp:" + color });
       g.appendChild(el("rect", { class: "grp-frame", x: gb.x0, y: gb.y0, width: gb.x1 - gb.x0, height: gb.y1 - gb.y0, rx: 12 }));
-      const t = el("text", { class: "grp-title", x: gb.x0 + 14, y: gb.y0 + 20 });
-      const kind = { namespace: "namespace · ", infra: "", node: "node · ", workload: "", shared: "", dependency: "" }[gb.g.type] || "";
-      const room = Math.max(10, Math.floor((gb.x1 - gb.x0 - 60) / 6.7));
-      const main = G.shorten(kind + gb.g.label, room);
+      const t = el("text", { class: "grp-title", x: gb.x0 + 14, y: gb.y0 + 23 });
+      const kind = { namespace: "namespace", infra: "", node: "node", workload: "", shared: "", dependency: "" }[gb.g.type] || "";
+      const room = Math.max(10, Math.floor((gb.x1 - gb.x0 - 64) / 7.6));
+      if (kind) { const k = el("tspan", { class: "grp-kind" }); k.textContent = kind + "  "; t.appendChild(k); }
+      const main = G.shorten(gb.g.label, Math.max(6, room - kind.length));
       t.appendChild(document.createTextNode(main));
       if (gb.g.sub && main.length + gb.g.sub.length + 5 <= room) { const s = el("tspan", { class: "grp-sub" }); s.textContent = "  ·  " + gb.g.sub; t.appendChild(s); }
       const sum = gb.g.summary;
       if (sum && sum.podsBad) { const s = el("tspan", { style: "fill:var(--crit)" }); s.textContent = "  ·  " + sum.podsBad + " pod" + (sum.podsBad > 1 ? "s" : "") + " failing"; t.appendChild(s); }
       g.appendChild(t);
-      const btn = el("g", { class: "grp-btn", "data-collapse": gb.key, transform: "translate(" + (gb.x1 - 26) + "," + (gb.y0 + 8) + ")" });
-      btn.appendChild(el("rect", { width: 18, height: 18, rx: 5 }));
-      const bt = el("text", { x: 9, y: 9.5 }); bt.textContent = "–"; btn.appendChild(bt);
+      const btn = el("g", { class: "grp-btn", "data-collapse": gb.key, transform: "translate(" + (gb.x1 - 30) + "," + (gb.y0 + 9) + ")" });
+      btn.appendChild(el("rect", { width: 20, height: 20, rx: 5 }));
+      const bt = el("text", { x: 10, y: 10.5 }); bt.textContent = "–"; btn.appendChild(bt);
       const title = el("title"); title.textContent = "Collapse " + gb.g.label; btn.appendChild(title);
       g.appendChild(btn);
       return g;
@@ -296,18 +323,49 @@
       g.appendChild(path);
       const hit = el("path", { class: "ehit", d });
       const t = el("title");
-      const types = Array.from(e.types).join(", ");
-      const bases = Array.from(new Set(e.canonical.map(c => c.basis))).map(b => G.BASIS_LABEL[b] || b).join("; ");
-      t.textContent = (e.count > 1 ? e.count + " × " : "") + types + "\n" + labelFor(e.from) + " → " + labelFor(e.to) + "\nbasis: " + bases;
+      t.textContent = edgeTooltip(e);
       hit.appendChild(t);
       g.appendChild(hit);
-      if (e.count > 1) {
-        const mid = pts[Math.floor(pts.length / 2)], prev = pts[Math.max(0, Math.floor(pts.length / 2) - 1)];
-        const c = el("text", { class: "ecount", x: (mid.x + prev.x) / 2 + 4, y: (mid.y + prev.y) / 2 - 4 }); c.textContent = "×" + e.count;
+      // A count is shown only on bundles between groups (where one line
+      // stands for several relationships); inside a group the tooltip says it.
+      const lp = e.cross && e.count > 1 ? countLabelPos.get(e.key) : null;
+      if (lp) {
+        const c = el("text", { class: "ecount", x: lp.x, y: lp.y, "text-anchor": "middle" }); c.textContent = e.count + " links";
         g.appendChild(c);
       }
       g._path = path;
       return g;
+    }
+    function edgeTooltip(e) {
+      const lines = [G.CATEGORY_LABEL[e.category] + (e.count > 1 ? " · " + e.count + " relationships" : "") + ":  " + labelFor(e.from) + "  →  " + labelFor(e.to)];
+      const seen = new Set();
+      e.canonical.slice(0, 6).forEach(c => {
+        const k = c.type + "|" + c.basis + "|" + (c.evidence || "");
+        if (seen.has(k)) return; seen.add(k);
+        lines.push("• " + c.type + " — " + (G.BASIS_LABEL[c.basis] || c.basis) + (c.evidence ? " (from " + c.evidence + ")" : ""));
+      });
+      if (e.count > 6) lines.push("… open the groups to see each one");
+      return lines.join("\n");
+    }
+    // Count labels for bundled cross-group lines: placed on the longest
+    // segment of each route, skipping any spot already taken by another
+    // label so counts never pile up into "×2×4".
+    let countLabelPos = new Map();
+    function placeCountLabels() {
+      countLabelPos = new Map();
+      const taken = [];
+      P.vedges.filter(e => e.cross && e.count > 1).forEach(e => {
+        const pts = Lay.routes.get(e.key); if (!pts) return;
+        const segs = [];
+        for (let i = 1; i < pts.length; i++) segs.push({ a: pts[i - 1], b: pts[i], len: Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) });
+        segs.sort((x, y) => y.len - x.len);
+        for (const sg of segs.slice(0, 3)) {
+          for (const f of [0.5, 0.3, 0.7]) {
+            const x = sg.a.x + (sg.b.x - sg.a.x) * f, y = sg.a.y + (sg.b.y - sg.a.y) * f - 6;
+            if (taken.every(q => Math.abs(q.x - x) > 52 || Math.abs(q.y - y) > 16)) { taken.push({ x, y }); countLabelPos.set(e.key, { x, y }); return; }
+          }
+        }
+      });
     }
     function labelFor(vid) {
       const v = P.vnodes.get(vid);
@@ -325,9 +383,10 @@
         g.appendChild(el("rect", { class: "bg-back", x: -w / 2 + 6, y: -h / 2 - 5, width: w - 12, height: h, rx: 8 }));
         g.appendChild(el("rect", { class: "bg", x: -w / 2, y: -h / 2, width: w, height: h, rx: 9 }));
         g.appendChild(el("rect", { x: -w / 2, y: -h / 2, width: 4, height: h, rx: 2, style: "fill:var(--cat-" + v.cat + ")" }));
-        const k = el("text", { class: "kind", x: -w / 2 + 12, y: -3, style: "fill:var(--cat-" + v.cat + ")" }); k.textContent = "GROUP · click to expand";
-        const n = el("text", { class: "name", x: -w / 2 + 12, y: 12 }); n.textContent = G.shorten(v.label, 30);
-        g.appendChild(k); g.appendChild(n);
+        const k = el("text", { class: "kind", x: -w / 2 + 14, y: -4, style: "fill:var(--cat-" + v.cat + ")" }); k.textContent = "Group · click to expand";
+        const n = el("text", { class: "name", x: -w / 2 + 14, y: 13 }); n.textContent = G.shorten(v.label, 30);
+        const lg = el("text", { class: "name-lg", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(v.label, Math.max(6, Math.floor((w - 24) / 8.4)));
+        g.appendChild(k); g.appendChild(n); g.appendChild(lg);
         if (v.bad) { const b = el("text", { class: "flag", x: w / 2 - 8, y: -h / 2 + 12, "text-anchor": "end", style: "fill:var(--crit)" }); b.textContent = v.bad + " failing"; g.appendChild(b); }
         const t = el("title"); t.textContent = v.label + " — click to show each one"; g.appendChild(t);
         return g;
@@ -338,17 +397,20 @@
       if (unver) g.classList.add("unverified");
       if (n.status) g.classList.add("st-" + n.status);
       if (v.focus) g.classList.add("focus");
+      g.appendChild(el("rect", { class: "ring", x: -w / 2 - 3, y: -h / 2 - 3, width: w + 6, height: h + 6, rx: 11 }));
       g.appendChild(el("rect", { class: "bg", x: -w / 2, y: -h / 2, width: w, height: h, rx: 9 }));
       g.appendChild(el("rect", { x: -w / 2, y: -h / 2, width: 4, height: h, rx: 2, style: "fill:var(--cat-" + n.cat + ")" }));
       const top = -h / 2;
-      const k = el("text", { class: "kind", x: -w / 2 + 12, y: top + 15, style: "fill:var(--cat-" + n.cat + ")" }); k.textContent = n.kind;
-      const nm = el("text", { class: "name", x: -w / 2 + 12, y: top + 30 }); nm.textContent = G.shorten(n.name, 30);
-      g.appendChild(k); g.appendChild(nm);
-      if (ghost || unver) { const f = el("text", { class: "flag", x: w / 2 - 8, y: top + 13, "text-anchor": "end" }); f.textContent = ghost ? "NOT FOUND" : "UNVERIFIED"; g.appendChild(f); }
-      else if (n.status) g.appendChild(el("circle", { class: "dot", cx: w / 2 - 10, cy: top + 10, r: 3.5 }));
+      const k = el("text", { class: "kind", x: -w / 2 + 14, y: top + 17, style: "fill:var(--cat-" + n.cat + ")" }); k.textContent = n.kind;
+      const nm = el("text", { class: "name", x: -w / 2 + 14, y: top + 34 }); nm.textContent = G.shorten(n.name, 30);
+      // Shown instead of kind/name/badge when zoomed out (see lod-mid).
+      const lg = el("text", { class: "name-lg", x: -w / 2 + 14, y: 5.5 }); lg.textContent = G.shorten(n.name, Math.max(6, Math.floor((w - 24) / 8.4)));
+      g.appendChild(k); g.appendChild(nm); g.appendChild(lg);
+      if (ghost || unver) { const f = el("text", { class: "flag", x: w / 2 - 10, y: top + 15, "text-anchor": "end" }); f.textContent = ghost ? "NOT FOUND" : "UNVERIFIED"; g.appendChild(f); }
+      else if (n.status) g.appendChild(el("circle", { class: "dot", cx: w / 2 - 12, cy: top + 12, r: 4 }));
       if (v.badges && v.badges.length) {
-        const b = el("text", { class: "badge-t", x: -w / 2 + 12, y: top + 44 });
-        const maxChars = Math.max(8, Math.floor((w - 24) / 5.9));
+        const b = el("text", { class: "badge-t", x: -w / 2 + 14, y: top + 50 });
+        const maxChars = Math.max(8, Math.floor((w - 26) / 6.2));
         b.textContent = G.shorten(v.badges.map(x => (x.kind === "node" ? "on " : x.kind === "ns" ? "ns " : "") + x.text).join("  ·  "), maxChars);
         g.appendChild(b);
       }
@@ -412,7 +474,7 @@
       if (!Lay) return;
       const b = Lay.bounds;
       const pw = panel.classList.contains("collapsed") ? 0 : panel.offsetWidth + 28;
-      const availW = Math.max(200, W() - pw - 40), availH = Math.max(200, H() - 110);
+      const availW = Math.max(200, W() - pw - 40), availH = Math.max(200, H() - 140); // top toolbar + bottom legend/status strip
       const k = Math.max(0.08, Math.min(1.25, availW / (b.x1 - b.x0), availH / (b.y1 - b.y0)));
       const tx = 20 + (availW - (b.x1 - b.x0) * k) / 2 - b.x0 * k, ty = 64 + (availH - (b.y1 - b.y0) * k) / 2 - b.y0 * k;
       if (animate) animateView(tx, ty, k); else { view.x = tx; view.y = ty; view.k = k; applyView(); }
@@ -769,7 +831,9 @@
     });
     const themeToggle = $("themeToggle");
     function applyTheme(theme) {
-      if (theme === "light") document.documentElement.setAttribute("data-theme", "light"); else document.documentElement.removeAttribute("data-theme");
+      // Always explicit: the application shell's tokens key off "dark" too, so
+      // removing the attribute would silently fall back to the light theme.
+      document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
       if (!themeToggle) return;
       const isLight = theme === "light", label = isLight ? "Switch to dark theme" : "Switch to light theme";
       themeToggle.setAttribute("aria-pressed", String(isLight)); themeToggle.title = label; themeToggle.setAttribute("aria-label", label);

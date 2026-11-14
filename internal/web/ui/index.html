@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mantis</title>
-<link rel="icon" type="image/webp" href="mantis-mascot.webp">
+<link rel="icon" type="image/svg+xml" href="brand/favicon.svg">
+<link rel="alternate icon" type="image/webp" href="mantis-mascot.webp">
 <script>
   // Apply the saved theme before first paint, so there is no flash.
   try {
@@ -21,7 +22,7 @@
 <body>
 <div class="m-shell" id="shell">
   <aside class="m-sidebar" aria-label="Main navigation">
-    <div class="m-brand"><img src="mantis-mascot.webp" alt=""><b>Mantis</b><span>preview</span></div>
+    <div class="m-brand"><img src="brand/mantis-mark.svg" alt=""><b>Mantis</b><span title="Public Preview">preview</span></div>
     <nav class="m-nav" id="mNav"></nav>
     <div class="m-side-foot"><button id="mRail" aria-label="Collapse sidebar"></button></div>
   </aside>
@@ -69,7 +70,7 @@
       </div>
       <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
       <div class="viewbar" id="viewbar"></div>
-      <div class="legend collapsed" id="legend">
+      <div class="legend" id="legend">
       <div class="legend-body"></div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
         <svg class="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.75" fill="currentColor" stroke="none"/></svg>

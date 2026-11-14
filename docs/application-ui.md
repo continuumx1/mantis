@@ -51,6 +51,40 @@ stylesheet. Status always uses the same vocabulary through one function
 (`statusOf`), so a Pod or Deployment reads the same in a table, a detail
 page and the dashboard.
 
+## Typography
+
+Inter for the interface, JetBrains Mono only for technical values (resource
+names, YAML, IPs, versions, CLI text). Both are bundled in
+`internal/web/ui/fonts/` (SIL Open Font License, licence files alongside), so
+nothing is fetched from a CDN — Mantis often runs on clusters without internet.
+
+| Use | Size / weight |
+|---|---|
+| Page title | 20px / 600 |
+| Section (card) heading | 15px / 600 |
+| Body, tables, sidebar | 13px / 400–500 |
+| Technical values (mono) | 12.5px |
+| Secondary metadata | 11.5–12px |
+| Graph card: kind / name / badge | 10px Inter 600 / 12px Mono 500 / 10.5px Inter |
+| Graph card zoomed out | one 15px Inter name replaces the three lines |
+
+## Branding
+
+`internal/web/ui/brand/`: `mantis-mark.svg` (the compact symbol, used in the
+sidebar), `mantis-logo-light.svg` / `mantis-logo-dark.svg` (symbol + wordmark
+for light and dark backgrounds) and `favicon.svg`. The mascot illustration
+(`mantis-mascot.webp`) stays for the login screen, docs and community material
+rather than every UI surface.
+
+## Topology presentation
+
+- Legend: a compact strip, bottom-left, open by default; it steps aside while
+  the inspector is open.
+- Status bar: what is drawn, what is in collapsed groups, folded into stacks,
+  or filtered out — each count is a button that undoes that hiding.
+- Hovering a line names the relationship, its evidence class and the API field
+  it was read from. Counts ("3 links") appear only on bundles between groups.
+
 ## Layout
 
 Collapsible dark sidebar (icon rail below 1100 px, a drawer below 760 px), a

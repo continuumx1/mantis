@@ -646,18 +646,19 @@
   // ---------------------------------------------------------------------
 
   const L = {
-    cardH: 40, cardHBadge: 52, minW: 132, maxW: 236, charW: 6.9,
-    rankGap: 76, rowGap: 14, gridGapX: 40, gridGapY: 12,
-    pad: 20, header: 30, groupGapX: 56, groupGapY: 64, infraGap: 96,
+    // Card text is 12px JetBrains Mono (0.6em advance ≈ 7.2px per char).
+    cardH: 44, cardHBadge: 58, minW: 140, maxW: 252, charW: 7.25,
+    rankGap: 72, rowGap: 12, gridGapX: 36, gridGapY: 12,
+    pad: 18, header: 34, groupGapX: 52, groupGapY: 64, infraGap: 92,
     collapsedW: 248, collapsedH: 112,
   };
 
   const shorten = (s, max) => (s.length > max ? s.slice(0, max - 1) + "…" : s);
   function sizeOf(v) {
     if (v.type === "groupcard") return { w: L.collapsedW, h: L.collapsedH };
-    if (v.type === "aggregate") return { w: Math.min(L.maxW, Math.max(L.minW + 20, shorten(v.label, 30).length * L.charW + 44)), h: L.cardH };
+    if (v.type === "aggregate") return { w: Math.min(L.maxW, Math.max(L.minW + 20, shorten(v.label, 30).length * L.charW + 48)), h: L.cardH };
     const name = shorten(v.node.name, 30);
-    const w = Math.min(L.maxW, Math.max(L.minW, name.length * L.charW + 46));
+    const w = Math.min(L.maxW, Math.max(L.minW, name.length * L.charW + 48));
     return { w, h: v.badges && v.badges.length ? L.cardHBadge : L.cardH };
   }
 
@@ -1036,10 +1037,11 @@
     main.forEach(b => {
       if (!row || (x > 0 && x + b.w > rowW)) {
         const y0 = row ? row.y1 + L.groupGapY : 0;
-        row = { index: rows.length, y0, y1: y0 };
+        row = { index: rows.length, y0, y1: y0, spans: [] };
         rows.push(row); x = 0;
       }
       b.x0 = x; b.y0 = row.y0; b.x1 = x + b.w; b.y1 = row.y0 + b.h; b.row = row.index;
+      row.spans.push([b.x0, b.x1]);
       row.y1 = Math.max(row.y1, b.y1);
       x += b.w + L.groupGapX;
     });
@@ -1147,15 +1149,37 @@
     const pts = pa.slice();
     pts.push({ x: xa, y: yA });
     if (Math.abs(yA - yB) > 0.5) {
-      const costL = Math.abs(xa - ctx.highwayL) + Math.abs(xb - ctx.highwayL);
-      const costR = Math.abs(xa - ctx.highwayR) + Math.abs(xb - ctx.highwayR);
-      const hx = (ga.row < 0 || gb.row < 0 || costR < costL ? ctx.highwayR : ctx.highwayL) + lane;
+      const hx = verticalLane(ctx, ga, gb, xa, xb) + lane;
       pts.push({ x: hx, y: yA });
       pts.push({ x: hx, y: yB });
     }
     pts.push({ x: xb, y: yB });
     pb.slice().reverse().forEach(p => pts.push(p));
     return simplify(pts);
+  }
+
+  // verticalLane picks the x at which an edge travels between two gutters
+  // that are rows apart: the cheapest vertical channel that no group in any
+  // row in between occupies — usually the gap between two groups right
+  // beside the edge's ends — falling back to the margin highways. To or from
+  // the side column it is always the highway between the rows and it.
+  function verticalLane(ctx, ga, gb, xa, xb) {
+    if (ga.row < 0 || gb.row < 0) return ctx.highwayR;
+    const lo = Math.min(ga.row, gb.row), hi = Math.max(ga.row, gb.row);
+    const between = ctx.rows.slice(lo + 1, hi);
+    const half = L.groupGapX / 2;
+    const cands = [ctx.highwayL, ctx.highwayR];
+    for (let r = lo; r <= hi; r++) {
+      ctx.rows[r].spans.forEach(([x0, x1]) => { cands.push(x0 - half, x1 + half); });
+    }
+    const free = x => between.every(row => row.spans.every(([x0, x1]) => x < x0 - 10 || x > x1 + 10));
+    let best = null, bestCost = Infinity;
+    cands.forEach(x => {
+      if (!free(x)) return;
+      const cost = Math.abs(xa - x) + Math.abs(xb - x);
+      if (cost < bestCost - 0.01 || (Math.abs(cost - bestCost) <= 0.01 && x < best)) { best = x; bestCost = cost; }
+    });
+    return best === null ? ctx.highwayL : best;
   }
 
   function simplify(pts) {

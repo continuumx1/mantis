@@ -53,7 +53,7 @@
     { g: "workloads", slug: "daemonsets", kind: "DaemonSet", label: "DaemonSets" },
     { g: "workloads", slug: "jobs", kind: "Job", label: "Jobs" },
     { g: "workloads", slug: "cronjobs", kind: "CronJob", label: "CronJobs" },
-    { g: "workloads", slug: "hpas", kind: "HorizontalPodAutoscaler", label: "HorizontalPodAutoscalers" },
+    { g: "workloads", slug: "hpas", kind: "HorizontalPodAutoscaler", label: "HPAs", long: "HorizontalPodAutoscalers" },
     { g: "network", slug: "services", kind: "Service", label: "Services" },
     { g: "network", slug: "ingresses", kind: "Ingress", label: "Ingresses" },
     { g: "network", slug: "networkpolicies", kind: "NetworkPolicy", label: "NetworkPolicies" },
@@ -79,7 +79,7 @@
     { id: "storage", label: "Storage", icon: "storage" },
     { id: "config", label: "Configuration", icon: "config" },
     { id: "cluster", label: "Cluster", icon: "cluster", extra: [{ href: "#/namespaces", label: "Namespaces", key: "namespaces" }, { href: "#/events", label: "Events", key: "events" }] },
-    { id: "security", label: "Security & Access", icon: "security" },
+    { id: "security", label: "RBAC", icon: "security" },
   ];
   // Kinds where system-managed objects are hidden unless the engine runs
   // with MANTIS_SHOW_ALL=true — the table says so, rather than looking empty.
@@ -111,6 +111,7 @@
   function syncGraph() {
     S.syncing = true; renderSync();
     return api("/api/graph" + (S.loaded ? "?since=" + store.revision : "")).then(p => {
+      if (p.delta && S.loaded) recordChanges(p.delta);
       const res = store.apply(p);
       const changed = res.full || (res.changedIds && res.changedIds.size > 0);
       S.loaded = true; S.error = null; S.offline = false; S.lastSync = new Date();
@@ -119,6 +120,17 @@
       S.error = String(err.message || err); S.offline = S.loaded;
       return false;
     }).finally(() => { S.syncing = false; renderSync(); });
+  }
+  // Recent changes: every graph delta the engine sends is real — a resource
+  // added, removed or updated between two syncs — so the dashboard can show
+  // what changed while this page has been open (the engine keeps no history
+  // before that, so neither does this list).
+  const changeLog = [];
+  function recordChanges(d) {
+    const at = new Date();
+    (d.upsertNodes || []).forEach(n => changeLog.unshift({ at, id: n.id, kind: n.kind, name: n.name, ns: n.ns, what: store.node(n.id) ? "updated" : "added" }));
+    (d.removeNodes || []).forEach(id => { const n = store.node(id); changeLog.unshift({ at, id, kind: n ? n.kind : id.split("/")[1], name: n ? n.name : id.split("/").pop(), ns: n ? n.ns : id.split("/")[0], what: "removed" }); });
+    if (changeLog.length > 200) changeLog.length = 200;
   }
   function loadEvents() { return api("/api/events?limit=500").then(e => { S.events = e; }).catch(err => { S.events = { error: String(err.message || err), events: [] }; }); }
   function loadCapacity() { return api("/api/cluster/capacity").then(c => { S.capacity = c; }).catch(err => { S.capacity = { error: String(err.message || err) }; }); }
@@ -266,7 +278,7 @@
       const items = KINDS.filter(k => k.g === g.id);
       if (g.id === "security") h += '<div class="m-nav-sec">Security &amp; access</div>';
       h += '<button class="m-nav-grp" aria-expanded="' + (collapsed[g.id] ? "false" : "true") + '" data-grp="' + g.id + '" title="' + esc(g.label) + '">' + icon(g.icon) + '<span class="m-label">' + esc(g.label) + '</span>' + icon("chevron", "m-chev") + '</button><div class="m-sub">' +
-        items.map(k => '<a href="#/r/' + k.slug + '" data-key="r/' + k.slug + '"><span class="m-label">' + esc(k.label) + '</span><span class="m-cnt" data-cnt="' + k.kind + '"></span></a>').join("") +
+        items.map(k => '<a href="#/r/' + k.slug + '" data-key="r/' + k.slug + '"' + (k.long ? ' title="' + esc(k.long) + '"' : "") + '><span class="m-label">' + esc(k.label) + '</span><span class="m-cnt" data-cnt="' + k.kind + '"></span></a>').join("") +
         (g.extra || []).map(x => '<a href="' + x.href + '" data-key="' + x.key + '"><span class="m-label">' + esc(x.label) + '</span><span class="m-cnt" data-cnt="' + x.key + '"></span></a>').join("") + '</div>';
     });
     h += '<div class="m-nav-sec">Administration</div>' + link("#/access", "admin", "Access & authentication", "access") + link("#/settings", "settings", "Settings", "settings");
@@ -427,10 +439,13 @@
       '</div>';
 
     // C. distribution + D. capacity
-    const byNs = new Map();
-    WORKLOAD_KINDS.forEach(k => allOf(k).forEach(n => byNs.set(n.ns, (byNs.get(n.ns) || 0) + 1)));
-    const nsRows = Array.from(byNs).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    const maxNs = Math.max(1, ...nsRows.map(x => x[1]));
+    const DIST_CATS = [["workload", "Workloads"], ["pod", "Pods"], ["network", "Networking"], ["config", "Config"], ["storage", "Storage"], ["security", "RBAC"]];
+    const nsDist = store.namespaces().map(ns => {
+      const by = {}; let total = 0;
+      (store.byNs.get(ns) || []).forEach(id => { const n = store.node(id); if (!n || n.resolved === false) return; const c = DIST_CATS.some(d => d[0] === n.cat) ? n.cat : null; if (c) { by[c] = (by[c] || 0) + 1; total++; } });
+      return { ns, by, total };
+    }).filter(x => x.total).sort((a, b) => b.total - a.total).slice(0, 8);
+    const maxDist = Math.max(1, ...nsDist.map(x => x.total));
     const podsByNode = nodes.map(n => [n, relCount(n.id, ["runs-on"], "in")]).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const maxPn = Math.max(1, ...podsByNode.map(x => x[1]));
     const seg = (n, c) => n ? '<span style="width:' + (100 * n / Math.max(1, pods.length)) + '%;background:var(--m-' + c + ')" title="' + n + '"></span>' : "";
@@ -439,8 +454,10 @@
         (pods.length ? '<div class="m-stack">' + seg(podState.Running, "ok") + seg(podState.Pending, "warn") + seg(podState.Failed, "crit") + seg(podState.Completed, "unknown") + '</div>' +
         '<div class="m-legend"><span><i style="background:var(--m-ok)"></i>Running ' + podState.Running + '</span><span><i style="background:var(--m-warn)"></i>Pending ' + podState.Pending + '</span><span><i style="background:var(--m-crit)"></i>Failing ' + podState.Failed + '</span><span><i style="background:var(--m-unknown)"></i>Completed ' + podState.Completed + '</span></div>'
           : '<div class="m-empty">No pods.</div>') + '</div></div>' +
-      '<div class="m-card"><div class="m-card-h"><h2>Workloads by namespace</h2><a href="#/namespaces">All namespaces</a></div><div class="m-card-b"><div class="m-bars">' +
-        (nsRows.length ? nsRows.map(([ns, c]) => '<div class="m-bar-row"><a class="m-bl" href="#/r/deployments" data-ns="' + esc(ns) + '">' + esc(ns) + '</a><div class="m-bar"><span style="width:' + (100 * c / maxNs) + '%;background:var(--m-accent)"></span></div><span class="num">' + c + '</span></div>').join("") : '<div class="m-empty">No workloads.</div>') + '</div></div></div>' +
+      '<div class="m-card"><div class="m-card-h"><h2>Resources by namespace</h2><a href="#/namespaces">All namespaces</a></div><div class="m-card-b"><div class="m-dist">' +
+        (nsDist.length ? nsDist.map(x => '<div class="m-dist-row"><a class="m-bl" href="#/dashboard" data-ns="' + esc(x.ns) + '" title="Scope the dashboard to ' + esc(x.ns) + '">' + esc(x.ns) + '</a><div class="m-stack" style="width:' + Math.max(4, 100 * x.total / maxDist) + '%" title="' + esc(DIST_CATS.map(([c, l]) => l + " " + (x.by[c] || 0)).join(" · ")) + '">' +
+          DIST_CATS.map(([c]) => x.by[c] ? '<span style="width:' + (100 * x.by[c] / x.total) + '%;background:var(--cat-' + c + ')"></span>' : "").join("") + '</div><span class="num">' + x.total + '</span></div>').join("") : '<div class="m-empty">No namespaced resources.</div>') +
+        '</div><div class="m-legend">' + DIST_CATS.map(([c, l]) => '<span><i style="background:var(--cat-' + c + ')"></i>' + l + '</span>').join("") + '</div></div></div>' +
       '<div class="m-card"><div class="m-card-h"><h2>Pods per node</h2><a href="#/topology?view=node">Node view</a></div><div class="m-card-b"><div class="m-bars">' +
         (podsByNode.length ? podsByNode.map(([n, c]) => '<div class="m-bar-row"><a class="m-bl" href="' + objHref(n.id) + '">' + esc(n.name) + '</a><div class="m-bar"><span style="width:' + (100 * c / maxPn) + '%;background:var(--m-' + (statusOf(n).c === "ok" ? "info" : "crit") + ')"></span></div><span class="num">' + c + '</span></div>').join("") : '<div class="m-empty">No nodes.</div>') + '</div></div></div>' +
       '</div>';
@@ -454,9 +471,14 @@
     const attn = unavailable.slice(0, 6).map(n => ({ n, why: (attrMap(n).replicas || attrMap(n).scheduled || "") }))
       .concat(failingPods.map(n => ({ n, why: (attrMap(n)._free[0] || "") })))
       .concat(broken.slice(0, 6).map(n => ({ n, why: "referenced by " + store.inEdges(n.id).map(e => short(e.from)).slice(0, 2).join(", ") + " but missing" })));
-    h += '<div class="m-card" style="margin-top:14px"><div class="m-card-h"><h2>Needs attention</h2><span class="m-card-sub">unavailable workloads, failing pods and broken references</span></div>' +
+    h += '<div class="m-grid m-g-2" style="margin-top:14px"><div class="m-card"><div class="m-card-h"><h2>Needs attention</h2><span class="m-card-sub">unavailable, failing or broken</span></div>' +
       (attn.length ? '<ul class="m-list">' + attn.slice(0, 12).map(({ n, why }) => '<li>' + badge(statusOf(n)) + '<div class="m-li-main"><div class="m-li-t"><a class="m-link m-mono" href="' + objHref(n.id) + '">' + esc(n.kind + "/" + n.name) + '</a></div><div class="m-li-s">' + esc(why) + '</div></div><span class="m-li-r">' + esc(n.ns || "cluster") + '</span></li>').join("") + '</ul>'
         : '<div class="m-empty"><b>Nothing needs attention</b>Every workload is available, every pod is healthy and every reference resolves.</div>') + '</div>';
+    const chg = changeLog.filter(c => !S.ns || c.ns === S.ns).slice(0, 12);
+    h += '<div class="m-card"><div class="m-card-h"><h2>Recent changes</h2><span class="m-card-sub">since this page opened · from graph revisions</span></div>' +
+      (chg.length ? '<ul class="m-list">' + chg.map(c => '<li><span class="m-badge m-chg ' + (c.what === "added" ? "ok" : c.what === "removed" ? "crit" : "info") + '">' + c.what + '</span><div class="m-li-main"><div class="m-li-t">' +
+        (c.what === "removed" ? '<span class="m-mono">' + esc(c.kind + "/" + c.name) + '</span>' : '<a class="m-link m-mono" href="' + objHref(c.id) + '">' + esc(c.kind + "/" + c.name) + '</a>') + '</div><div class="m-li-s">' + esc(c.ns || "cluster-scoped") + '</div></div><span class="m-li-r">' + esc(age(c.at.toISOString())) + ' ago</span></li>').join("") + '</ul>'
+        : '<div class="m-empty"><b>No changes yet</b>Mantis checks for changes every ' + (S.refreshMs ? S.refreshMs / 1000 + " seconds" : "time you refresh") + '; anything added, removed or updated in the cluster appears here.</div>') + '</div></div>';
 
     h += '</div>';
     el.innerHTML = h;
