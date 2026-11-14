@@ -90,7 +90,7 @@
     <div class="search-wrap">
       <span class="search-ico">⌕</span>
       <input class="search" id="search" type="text" placeholder="Search resources…" autocomplete="off" spellcheck="false" />
-      <kbd class="search-kbd">Ctrl F</kbd>
+      <kbd class="search-kbd" data-key="F">Ctrl F</kbd>
       <div class="search-results" id="searchResults"></div>
     </div>
 
@@ -176,7 +176,7 @@
           <div class="ymodal-search">
             <span class="search-ico">⌕</span>
             <input id="ymodalSearch" type="text" placeholder="Find in YAML…" autocomplete="off" spellcheck="false" />
-            <kbd class="search-kbd ymodal-kbd">Ctrl F</kbd>
+            <kbd class="search-kbd ymodal-kbd" data-key="F">Ctrl F</kbd>
             <span class="ymodal-match-count" id="ymodalMatchCount"></span>
             <button class="ymodal-nav" id="ymodalPrev" title="Previous match (Shift+Enter)" aria-label="Previous match">↑</button>
             <button class="ymodal-nav" id="ymodalNext" title="Next match (Enter)" aria-label="Next match">↓</button>
@@ -299,7 +299,7 @@
 
   const TOUR_STEPS = [
     { title: "Welcome to the Mantis Playground", target: null,
-      body: "This is the real Mantis UI, running against real captured cluster graphs — nothing here is a mockup. This tour takes about a minute; press <b>Esc</b> anytime to stop, or <b>Ctrl F</b> afterward to search for a resource yourself." },
+      body: "This is the real Mantis UI, running against real captured cluster graphs — nothing here is a mockup. This tour takes about a minute; press <b>Esc</b> anytime to stop, or <b>" + MantisKeys.label("F") + "</b> afterward to search for a resource yourself." },
     { title: "Three real scenarios", target: () => document.getElementById("pgScenarios"),
       body: "Each of these is a graph Mantis actually produced against a real cluster — labeled kubeadm, GKE, and EKS so together they show Mantis working identically across distributions, which is the actual point." },
     { title: "Every namespace, connected", target: () => app.nodeElement("shop-frontend/Deployment/storefront"),

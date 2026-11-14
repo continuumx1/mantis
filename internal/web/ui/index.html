@@ -37,7 +37,7 @@
       <div class="m-gsearch" role="search">
         <svg class="m-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="mSearch" type="search" placeholder="Search resources…" autocomplete="off" spellcheck="false" aria-label="Search resources" aria-controls="mSearchResults">
-        <kbd>Ctrl K</kbd>
+        <kbd data-key="K">Ctrl K</kbd>
         <div class="m-gresults" id="mSearchResults" role="listbox"></div>
       </div>
       <button class="m-sync" id="mSync" aria-label="Sync status — click to refresh"></button>
@@ -65,7 +65,7 @@
       <div class="m-topo-search search-wrap">
         <span class="search-ico">⌕</span>
         <input class="search" id="search" type="text" placeholder="Find in graph…" autocomplete="off" spellcheck="false" aria-label="Find in graph" />
-        <kbd class="search-kbd">Ctrl F</kbd>
+        <kbd class="search-kbd" data-key="F">Ctrl F</kbd>
         <div class="search-results" id="searchResults"></div>
       </div>
       <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
@@ -89,7 +89,7 @@
           <div class="ymodal-search">
             <span class="search-ico">⌕</span>
             <input id="ymodalSearch" type="text" placeholder="Find in YAML…" autocomplete="off" spellcheck="false" />
-            <kbd class="search-kbd ymodal-kbd">Ctrl F</kbd>
+            <kbd class="search-kbd ymodal-kbd" data-key="F">Ctrl F</kbd>
             <span class="ymodal-match-count" id="ymodalMatchCount"></span>
             <button class="ymodal-nav" id="ymodalPrev" title="Previous match (Shift+Enter)" aria-label="Previous match">↑</button>
             <button class="ymodal-nav" id="ymodalNext" title="Next match (Enter)" aria-label="Next match">↓</button>

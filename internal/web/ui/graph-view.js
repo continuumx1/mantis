@@ -19,6 +19,19 @@
   const $ = id => document.getElementById(id);
   const VIEW_LABEL = { namespace: "Namespaces", node: "Nodes", workload: "Workloads", dependency: "Dependencies" };
 
+  // Keyboard shortcuts work the same on every OS: the handlers accept Ctrl
+  // (Windows, Linux) and ⌘ (macOS) alike. Only the label differs, so a
+  // shortcut hint always shows the key the person actually has.
+  const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
+  const IS_MAC = /mac|iphone|ipad|ipod/i.test(plat);
+  const keyLabel = k => (IS_MAC ? "⌘ " : "Ctrl ") + k;
+  const applyKeyLabels = (root) => (root || document).querySelectorAll("kbd[data-key]").forEach(el => {
+    el.textContent = keyLabel(el.getAttribute("data-key"));
+    el.title = (IS_MAC ? "Command" : "Ctrl") + " + " + el.getAttribute("data-key");
+  });
+  global.MantisKeys = { isMac: IS_MAC, label: keyLabel, apply: applyKeyLabels };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => applyKeyLabels()); else applyKeyLabels();
+
   function mount(opts) {
     const source = opts.source;
     const svg = $("canvas");

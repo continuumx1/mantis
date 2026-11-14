@@ -102,7 +102,7 @@ body { background: var(--m-bg); color: var(--m-text); font-family: var(--m-font)
 .m-title { font-size: var(--m-fs-lg); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .m-title small { color: var(--m-text-2); font-weight: 400; font-size: var(--m-fs-sm); margin-left: 6px; }
 .m-grow { flex: 1; }
-.m-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: var(--m-h-ctl); height: var(--m-h-ctl); border-radius: var(--m-r); border: 1px solid transparent; background: none; color: var(--m-text-2); cursor: pointer; flex: none; }
+.m-iconbtn { display: inline-flex; align-items: center; justify-content: center; padding: 0; width: var(--m-h-ctl); height: var(--m-h-ctl); border-radius: var(--m-r); border: 1px solid transparent; background: none; color: var(--m-text-2); cursor: pointer; flex: none; }
 .m-iconbtn:hover { background: var(--m-hover); color: var(--m-text); }
 .m-hamburger { display: none; }
 .m-ctx { display: flex; align-items: center; gap: 8px; height: var(--m-h-ctl); box-sizing: border-box; padding: 0 10px; border: 1px solid var(--m-border); border-radius: var(--m-r); background: var(--m-surface); color: var(--m-text); font-size: var(--m-fs-sm); white-space: nowrap; }
@@ -139,7 +139,7 @@ select.m-ctx { cursor: pointer; appearance: none; padding-right: 26px; font: inh
 .m-menu .m-menu-h small { display: block; color: var(--m-text-2); margin-top: 2px; }
 .m-menu a, .m-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 10px; border: 0; background: none; color: var(--m-text); font: inherit; font-size: var(--m-fs-sm); border-radius: var(--m-r-sm); cursor: pointer; text-decoration: none; text-align: left; }
 .m-menu a:hover, .m-menu button:hover { background: var(--m-hover); }
-.m-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--m-accent-soft); color: var(--m-accent-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
+.m-avatar { flex: none; box-sizing: border-box; width: 28px; height: 28px; min-width: 28px; aspect-ratio: 1 / 1; line-height: 1; border-radius: 50%; background: var(--m-accent-soft); color: var(--m-accent-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
 
 .m-content { flex: 1; min-height: 0; overflow-y: auto; }
 .m-page { padding: 20px 24px 40px; max-width: 1600px; margin: 0 auto; }
