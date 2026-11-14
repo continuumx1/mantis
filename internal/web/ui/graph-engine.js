@@ -882,7 +882,8 @@
       let yy = 0;
       col.forEach(id => {
         const s = sizes.get(id);
-        pos.set(id, { x: x + w / 2, y: yy + s.h / 2, w: s.w, h: s.h, chL: x - L.gridGapX / 2, chR: x + w + L.gridGapX / 2 });
+        // Left-aligned in the column, so a column of cards reads as a list.
+        pos.set(id, { x: x + s.w / 2, y: yy + s.h / 2, w: s.w, h: s.h, chL: x - L.gridGapX / 2, chR: x + w + L.gridGapX / 2 });
         yy += s.h + L.gridGapY;
       });
       height = Math.max(height, yy - L.gridGapY);
