@@ -93,8 +93,10 @@ func (g *gen) run() []runtime.Object {
 		g.add(&corev1.Node{
 			ObjectMeta: g.meta(name, "", map[string]string{"kubernetes.io/hostname": name, "topology.kubernetes.io/zone": fmt.Sprintf("zone-%c", 'a'+i%3)}),
 			Status: corev1.NodeStatus{
-				Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: ready}},
-				Capacity:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8"), corev1.ResourceMemory: resource.MustParse("32Gi")},
+				Conditions:  []corev1.NodeCondition{{Type: corev1.NodeReady, Status: ready}},
+				Capacity:    corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8"), corev1.ResourceMemory: resource.MustParse("32Gi"), corev1.ResourcePods: resource.MustParse("110")},
+				Allocatable: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("7910m"), corev1.ResourceMemory: resource.MustParse("30Gi"), corev1.ResourcePods: resource.MustParse("110")},
+				NodeInfo:    corev1.NodeSystemInfo{KubeletVersion: "v1.31.4"},
 			},
 		})
 	}

@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -63,6 +65,10 @@ func main() {
 
 	objs := synth.Generate(synth.Options{Resources: *resources, Seed: *seed})
 	cs := fake.NewSimpleClientset(objs...)
+	// The fake clientset otherwise reports a placeholder version string.
+	if d, ok := cs.Discovery().(*fakediscovery.FakeDiscovery); ok {
+		d.FakedServerVersion = &version.Info{Major: "1", Minor: "31", GitVersion: "v1.31.4"}
+	}
 	slog.Info("synthetic cluster", "objects", len(objs))
 
 	if *dump != "" {
