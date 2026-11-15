@@ -294,6 +294,11 @@ convenience.
 | `claims` | A Pod claims a PersistentVolumeClaim | `volumes[].persistentVolumeClaim` |
 | `bound-to` | A PVC is bound to a PersistentVolume | `pvc.spec.volumeName` |
 | `scales` | An HPA/VPA drives a workload's replicas or resources | `scaleTargetRef` / `targetRef` |
+| `uses-service-account` | A Pod runs as a ServiceAccount | `pod.spec.serviceAccountName` |
+| `storage-class` | A PVC or PV uses a StorageClass | `spec.storageClassName` |
+| `binds-role` | A (Cluster)RoleBinding grants a Role or ClusterRole | `roleRef` |
+| `grants-to` | A (Cluster)RoleBinding grants its role to a ServiceAccount | `subjects` |
+| `applies-to` | A NetworkPolicy selects a Pod | `spec.podSelector` |
 
 A key principle: Mantis distinguishes **facts** it read from the API from
 references it couldn't verify. A target that was checked and found missing

@@ -1,6 +1,6 @@
 # Core Concepts
 
-## Resources, relationships, and regions
+## Resources, relationships, and groups
 
 Mantis represents your cluster as a graph:
 
@@ -8,10 +8,11 @@ Mantis represents your cluster as a graph:
   everything else Mantis maps (see [Resource kinds](#resource-kinds) below).
 - **Edges** are typed, directional relationships between them — see
   [Relationship types](#relationship-types).
-- **Namespaces** are drawn as soft visual regions on the canvas, not hard
-  containers — they're for orientation, and you can still drag any node
-  anywhere. Cluster-scoped resources (Nodes, NodePools) get their own
-  region rather than being forced into a namespace they don't belong to.
+- **Groups** organise the picture: in the default view each namespace is a
+  group, and cluster-scoped resources (Nodes, PersistentVolumes,
+  StorageClasses, ClusterRoles, NodePools) get their own "cluster
+  infrastructure" group rather than being forced into a namespace. The
+  Nodes and Workloads views group by node and by application instead.
 
 ## Verified, not guessed
 
@@ -26,11 +27,18 @@ reference is exactly the kind of thing worth surfacing, not smoothing over.
 
 ## Resource kinds
 
-Core, built-in kinds: `Pod`, `Node`, `Service`, `Ingress`, `ConfigMap`,
-`Secret` (metadata only — see [Security](security.md)),
-`PersistentVolumeClaim`, `PersistentVolume`, `ResourceQuota`, `LimitRange`,
-`Deployment`, `ReplicaSet`, `StatefulSet`, `DaemonSet`, `Job`, `CronJob`,
-`HorizontalPodAutoscaler`.
+Core, built-in kinds:
+
+- **Workloads:** `Pod`, `Deployment`, `ReplicaSet`, `StatefulSet`,
+  `DaemonSet`, `Job`, `CronJob`
+- **Networking:** `Service`, `EndpointSlice` (used to verify routing),
+  `Ingress`, `NetworkPolicy`
+- **Configuration:** `ConfigMap`, `Secret` (metadata only — see
+  [Security](security.md)), `ResourceQuota`, `LimitRange`
+- **Storage:** `PersistentVolumeClaim`, `PersistentVolume`, `StorageClass`
+- **Security:** `ServiceAccount`, `Role`, `RoleBinding`, `ClusterRole`,
+  `ClusterRoleBinding`
+- **Cluster and scaling:** `Node`, `Namespace`, `HorizontalPodAutoscaler`
 
 Optional, best-effort custom resources (included automatically if the CRD
 is installed and RBAC allows reading it; silently omitted otherwise, never
@@ -53,6 +61,17 @@ running, without requiring either to be present.
 | `claims` | A Pod claims a PersistentVolumeClaim | `volumes[].persistentVolumeClaim` |
 | `bound-to` | A PVC is bound to a PersistentVolume | `pvc.spec.volumeName` |
 | `scales` | An autoscaler (HPA/VPA) drives a workload's replica count or resources | HPA/VPA `scaleTargetRef` / `targetRef` |
+| `uses-service-account` | A Pod runs as a ServiceAccount | `pod.spec.serviceAccountName` |
+| `storage-class` | A PVC or PV uses a StorageClass | `spec.storageClassName` |
+| `binds-role` | A (Cluster)RoleBinding grants a Role or ClusterRole | `roleRef` |
+| `grants-to` | A (Cluster)RoleBinding grants its role to a ServiceAccount | `subjects` |
+| `applies-to` | A NetworkPolicy selects a Pod | `spec.podSelector` |
+
+Each relationship belongs to a category — ownership, scheduling,
+networking, configuration, storage, security or autoscaling — which the
+Topology page uses for line styles and filters, and carries its evidence:
+whether Mantis verified it against the cluster (an EndpointSlice, a
+resolved reference) or read it from a spec field.
 
 Relationships are named for their **Kubernetes semantics**, not for
 convenience — `runs-on` means exactly what `kubectl get pod -o wide`'s NODE
