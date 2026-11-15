@@ -41,8 +41,9 @@ building, craftsmanship and engineering. This is our first stable release.
   capacity and a needs-attention list.
 - **Live** — the engine follows the cluster with Kubernetes watches; the UI
   receives only what changed.
-- **Infrastructure reports** — export the cluster as a password-protected
-  (AES-256) PDF with topology diagrams, inventory, health and findings.
+- **Download reports** — one click exports the cluster as a
+  password-protected (AES-256) PDF with topology diagrams, inventory, health
+  and findings ([see below](#download-a-report)).
 - **Secure by default** — strictly read-only, Secret values never fetched,
   and sign-in with a password you configure (no default password).
 
@@ -51,9 +52,39 @@ building, craftsmanship and engineering. This is our first stable release.
 [Changelog](CHANGELOG.md) ·
 [Release page](https://mantis.continuumx1.com/releases/v1.0.0)
 
+<p align="center">
+  <img src="docs/images/screens/topology.jpg" alt="Mantis Topology page: every namespace expanded with workloads, Pods, Services, configuration and permissions connected by typed relationship lines" width="900">
+  <br><sub>The Topology page on a sample cluster. More: <a href="docs/images/screens/dashboard.jpg">dashboard</a> · <a href="docs/images/screens/overview.jpg">overview of a larger cluster</a></sub>
+</p>
+
 Built and maintained by [ContinuumX1 Technologies](https://continuumx1.com).
 
 ---
+
+## Download a report
+
+**Download report** — on the dashboard, in the account menu, or on the
+Topology toolbar — turns the live cluster into a password-protected PDF you
+can archive, attach to a change review, or share with someone who doesn't
+use Mantis.
+
+1. Choose what to include: topology, inventory, health, findings.
+2. Set a password. The PDF is encrypted with AES-256 (PDF 2.0); Mantis never
+   stores or logs the password and keeps no copy of the report.
+3. Watch each stage complete, and the encrypted PDF downloads.
+
+<p align="center">
+  <img src="docs/images/screens/report-dialog.jpg" alt="The Infrastructure report dialog: scope, contents checkboxes and AES-256 password fields" width="420">
+  <img src="docs/images/screens/report-ready.jpg" alt="The report dialog after generation, every stage checked and the download started" width="420">
+</p>
+
+| Cover | Health summary | Topology | Findings |
+|---|---|---|---|
+| <img src="docs/images/report/cover.jpg" alt="Report cover" width="200"> | <img src="docs/images/report/health.jpg" alt="Cluster health summary page" width="200"> | <img src="docs/images/report/topology.jpg" alt="Topology diagram page" width="200"> | <img src="docs/images/report/findings.jpg" alt="Findings and anomalies page" width="200"> |
+
+Secrets appear by name and type only, ConfigMaps by key names only, and every
+resource on a diagram is checked against the cluster. Details:
+[Infrastructure Reports](docs/reports.md).
 
 ## Why Mantis?
 

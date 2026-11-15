@@ -86,6 +86,8 @@ choose the password (8 characters or more); the PDF is encrypted with
 AES-256 and Mantis keeps no copy. The dialog shows each stage as it runs and
 can be cancelled. See [Infrastructure Reports](reports.md).
 
+![The Infrastructure report dialog: scope, contents and AES-256 password fields](images/screens/report-dialog.jpg){ width="420" }
+
 ## Staying current
 
 The engine watches the cluster, so changes reach it within about a second.

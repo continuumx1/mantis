@@ -19,5 +19,6 @@ You may not use these marks in a way that implies your fork or derivative is an
 official Mantis distribution. For any other use of the Mantis name, logo, or mascot,
 please contact ContinuumX1 Technologies.
 
-`mantis-architecture.svg` (the three-service diagram) is documentation, not a
-brand asset.
+`mantis-architecture.svg` (the three-service diagram), `screens/` (light-theme
+UI screenshots of a sample cluster) and `report/` (pages of a report generated
+from that sample cluster) are documentation, not brand assets.

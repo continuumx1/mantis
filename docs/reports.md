@@ -5,7 +5,18 @@ point-in-time **Infrastructure Report** you can archive, attach to a change
 review or hand to someone without Mantis access.
 
 Open it from **Download report…** in the user menu, the **Download report**
-button on the dashboard, or **Report** in the Topology toolbar.
+button on the dashboard, or **Report** in the Topology toolbar. Choose the
+contents, set a password, and the encrypted PDF downloads when every stage
+is done:
+
+![The Infrastructure report dialog: scope, contents and AES-256 password fields](images/screens/report-dialog.jpg){ width="330" }
+![The report dialog after generation: every stage checked and the download started](images/screens/report-ready.jpg){ width="330" }
+
+Pages from a report generated from a sample cluster:
+
+| Cover | Health summary | Topology | Findings |
+|---|---|---|---|
+| <img src="images/report/cover.jpg" alt="Report cover" width="200"> | <img src="images/report/health.jpg" alt="Cluster health summary page" width="200"> | <img src="images/report/topology.jpg" alt="Topology diagram page" width="200"> | <img src="images/report/findings.jpg" alt="Findings and anomalies page" width="200"> |
 
 ## What the report contains
 
