@@ -2,120 +2,101 @@
 
 ## Signing in
 
-Every Public Preview build sits behind a login screen. Sign in with
-**`admin` / `admin`** (the credential is printed on the login screen itself
-— see [Public Preview notes](security.md#public-preview-notes) for what
-this credential is and isn't). The session lasts 12 hours or until you
-sign out.
+Mantis asks for the administrator account that was configured when it was
+installed. With the Helm chart, a random password is generated unless you
+set one; the install notes print the command to read it:
 
-## The graph canvas
+```sh
+kubectl get secret <release>-mantis-admin -n <namespace> \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+```
 
-Once signed in, you land on the main graph:
+A session lasts 12 hours, or until you sign out. After 10 failed sign-ins
+from one address, that address is refused for 10 minutes. See
+[Security](security.md#signing-in) for how the account is stored and how to
+change it.
 
-- **Namespace regions.** Each namespace is drawn as a soft, labeled region
-  on the canvas; cluster-scoped resources (Nodes, NodePools, …) get their
-  own region rather than being forced into a namespace they don't belong
-  to. Regions are boundaries for orientation, not hard walls — you can drag
-  a node anywhere.
-- **Resource cards (nodes).** Each card shows the resource's kind, name,
-  and — for Pods — a small status ring: **green** means running/succeeded
-  with every container ready; **red** means anything else (crash-looping,
-  pending, not-ready containers, …). Other kinds don't carry a health ring
-  today (see [Known limitations](troubleshooting.md#known-limitations)).
-- **Edges.** A line between two cards is a relationship, drawn as a solid
-  line when it points at something that exists, or a **dashed red** line
-  when Mantis checked and the target isn't actually there (a dangling
-  reference). Hover the legend (bottom-left "i" icon) for the full color
-  key — categories (Workload, Pod, Service/Ingress, Config/Secret, Storage,
-  Node, Autoscaler) and edge meanings.
-- **Pan, zoom, drag.** Scroll/pinch to zoom, drag empty canvas to pan, drag
-  a card to reposition it (it stays pinned where you drop it until you
-  reload).
+## Finding your way around
 
-## Selecting a resource: the details drawer
+The sidebar holds every page; it collapses to an icon rail on narrower
+screens and to a drawer on phones. The top bar has:
 
-Click any card to open the **details drawer** on the right. Here's a
-`Service` selected, with its **Relationships** tab open — `selects` and
-`serves` edges pointing at the Pod it actually routes to:
+- **Namespace selector.** It applies to every page, the Topology included.
+- **Search.** `Ctrl K` or `/` from anywhere. Filters such as `kind:Pod`,
+  `ns:shop` and `label:app=web` narrow the results; arrow keys and Enter
+  open one. The same keys work on Windows, Linux and macOS.
+- **Sync status.** "Synced 4s ago", or "Connection lost" with how old the
+  data on screen is, while it keeps retrying.
+- **Theme** (light or dark) and your **account menu** (Access, Settings,
+  Download report, Sign out).
 
-![Mantis UI: a Service selected, Relationships tab open, showing its selects/serves edges to a Pod](images/mantis-ui-relationships-example.png)
+## Dashboard
 
-The drawer has three tabs:
+The cluster at a glance: resource and namespace counts, health across
+workloads and Pods, Pod status, workloads by namespace, Pods per node,
+capacity (usage only when metrics-server is installed, otherwise
+allocatable capacity), recent warning events, and a **Needs attention**
+list of what is failing or degraded.
 
-- **Summary** — the compact, human-readable facts the engine computed for
-  that resource: readiness, image, resource requests/limits, probes,
-  storage class, endpoints, and similar, kind-specific detail. Anything
-  meaningfully absent (no probes configured, no resource requests set) is
-  shown as `none` rather than omitted — the gap is often the thing you're
-  looking for.
-- **Relationships** — every edge touching this resource, in both
-  directions, each one clickable to jump straight to the other end.
-- **YAML** — the resource's live manifest, fetched fresh from the cluster
-  the moment you open this tab (server-managed `managedFields` noise is
-  stripped). Secrets show a "hidden for security" message instead of a
-  manifest — see [Security](security.md). The YAML view has its own
-  **find-in-page search** (the same `Ctrl F` shortcut, scoped to the open
-  manifest) with match highlighting and next/previous navigation.
+## Resources
 
-Close the drawer with the ✕ in its header, or press `Escape`.
+Each kind in the sidebar opens a table you can filter, sort, page through
+and filter by status. Open a row (click or Enter) for its details page:
 
-## Relationship focus and tracing
+- **Overview**: status, owner, labels, and the facts that matter for that
+  kind (replicas, images, ports, selectors, capacity, …).
+- **YAML**: the live manifest, fetched when you open the tab, with
+  `managedFields` removed. Secrets never show values or YAML.
+- **Events** and **Conditions**.
+- **Related resources**: everything it is connected to, with the kind of
+  relationship and whether Mantis verified it.
 
-Selecting a resource doesn't just open its drawer — it also **traces**
-outward through the graph a couple of hops and dims everything else: direct
-neighbors of the selected resource stay fully visible, resources a couple
-of hops further out are dimmed but still legible, and everything unrelated
-fades into the background. This is the fastest way to answer "what does
-this actually connect to" without hunting across a busy canvas. Selecting
-nothing (click empty canvas, or `Escape`) clears the trace and restores
-everything.
+## Topology
 
-## Search
+The graph of how your resources relate. It is laid out deterministically:
+the same cluster always produces the same picture, nothing drifts, and no
+two cards or lines overlap.
 
-Click the search box (or press `Ctrl F`, from anywhere) to search by
-resource name or kind. Selecting a result both selects that resource
-(opening its drawer and trace) and smoothly flies the camera to center it
-on screen — you don't have to manually hunt for it on a large graph.
-`Ctrl F` works the same on Windows, Linux, and macOS — it's not Cmd-only or
-platform-specific.
+- **Views.** *Namespaces* (the default), *Nodes* (which Pods run where),
+  *Workloads* (each application with what it uses), and *Dependencies*
+  (one resource's neighbourhood, 1–3 hops out and in).
+- **Overview first.** On a larger cluster each namespace starts as a
+  summary card with its resource count, Pod health and broken references.
+  Click one to expand it; **Expand all** and **Overview** switch between the
+  two. Large sets fold into stacks such as "48 Pods"; click to open one.
+- **Relationships.** Lines are typed (ownership, networking, configuration,
+  storage, security, autoscaling, scheduling) and can be filtered. A solid
+  line was verified against the cluster; a dashed red line points at
+  something that does not exist. Hover a line to see the relationship and
+  the field it was read from. The legend (bottom-left) explains every style.
+- **Select a resource** to highlight its neighbourhood and open the
+  inspector; `Esc` clears it. `Ctrl F` finds a resource in the graph.
+- **Zoom.** Scroll or pinch, drag empty space to pan, or use the zoom bar:
+  `+`, `−`, a slider and *Fit*. Drag the bar wherever it suits you; Mantis
+  remembers where you put it.
+- The status bar counts what is drawn, collapsed, folded or filtered out;
+  each count is a button that undoes that hiding.
 
-## Staying in sync: the sync pill
+## Infrastructure reports
 
-The pill near the top of the screen shows both *that* Mantis is syncing
-with the cluster and *how often*: it always displays the current interval
-next to its status dot (`3s`, `10s`, `30s`, `1m`, `5m`), never a vague
-"Live" label with no number attached. Click it to change the interval or
-switch to **Manual** (no automatic refresh; use the Refresh control
-instead). The fastest automatic interval is 3 seconds — anything faster
-isn't offered, since polling a whole-cluster read on a very tight loop
-isn't a good default for API server load. If the engine can't be reached,
-the pill switches to a "Connection lost" state and shows how stale the
-displayed data is while it keeps retrying.
+**Download report** (dashboard, account menu, or *Report* on the Topology
+toolbar) produces a password-protected PDF: cover, contents, overview,
+health, topology diagrams, full inventory, findings and report metadata. You
+choose the password (8 characters or more); the PDF is encrypted with
+AES-256 and Mantis keeps no copy. The dialog shows each stage as it runs and
+can be cancelled. See [Infrastructure Reports](reports.md).
 
-Reopening a resource's drawer or YAML tab is preserved across a background
-sync — an automatic refresh updates the graph underneath you without
-closing whatever you had open.
+## Staying current
 
-## Theme
+The engine watches the cluster, so changes reach it within about a second.
+The browser fetches only what changed since its last update, every
+10 seconds by default; change the interval (5 s, 10 s, 30 s, 1 min, or
+Manual) in **Settings**. Updates never close what you have open: an
+inspector, a details page or a YAML tab stays where it is.
 
-Mantis opens in **dark theme by default**. Toggle to light with the
-sun/moon control in the header if you prefer it; the choice is remembered
-for the rest of that browser tab (so a reload doesn't flip back to dark
-under you) but is not carried over to a new tab or the next time you open
-Mantis — it always starts dark.
+## Access & Settings
 
-## Signing out
-
-The **Sign out** control in the header ends your session immediately and
-returns you to the login screen.
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl F` | Focus search (or the YAML find-in-page box, if a YAML tab is open) |
-| `Escape` | Close YAML search → close details drawer → clear selection (in that order, one press at a time) |
-| `Enter` / `Shift Enter` | Next / previous match, inside YAML find-in-page |
-| Scroll / pinch | Zoom the canvas |
-| Drag (empty canvas) | Pan |
-| Drag (a card) | Reposition that resource |
+**Access & authentication** describes how sign-in works and exactly what
+Mantis can read in the cluster, including any kinds RBAC does not allow it
+to list (those are missing everywhere and references to them show as
+"unverified"). **Settings** holds the theme and refresh interval.

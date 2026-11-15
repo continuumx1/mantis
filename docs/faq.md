@@ -8,9 +8,20 @@
   hand.
 
 **Is Mantis production-ready?**
-: Not yet. Mantis is in Public Preview: functional and safe to point at a
-  real cluster, but its login flow, UI, and interfaces are still evolving
-  ahead of a stable release. See [Public Preview notes](security.md#public-preview-notes).
+: Yes, as of 1.0. It is strictly read-only, signs in with an administrator
+  password you configure (there is no default), and never handles Secret
+  values. It has one administrator account today; multiple users, roles
+  and single sign-on are on the [Roadmap](roadmap.md). See
+  [Security](security.md#signing-in) for the recommended setup.
+
+**How do I get the admin password?**
+: The Helm chart generates one unless you set `auth.adminPassword`. Read
+  it with `kubectl get secret <release>-mantis-admin -n <namespace> -o jsonpath='{.data.password}' | base64 -d`.
+
+**Can I export what Mantis shows?**
+: Yes: **Download report** produces a password-protected (AES-256) PDF
+  with the topology, inventory, health and findings. See
+  [Infrastructure Reports](reports.md).
 
 **Does Mantis modify my cluster?**
 : No. Mantis is strictly read-only — every Kubernetes API call it makes is
@@ -37,13 +48,16 @@
   does need registry access once, unless you build and load them locally.
 
 **How current is the data I'm looking at?**
-: As current as the last sync — Mantis polls on an interval you control
-  (down to every 3 seconds), it doesn't hold a live `watch` subscription.
-  See [Core Concepts](core-concepts.md#a-snapshot-not-a-stream).
+: Within seconds. The engine follows the cluster with Kubernetes watches
+  and picks up a change in about a second; the browser fetches what changed
+  every 10 seconds by default (5 seconds to manual, in Settings). See
+  [Core Concepts](core-concepts.md#how-mantis-stays-current).
 
-**Why doesn't every resource have a health indicator?**
-: Today the status ring is Pod-only. Other kinds show readiness as text in
-  the Summary tab. Broader health indicators are on the roadmap.
+**How does Mantis decide what is healthy?**
+: From observed state only: Pod phase and container readiness, workload
+  replica availability, node conditions, claim binding, and references that
+  point at nothing. The same rules drive the dashboard, resource tables and
+  reports.
 
 **How can I contribute?**
 : Join the [Discord](https://discord.gg/ZTB4eGfCxa), open an issue or pull

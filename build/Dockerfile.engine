@@ -7,7 +7,7 @@
 #
 # Multi-arch (what the published cx1tech/mantis images actually use):
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     --build-arg VERSION=0.1.0-preview.1 \
+#     --build-arg VERSION=1.0.0 \
 #     -f build/Dockerfile.engine -t cx1tech/mantis:0.1.0-preview.1-engine --push .
 #
 # Note: the builder tag must match the Go toolchain in go.mod (currently 1.26).

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: mantis
-description: Visual Kubernetes topology and relationship graph — read-only, any distribution.
+description: Visual Kubernetes topology, relationship graph and infrastructure reports — read-only, any distribution.
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
@@ -18,7 +18,4 @@ maintainers:
     url: https://continuumx1.com
 icon: https://raw.githubusercontent.com/continuumx1/mantis/main/docs/images/mantis-muscot.webp
 annotations:
-  # This chart ships Mantis's Public Preview build: a hardcoded demo login
-  # (admin/admin) sits in front of the UI. See README.md's "Public Preview"
-  # section before exposing a release beyond your own machine/team.
   category: Monitoring

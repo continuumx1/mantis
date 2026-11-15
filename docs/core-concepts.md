@@ -58,11 +58,13 @@ Relationships are named for their **Kubernetes semantics**, not for
 convenience — `runs-on` means exactly what `kubectl get pod -o wide`'s NODE
 column means, nothing more inferred.
 
-## A snapshot, not a stream
+## How Mantis stays current
 
-Mantis builds the graph fresh on every sync — it polls, on an interval you
-control (as fast as every 3 seconds, or manual), rather than holding a
-persistent `watch` subscription. What you see is accurate as of the last
-sync, not necessarily this exact instant. See
-[Known limitations](troubleshooting.md#known-limitations) for what that
-does and doesn't affect.
+The engine lists each kind once, then follows the cluster with Kubernetes
+watches and rebuilds the graph from its cache when something changes,
+usually within a second. The browser asks for what changed since its last
+revision every 10 seconds by default (configurable in Settings, or
+manual), so what you see is at most one refresh interval old. If the API
+server refuses watches, the engine falls back to re-listing on an interval
+on its own. See
+[the graph architecture](graph-architecture.md#keeping-the-graph-current-watch-not-poll).

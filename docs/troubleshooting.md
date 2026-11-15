@@ -1,10 +1,28 @@
 # Troubleshooting
 
-**Login redirects back to `/login` immediately after signing in.** Confirm
-you're using `admin` / `admin` exactly — the demo credential comparison is
-case-sensitive. If it still fails, check `mantis-web`'s logs; a
-`502`/proxy error there usually means it can't reach `mantis-engine` at the
-configured `MANTIS_ENGINE_URL`.
+**"Invalid username or password".** The account is the one configured at
+install time; both fields are case-sensitive. With Helm, read the password
+from the `<release>-mantis-admin` Secret (see
+[Getting Started](getting-started.md#first-login)). After 10 failures from
+one address, sign-in is refused for 10 minutes ("too many failed
+sign-ins").
+
+**`mantis-web` exits at startup with "no admin password configured".** Set
+`MANTIS_ADMIN_PASSWORD_HASH` or `MANTIS_ADMIN_PASSWORD` (the Helm chart does
+this for you).
+
+**Signed out unexpectedly.** Sessions live in `mantis-web`'s memory: a
+restart or upgrade signs everyone out, and with more than one `mantis-web`
+replica you need sticky sessions on your Ingress.
+
+**Login redirects back to `/login` immediately after signing in.** Check
+`mantis-web`'s logs; a `502`/proxy error there usually means it can't reach
+`mantis-engine` at the configured `MANTIS_ENGINE_URL`.
+
+**"Download report" says reports are not available.** `mantis-report` is
+not deployed (`report.enabled=false`) or `MANTIS_REPORT_URL` is unset. A
+"try again in a moment" message means that replica is already generating
+`report.maxConcurrent` reports.
 
 **The graph is empty, or missing resources you know exist.** Check the
 `mantis-engine` logs for RBAC "forbidden" messages — a missing `list`
@@ -31,21 +49,19 @@ match how you're actually distributing the image.
 
 ## Known limitations
 
-- **Snapshot-on-poll, not push.** The graph reflects the cluster as of the
-  last sync (as fast as every 3 seconds, or manual); there's no live
-  watch/stream yet, so a change can be up to one sync interval old.
-- **Pod-only health today.** The status ring only reflects Pod health;
-  other kinds (Deployments, StatefulSets, …) show their readiness as text
-  in the Summary tab but don't yet carry a ring of their own.
+- **Refresh interval.** The engine sees changes within about a second,
+  but the browser asks for them every 10 seconds by default (configurable),
+  so the screen can be up to one interval behind.
+- **No Gateway API yet.** Gateways and HTTPRoutes are not mapped.
 - **Built-in kinds plus two specific CRDs, not arbitrary CRDs.** VPA and
   Karpenter NodePool are understood specifically; other custom resources
   aren't mapped into the graph yet.
 - **No change history or GitOps awareness.** Mantis explains current
   state, not what changed, when, or why.
-- **Single shared visibility per deployment.** Everyone using one Mantis
-  deployment currently sees the same graph — the one `mantis-engine`'s
-  ServiceAccount can read. Per-user, RBAC-aware visibility is planned
-  alongside real authentication (see [Roadmap](roadmap.md)).
+- **One administrator account, shared visibility.** Everyone signed in
+  sees the same graph — the one `mantis-engine`'s ServiceAccount can read.
+  Multiple users, roles, SSO and per-user, RBAC-aware visibility are
+  planned (see [Roadmap](roadmap.md)).
 
 ## Still stuck?
 

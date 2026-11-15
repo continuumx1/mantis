@@ -16,13 +16,13 @@ administration — is the application shell in `internal/web/ui/app-shell.js` an
 | `#/r/<kind>` | Resource table: filter, status filter, sort, pagination | `/api/graph` |
 | `#/o/<id>` | Resource detail: Overview, YAML, Events, Conditions, Related resources | `/api/graph`, `/api/resource`, `/api/events` |
 | `#/namespaces`, `#/events` | Namespace health; cluster events | `/api/graph`, `/api/events` |
-| `#/access`, `#/settings` | What sign-in and cluster access actually are; theme and refresh preferences | `/api/graph` meta |
+| `#/access`, `#/settings` | What sign-in and cluster access actually are; theme and refresh preferences | `/api/graph` meta, `/api/session` |
 
 Every number comes from the engine. Capacity *usage* is shown only when
 metrics-server is installed; otherwise the dashboard says so and shows
-allocatable capacity only. The Access page describes the Public Preview sign-in
-as it is — there are no user, role or OIDC controls until those exist in the
-backend. Secrets never show values, YAML or annotations.
+allocatable capacity only. The Access page describes sign-in as it is (one
+configured administrator account) — there are no user, role or OIDC controls
+until those exist in the backend. Secrets never show values, YAML or annotations.
 
 The engine endpoints added for these pages are read-only and cached briefly
 (`/api/events` 10 s, `/api/cluster/capacity` 15 s); `/api/resource?format=json`
@@ -70,11 +70,13 @@ nothing is fetched from a CDN — Mantis often runs on clusters without internet
 
 ## Branding
 
-`internal/web/ui/brand/`: `mantis-mark.svg` (the compact symbol, used in the
-sidebar), `mantis-logo-light.svg` / `mantis-logo-dark.svg` (symbol + wordmark
-for light and dark backgrounds) and `favicon.svg`. The mascot illustration
-(`mantis-mascot.webp`) stays for the login screen, docs and community material
-rather than every UI surface.
+The Mantis mascot is the logo. `internal/web/ui/brand/mantis-mascot.svg` is
+the full mascot as a vector drawing; `mantis-mark.svg` and `favicon.svg` crop
+it to the face for small sizes (sidebar, browser tab);
+`mantis-logo-light.svg` / `mantis-logo-dark.svg` pair the face with the
+wordmark for light and dark backgrounds. The original artwork
+(`mantis-mascot.webp`) stays for the login screen. The PDF report cover
+draws the same mascot as vectors (`internal/report/pdf.go`).
 
 ## Topology presentation
 

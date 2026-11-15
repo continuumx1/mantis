@@ -8,9 +8,13 @@ code. See the repository [NOTICE](../../NOTICE) file.
 |------|-----|
 | `mantis-title-black.PNG` | Mantis wordmark, dark text (README header, light backgrounds) |
 | `mantis-title-white.PNG` | Mantis wordmark, light text (dark backgrounds) |
-| `mantis-muscot.webp` | Mantis mascot |
+| `mantis-muscot.webp` | Mantis mascot (original artwork; also the docs-site logo) |
+| `../../internal/web/ui/brand/*.svg` | The mascot as vectors: full mascot, face mark, favicon, wordmark logos |
 | `mantis-nature-neon-login-screen.jpg` | Login screen background photo |
 
 You may not use these marks in a way that implies your fork or derivative is an
 official Mantis distribution. For any other use of the Mantis name, logo, or mascot,
 please contact ContinuumX1 Technologies.
+
+`mantis-architecture.svg` (the three-service diagram) is documentation, not a
+brand asset.

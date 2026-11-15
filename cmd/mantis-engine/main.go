@@ -31,7 +31,7 @@ import (
 	mantiskube "github.com/continuumx1/mantis/internal/kubernetes"
 )
 
-// version identifies this build (e.g. "0.1.0-preview.1"). It's set at
+// version identifies this build (e.g. "1.0.0"). It's set at
 // image-build time via -ldflags "-X main.version=..." (see
 // build/Dockerfile.engine); local `go run`/`go build` with no ldflags
 // leaves it at "dev". Logged at startup so `kubectl logs` on a running Pod

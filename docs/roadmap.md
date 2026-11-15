@@ -3,22 +3,24 @@
 Priorities evolve from real use — nothing below is a commitment, and
 "Planned"/"Future" are explicitly not scheduled.
 
-## Current
+## Current (1.0)
 
-- Relationship engine with a structured `Context`
-- Whole-cluster graph as a two-service web application
+- Relationship engine with typed, evidence-classified relationships
+- Deterministic topology: namespace, node, workload and dependency views
+- Application UI: dashboard, resource tables and details, events, capacity
+- Watch-based sync with incremental updates (poll fallback)
+- Password-protected PDF infrastructure reports (`mantis-report`)
+- Configurable administrator sign-in (bcrypt, no default password)
 - Any-distribution support via standard kubeconfig / in-cluster auth
-- Verified dangling-reference detection
-- Public-preview login gate
-- Helm chart (two Deployments, two Services, read-only RBAC)
+- Helm chart (three services, read-only RBAC, network policies)
 - Published multi-arch images on Docker Hub (`cx1tech/mantis`)
 
 ## Planned
 
-- CI (build/vet/test/gofmt on every PR)
-- Real authentication, delegating to Kubernetes RBAC
-- Richer per-resource detail in the UI
-- Live updates (watch) instead of snapshot-on-poll
+- Multiple users and roles, OIDC single sign-on, audit log
+- Per-user, RBAC-aware visibility
+- Gateway API resources
+- Scheduled reports
 
 ## Future
 

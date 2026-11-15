@@ -5,9 +5,7 @@ browser as the client: `mantis-web`, `mantis-engine` and `mantis-report`.
 There is no database and no separate storage — every graph you see is built
 from the engine's live view of the Kubernetes API.
 
-<div markdown style="background: #fff; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-![Mantis architecture: browser → mantis-web → mantis-engine → Kubernetes API server](images/mantis-arch-white-bg.png)
-</div>
+![Mantis architecture: browser → mantis-web; mantis-web → mantis-engine and mantis-report; mantis-report → mantis-engine; mantis-engine → Kubernetes API server](images/mantis-architecture.svg)
 
 ## The three services
 
@@ -54,33 +52,77 @@ mounts no ServiceAccount token. Network policies allow only
    document with its JS/CSS inlined — no separate asset requests, no CDN).
 3. The page calls `GET /api/graph`. `mantis-web` proxies this straight to
    `mantis-engine`.
-4. `mantis-engine` walks every namespace (plus cluster-scoped kinds) using
-   its Kubernetes client, issuing `list` calls for each resource kind it
-   understands (see [Core Concepts](core-concepts.md#resource-kinds)),
-   resolves the relationships between what it found (owner references,
-   selectors, endpoint slices, volume/env references, …), and assembles an
-   in-memory graph.
-5. That graph is serialized to JSON and returned. The browser never sees
-   raw Kubernetes objects for the graph view — only the derived nodes,
-   edges, and the compact display attributes the engine computed
-   (readiness, image, probes, resource requests, …).
-6. The UI renders the graph as SVG and starts a force-directed layout
-   simulation client-side (no server involvement) so nodes settle into
-   place and you can drag them around.
-7. On an interval you control (see [the sync pill](user-guide.md#staying-in-sync-the-sync-pill)),
-   the browser repeats step 3 and re-renders — this is a poll, not a
-   push/watch subscription, so what you see is a snapshot as of the last
-   sync, not a live stream.
-8. If you click a resource and open its **YAML** tab, *that* triggers a
-   separate, single, on-demand `GET /api/resource?kind=...&name=...&ns=...`
-   call — the engine fetches that one object fresh from the Kubernetes API
-   (via the dynamic client, so this also covers CRDs), strips
-   server-managed noise (`managedFields`), and returns it as YAML. Nothing
-   about YAML fetching happens unless you explicitly open that tab.
+4. `mantis-engine` already has the graph. At startup it listed each
+   resource kind it understands once (see
+   [Core Concepts](core-concepts.md#resource-kinds)), then keeps an
+   in-memory cache current with a Kubernetes `watch` per kind. When changes
+   arrive it rebuilds the graph from that cache, with no API calls,
+   resolving relationships (owner references, selectors, endpoint slices,
+   volume/env references, …) and publishing a new revision. See
+   [the graph architecture](graph-architecture.md#keeping-the-graph-current-watch-not-poll).
+5. The graph is returned as JSON (gzip-compressed). The browser never sees
+   raw Kubernetes objects for the graph — only the derived nodes, typed
+   edges and the compact attributes the engine computed (readiness, image,
+   probes, resource requests, …).
+6. The UI projects the graph into the view you chose and lays it out
+   deterministically, in the browser: no physics, no drift, no overlaps.
+7. Every refresh interval (10 seconds by default, or manual) the browser
+   asks for `GET /api/graph?since=<revision>` and receives only what
+   changed.
+8. If you open a resource's **YAML** tab, *that* triggers a single
+   on-demand `GET /api/resource?kind=...&name=...&ns=...` — the engine
+   fetches that one object fresh from the Kubernetes API (via the dynamic
+   client, so this also covers CRDs), strips `managedFields`, and returns it.
+   Secrets are refused outright.
+9. **Download report** sends the browser's topology layout to
+   `POST /api/report`; `mantis-web` proxies it to `mantis-report`, which
+   reads one snapshot from the engine, checks the layout against it, and
+   streams progress and then the encrypted PDF back. See
+   [Infrastructure Reports](reports.md).
+
+## How a report is generated
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant W as mantis-web
+    participant R as mantis-report
+    participant E as mantis-engine
+    participant K as Kubernetes API
+
+    Note over E,K: Always running: one list per kind, then watches keep the engine's cache current
+    B->>B: Lay out the topology (same engine as the Topology page)
+    B->>W: POST /api/report (graph revision, layout, password)
+    W->>W: Check the sign-in session
+    W->>R: Proxy the request
+    R->>R: Validate it (password length, size limits, free slot)
+    R->>E: GET /internal/v1/snapshot
+    alt watch mode (default)
+        E->>E: Read the watch cache, no API calls
+    else poll mode
+        E->>K: List resources (read-only)
+        K-->>E: Resources
+    end
+    E-->>R: Graph + trimmed objects (no Secret or ConfigMap values)
+    alt cluster changed since the layout
+        R-->>B: 409 with the new revision
+        B->>B: Re-lay out and retry (up to 3 times)
+    end
+    R->>R: Check every card and line against the snapshot
+    R->>R: Health, findings and inventory
+    R->>R: Draw the topology as PDF vector graphics, render the PDF
+    R->>R: Encrypt with AES-256 (PDF 2.0, revision 6)
+    R-->>B: Progress stages, then the encrypted PDF (streamed through mantis-web)
+    B->>B: Save the PDF file
+```
+
+The password exists only inside that one request; the unencrypted PDF is
+never written to disk. Details: [Infrastructure Reports](reports.md).
 
 ## RBAC: what the engine's ServiceAccount needs
 
-`mantis-engine`'s ServiceAccount needs **read-only** (`get`/`list`) access
+`mantis-engine`'s ServiceAccount needs **read-only** (`get`/`list`/`watch`) access
 to the resource kinds it maps — core workloads, networking, storage,
 autoscaling objects, Nodes, and (best-effort, only if installed)
 VerticalPodAutoscaler and Karpenter NodePool custom resources. It needs no
