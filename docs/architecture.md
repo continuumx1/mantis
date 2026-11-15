@@ -91,7 +91,7 @@ sequenceDiagram
     participant E as mantis-engine
     participant K as Kubernetes API
 
-    Note over E,K: Always running: one list per kind, then watches keep the engine's cache current
+    Note over E,K: Always running: list once, then watch
     B->>B: Lay out the topology (same engine as the Topology page)
     B->>W: POST /api/report (graph revision, layout, password)
     W->>W: Check the sign-in session
