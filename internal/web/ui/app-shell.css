@@ -218,6 +218,9 @@ select.m-ctx { cursor: pointer; appearance: none; padding-right: 26px; font: inh
 
 .m-empty { text-align: center; padding: 40px 20px; color: var(--m-text-2); font-size: var(--m-fs-sm); }
 .m-empty b { display: block; color: var(--m-text); font-size: var(--m-fs-md); margin-bottom: 4px; }
+/* Class display rules must not override the hidden attribute (an empty
+   error note used to show as a blank red bar in the report dialog). */
+[hidden] { display: none !important; }
 .m-note { display: block; padding: 10px 12px; border-radius: var(--m-r); font-size: var(--m-fs-sm); background: var(--m-info-soft); color: var(--m-info-ink); border: 1px solid transparent; line-height: 1.5; }
 .m-note.warn { background: var(--m-warn-soft); color: var(--m-warn-ink); }
 .m-note.crit { background: var(--m-crit-soft); color: var(--m-crit-ink); }
