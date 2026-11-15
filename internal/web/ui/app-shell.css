@@ -71,7 +71,7 @@ body { background: var(--m-bg); color: var(--m-text); font-family: var(--m-font)
 .m-sidebar { width: var(--m-sidebar-w); flex: none; background: var(--m-sidebar); color: var(--m-sidebar-text); display: flex; flex-direction: column; z-index: 20;
   transition: width .18s ease; border-right: 1px solid rgba(255,255,255,.04); }
 .m-brand { display: flex; align-items: center; gap: 10px; height: var(--m-topbar-h); padding: 0 16px; flex: none; border-bottom: 1px solid rgba(255,255,255,.06); }
-.m-brand img { height: 26px; width: 26px; }
+.m-brand img { height: 28px; width: 28px; filter: drop-shadow(0 0 .6px rgba(255,255,255,.7)) drop-shadow(0 0 5px rgba(187,234,90,.25)); }
 .m-brand b { font-size: 16px; font-weight: 650; letter-spacing: -.2px; color: #F8FAFC; }
 .m-brand span { font-size: 10px; font-weight: 500; color: var(--m-sidebar-muted); border: 1px solid rgba(255,255,255,.12); border-radius: 4px; padding: 0 5px; margin-left: auto; line-height: 16px; }
 .m-nav { flex: 1; overflow-y: auto; padding: 10px 8px 16px; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
