@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func testEngine(t *testing.T) *httptest.Server {
@@ -23,11 +25,27 @@ func testEngine(t *testing.T) *httptest.Server {
 	return engine
 }
 
-// login POSTs the hardcoded dev credentials and returns the session cookie the
+const testPassword = "correct-horse-battery"
+
+func testAdmin(t *testing.T) Credentials {
+	t.Helper()
+	c, err := NewCredentials("admin", testPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func newTestHandler(t *testing.T, engineURL string) (http.Handler, error) {
+	t.Helper()
+	return NewHandler(Config{EngineURL: engineURL, Admin: testAdmin(t)})
+}
+
+// login POSTs the configured test credentials and returns the session cookie the
 // handler set, failing the test if login did not succeed.
 func login(t *testing.T, handler http.Handler) *http.Cookie {
 	t.Helper()
-	body, _ := json.Marshal(map[string]string{"username": "admin", "password": "admin"})
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": testPassword})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
 	handler.ServeHTTP(rec, req)
@@ -44,7 +62,7 @@ func login(t *testing.T, handler http.Handler) *http.Cookie {
 // Unauthenticated requests must not reach the UI or the proxied API: a browser
 // navigation bounces to the login page, and an API fetch gets a plain 401.
 func TestNewHandler_RequiresLogin(t *testing.T) {
-	handler, err := NewHandler(testEngine(t).URL)
+	handler, err := newTestHandler(t, testEngine(t).URL)
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
@@ -77,7 +95,7 @@ func TestNewHandler_RequiresLogin(t *testing.T) {
 
 // The wrong credentials must not issue a session.
 func TestNewHandler_LoginRejectsBadCredentials(t *testing.T) {
-	handler, err := NewHandler(testEngine(t).URL)
+	handler, err := newTestHandler(t, testEngine(t).URL)
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
@@ -96,7 +114,7 @@ func TestNewHandler_LoginRejectsBadCredentials(t *testing.T) {
 // With a valid session, / serves the UI shell and /api/ is proxied to the
 // engine — the same behavior the pre-login-gate test covered.
 func TestNewHandler_ServesUIAndProxiesAPIWhenLoggedIn(t *testing.T) {
-	handler, err := NewHandler(testEngine(t).URL)
+	handler, err := newTestHandler(t, testEngine(t).URL)
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
@@ -128,7 +146,7 @@ func TestNewHandler_ServesUIAndProxiesAPIWhenLoggedIn(t *testing.T) {
 // Logging out revokes the session, so a subsequent request behaves as
 // unauthenticated again.
 func TestNewHandler_Logout(t *testing.T) {
-	handler, err := NewHandler(testEngine(t).URL)
+	handler, err := newTestHandler(t, testEngine(t).URL)
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
@@ -155,7 +173,7 @@ func TestNewHandler_Logout(t *testing.T) {
 // rejected at startup rather than failing silently on the first request.
 func TestNewHandler_RejectsBadEngineURL(t *testing.T) {
 	for _, bad := range []string{"", "mantis-engine:8080", "://nope"} {
-		if _, err := NewHandler(bad); err == nil {
+		if _, err := NewHandler(Config{EngineURL: bad, Admin: testAdmin(t)}); err == nil {
 			t.Errorf("NewHandler(%q) = nil error, want rejection", bad)
 		}
 	}
@@ -172,5 +190,105 @@ func TestStaticHandler_UIIsNotCachedStale(t *testing.T) {
 		if rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-cache" {
 			t.Errorf("%s: status %d Cache-Control %q, want 200 and no-cache", path, rec.Code, rec.Header().Get("Cache-Control"))
 		}
+	}
+}
+
+func postLogin(handler http.Handler, user, pass, remote string) *httptest.ResponseRecorder {
+	body, _ := json.Marshal(map[string]string{"username": user, "password": pass})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	req.RemoteAddr = remote
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec
+}
+
+// There is no built-in default account: admin/admin must not sign in, and a
+// handler cannot be built without credentials.
+func TestNoDefaultCredentials(t *testing.T) {
+	handler, err := newTestHandler(t, testEngine(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := postLogin(handler, "admin", "admin", "192.0.2.1:1234"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("admin/admin status = %d, want 401", rec.Code)
+	}
+	if _, err := NewHandler(Config{EngineURL: testEngine(t).URL}); err == nil {
+		t.Fatal("NewHandler without credentials succeeded, want error")
+	}
+}
+
+func TestCredentialsFromEnv(t *testing.T) {
+	t.Setenv("MANTIS_ADMIN_USERNAME", "")
+	t.Setenv("MANTIS_ADMIN_PASSWORD", "")
+	t.Setenv("MANTIS_ADMIN_PASSWORD_HASH", "")
+	if _, err := CredentialsFromEnv(); err == nil {
+		t.Fatal("no password configured: want error")
+	}
+	t.Setenv("MANTIS_ADMIN_PASSWORD", "short")
+	if _, err := CredentialsFromEnv(); err == nil {
+		t.Fatal("short password: want error")
+	}
+	t.Setenv("MANTIS_ADMIN_PASSWORD", "long-enough-password")
+	c, err := CredentialsFromEnv()
+	if err != nil || c.Username != "admin" || !c.check("admin", "long-enough-password") || c.check("admin", "wrong") {
+		t.Fatalf("plain password: %v %+v", err, c.Username)
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte("from-a-secret-hash"), bcrypt.MinCost)
+	t.Setenv("MANTIS_ADMIN_USERNAME", "ops")
+	t.Setenv("MANTIS_ADMIN_PASSWORD_HASH", string(hash)+"\n")
+	c, err = CredentialsFromEnv()
+	if err != nil || !c.check("ops", "from-a-secret-hash") || c.check("ops", "long-enough-password") || c.check("admin", "from-a-secret-hash") {
+		t.Fatalf("hash should take precedence: %v", err)
+	}
+	t.Setenv("MANTIS_ADMIN_PASSWORD_HASH", "not-a-hash")
+	if _, err := CredentialsFromEnv(); err == nil {
+		t.Fatal("invalid hash: want error")
+	}
+}
+
+// Repeated failures from one address are refused for a while, even with the
+// right password; other addresses are unaffected.
+func TestLoginThrottling(t *testing.T) {
+	handler, err := newTestHandler(t, testEngine(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < maxLoginFailures; i++ {
+		if rec := postLogin(handler, "admin", "wrong", "198.51.100.7:4000"); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: status %d, want 401", i, rec.Code)
+		}
+	}
+	if rec := postLogin(handler, "admin", testPassword, "198.51.100.7:4001"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("throttled address: status %d, want 429", rec.Code)
+	}
+	if rec := postLogin(handler, "admin", testPassword, "198.51.100.8:4000"); rec.Code != http.StatusOK {
+		t.Fatalf("other address: status %d, want 200", rec.Code)
+	}
+}
+
+// The session endpoint names the signed-in user; cookies are Secure behind
+// an HTTPS proxy.
+func TestSessionAndSecureCookie(t *testing.T) {
+	handler, err := newTestHandler(t, testEngine(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]string{"username": "admin", "password": testPassword})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	c := rec.Result().Cookies()
+	if rec.Code != http.StatusOK || len(c) == 0 || !c[0].Secure || !c[0].HttpOnly {
+		t.Fatalf("login over https: status %d cookies %+v", rec.Code, c)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/session", nil)
+	req.AddCookie(c[0])
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	var got map[string]string
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if rec.Code != http.StatusOK || got["username"] != "admin" {
+		t.Fatalf("/api/session: %d %v", rec.Code, got)
 	}
 }

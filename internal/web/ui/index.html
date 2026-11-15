@@ -22,7 +22,7 @@
 <body>
 <div class="m-shell" id="shell">
   <aside class="m-sidebar" aria-label="Main navigation">
-    <div class="m-brand"><img src="brand/mantis-mark.svg" alt=""><b>Mantis</b><span title="Public Preview">preview</span></div>
+    <div class="m-brand"><img src="brand/mantis-mark.svg" alt=""><b>Mantis</b></div>
     <nav class="m-nav" id="mNav"></nav>
     <div class="m-side-foot"><button id="mRail" aria-label="Collapse sidebar"></button></div>
   </aside>
@@ -43,9 +43,9 @@
       <button class="m-sync" id="mSync" aria-label="Sync status — click to refresh"></button>
       <button class="m-iconbtn" id="mThemeBtn"></button>
       <div class="m-menu-wrap">
-        <button class="m-iconbtn" id="mUserBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account"><span class="m-avatar">A</span></button>
+        <button class="m-iconbtn" id="mUserBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account"><span class="m-avatar" id="mAvatar">A</span></button>
         <div class="m-menu" id="mUserMenu" role="menu">
-          <div class="m-menu-h"><b>admin</b><small>Public Preview account</small></div>
+          <div class="m-menu-h"><b id="mUserName">admin</b><small>Administrator</small></div>
           <a href="#/access" role="menuitem">Access &amp; authentication</a>
           <a href="#/settings" role="menuitem">Settings</a>
           <button data-report role="menuitem">Download report…</button>

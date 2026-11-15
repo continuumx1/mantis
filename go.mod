@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/pdfcpu/pdfcpu v0.16.4
+	golang.org/x/crypto v0.58.0
 	k8s.io/api v0.36.3
 	k8s.io/apimachinery v0.36.3
 	k8s.io/client-go v0.36.3
@@ -36,7 +37,6 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect

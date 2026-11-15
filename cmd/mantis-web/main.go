@@ -19,7 +19,7 @@ import (
 	"github.com/continuumx1/mantis/internal/web"
 )
 
-// version identifies this build (e.g. "0.1.0-preview.1") — see
+// version identifies this build (e.g. "1.0.0") — see
 // cmd/mantis-engine/main.go's version comment; the same build-time
 // mechanism applies here.
 var version = "dev"
@@ -33,14 +33,19 @@ func main() {
 
 	// Empty disables reports (the UI then explains the service is not deployed).
 	reportURL := httpx.EnvOr("MANTIS_REPORT_URL", "")
-	handler, err := web.NewHandler(engineURL, reportURL)
+	admin, err := web.CredentialsFromEnv()
+	if err != nil {
+		slog.Error("startup failed", "event", "auth_config_invalid", "error", err.Error())
+		os.Exit(1)
+	}
+	handler, err := web.NewHandler(web.Config{EngineURL: engineURL, ReportURL: reportURL, Admin: admin})
 	if err != nil {
 		slog.Error("startup failed", "event", "handler_init_failed", "error", err.Error())
 		os.Exit(1)
 	}
 
 	slog.Info("startup", "event", "ready_to_serve", "addr", addr, "engine_url", engineURL,
-		"warning", "public-preview auth active (admin/admin, see internal/web/auth.go) — not production login")
+		"reports", reportURL != "", "admin_user", admin.Username)
 
 	if err := httpx.ListenAndServe(addr, handler); err != nil {
 		slog.Error("fatal", "event", "serve_failed", "error", err.Error())

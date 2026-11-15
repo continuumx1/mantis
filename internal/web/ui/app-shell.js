@@ -710,15 +710,15 @@
   function pageAccess(r, el) {
     const meta = store.meta || {};
     el.innerHTML = '<div class="m-page"><div class="m-page-h"><div><div class="m-crumbs">Administration</div><h1>Access &amp; authentication</h1><p>How people sign in to Mantis, and what Mantis itself can read in the cluster.</p></div></div>' +
-      '<div class="m-grid m-g-2"><div class="m-card"><div class="m-card-h"><h2>Mantis sign-in</h2><span class="m-badge warn">Public Preview</span></div><div class="m-card-b">' +
-      '<div class="m-kv"><div class="k">Method</div><div class="v">Built-in preview gate</div><div class="k">Accounts</div><div class="v">One shared account (<code>admin</code>)</div><div class="k">Sessions</div><div class="v">Server-side, in memory; cleared on sign-out or restart</div><div class="k">Enforced by</div><div class="v">mantis-web, on every page and API request</div></div>' +
-      '<div class="m-note warn" style="margin-top:12px">This preview gate is not production authentication. User accounts, roles (Admin, Maintainer, Viewer), OIDC and audit logs are on the roadmap and are not available yet — so there are no controls for them here.</div>' +
+      '<div class="m-grid m-g-2"><div class="m-card"><div class="m-card-h"><h2>Mantis sign-in</h2><span class="m-badge ok">Password</span></div><div class="m-card-b">' +
+      '<div class="m-kv"><div class="k">Method</div><div class="v">Username and password, set by whoever installed Mantis (stored only as a bcrypt hash)</div><div class="k">Account</div><div class="v">One administrator (<code>' + esc(currentUser) + '</code>)</div><div class="k">Sessions</div><div class="v">Server-side, in memory; expire after 12 hours, on sign-out or on restart</div><div class="k">Protection</div><div class="v">Repeated failed sign-ins are refused for 10 minutes; HttpOnly, SameSite cookies, Secure over HTTPS</div><div class="k">Enforced by</div><div class="v">mantis-web, on every page and API request</div></div>' +
+      '<div class="m-note neutral" style="margin-top:12px">To change the password, update the Helm value <code>auth.adminPassword</code> (or your own Secret) and upgrade. Multiple users, roles, OIDC single sign-on and audit logs are on the roadmap; to use your identity provider today, put Mantis behind an authenticating proxy such as oauth2-proxy.</div>' +
       '<div style="margin-top:12px"><button class="m-btn" id="aOut">' + icon("logout") + 'Sign out of this session</button></div></div></div>' +
       '<div class="m-card"><div class="m-card-h"><h2>Kubernetes access</h2><span class="m-badge ok">Read-only</span></div><div class="m-card-b">' +
       '<div class="m-kv"><div class="k">Identity</div><div class="v">The engine\'s ServiceAccount (or your kubeconfig when run locally)</div><div class="k">Permissions</div><div class="v">get / list only — no create, update, patch or delete anywhere</div><div class="k">Cluster</div><div class="v">' + esc(meta.context || "—") + '</div><div class="k">API server</div><div class="v">' + esc(meta.server || "—") + '</div></div>' +
       ((meta.skipped || []).length ? '<div class="m-note warn" style="margin-top:12px">RBAC does not allow Mantis to list: ' + meta.skipped.map(s => '<code>' + esc(s) + '</code>').join(", ") + '. Those resources are missing from every page, and references to them show as “unverified”.</div>'
         : '<div class="m-note neutral" style="margin-top:12px">Mantis can list every kind it understands in this cluster.</div>') +
-      '<p class="m-muted" style="font-size:12px;margin-bottom:0">Everyone signed in to Mantis sees what this one identity can read. Per-user, RBAC-aware access will arrive with real authentication.</p></div></div></div></div>';
+      '<p class="m-muted" style="font-size:12px;margin-bottom:0">Everyone signed in to Mantis sees what this one identity can read. Per-user, RBAC-aware access will arrive with multi-user accounts.</p></div></div></div></div>';
     $("aOut").addEventListener("click", signOut);
   }
   function pageSettings(r, el) {
@@ -783,6 +783,18 @@
     if (topo && topo.isLoaded()) topo.render();
     rerender();
   }
+  // Who is signed in, for the user menu and the Access page. Without a
+  // session API (the local dev server) the defaults stay.
+  let currentUser = "admin";
+  fetch("/api/session", { headers: { Accept: "application/json" } })
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => {
+      if (!j || !j.username) return;
+      currentUser = j.username;
+      $("mUserName").textContent = currentUser;
+      $("mAvatar").textContent = currentUser.charAt(0).toUpperCase();
+    })
+    .catch(() => {});
   function signOut() { fetch("/logout", { method: "POST" }).finally(() => { location.href = "/login"; }); }
 
   // ---------------------------------------------------------------- reports

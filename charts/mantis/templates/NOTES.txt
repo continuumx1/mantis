@@ -20,22 +20,26 @@ Mantis is deployed.
    then open http://localhost:8081
 {{- end }}
 
-2. Sign in.
-   This is a Public Preview build: the login screen shows a demo
-   credential (admin/admin) right on the screen. That gate is not real
-   authentication — see the repo's docs/USER_GUIDE.md ("Public Preview
-   notes") before pointing this release at anything beyond your own
-   machine or team.
+2. Sign in as "{{ .Values.auth.adminUsername | default "admin" }}".
+{{- if .Values.auth.existingSecret }}
+   The password is in your Secret "{{ .Values.auth.existingSecret }}".
+{{- else if .Values.auth.adminPassword }}
+   Use the password you set in auth.adminPassword.
+{{- else }}
+   A random password was generated. Read it with:
+     kubectl get secret {{ include "mantis.admin.secretName" . }} -n {{ .Release.Namespace }} -o jsonpath='{.data.password}' | base64 -d; echo
+{{- end }}
+   Expose Mantis over HTTPS (an Ingress with TLS) beyond your own machine.
 
 3. Verify it's actually reading your cluster:
      kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
-   Both Pods should be Running; mantis-engine's logs will name the
+   All Pods (engine, web{{ if .Values.report.enabled }}, report{{ end }}) should be Running; mantis-engine's logs will name the
    cluster context it connected to.
 
 By default this pulls {{ include "mantis.engine.image" . }} and
-{{ include "mantis.web.image" . }} straight from Docker Hub — no local
-build needed. If you're running your own build instead (see
-build/Dockerfile.engine and build/Dockerfile.web), point image.repository
+{{ include "mantis.web.image" . }}{{ if .Values.report.enabled }} and {{ include "mantis.report.image" . }}{{ end }} straight
+from Docker Hub — no local build needed. If you're running your own build
+instead (see build/Dockerfile.*), point image.repository
 at it, or load it directly into a local cluster (e.g.
 `minikube image load mantis-engine:dev`) and set image.pullPolicy to
 "Never".

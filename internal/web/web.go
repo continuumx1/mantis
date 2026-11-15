@@ -4,6 +4,7 @@ package web
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -52,15 +53,25 @@ func NoCache(h http.Handler) http.Handler { return noCache(h) }
 // same-origin means no CORS, and the engine never has to face the browser — it
 // can stay a private ClusterIP reachable only from this service.
 //
-// Everything except the login page, logout, and the liveness probe sits behind
-// a public-preview login gate (see auth.go) — a hardcoded admin/admin and an
-// in-memory session, not a real auth story, but enough to stand a login screen
-// up in front of the graph.
-//
-// /api/report goes to mantis-report instead (reportURL), behind the same gate.
-// An empty reportURL means the report service is not deployed: report
-// requests then get a clear 503 instead of reaching the engine.
-func NewHandler(engineURL string, reportURL ...string) (http.Handler, error) {
+// Config configures mantis-web's handler.
+type Config struct {
+	// EngineURL is mantis-engine's base URL; /api/* is proxied to it.
+	EngineURL string
+	// ReportURL is mantis-report's base URL for /api/report. Empty means the
+	// report service is not deployed: report requests get a clear 503.
+	ReportURL string
+	// Admin is the account that can sign in (see CredentialsFromEnv).
+	Admin Credentials
+}
+
+// NewHandler builds mantis-web. Everything except the login page, logout, the
+// liveness probe and the login page's own assets requires a signed-in session
+// (see auth.go).
+func NewHandler(cfg Config) (http.Handler, error) {
+	engineURL := cfg.EngineURL
+	if len(cfg.Admin.hash) == 0 {
+		return nil, errors.New("no admin credentials configured")
+	}
 	target, err := url.Parse(engineURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse engine url %q: %w", engineURL, err)
@@ -89,11 +100,12 @@ func NewHandler(engineURL string, reportURL ...string) (http.Handler, error) {
 		return nil, fmt.Errorf("read favicon: %w", err)
 	}
 
-	sess := newSessions()
+	sess := newSessions(cfg.Admin)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", proxy)
-	mux.Handle("/api/report", reportHandler(firstOr(reportURL, "")))
+	mux.Handle("/api/report", reportHandler(cfg.ReportURL))
+	mux.HandleFunc("/api/session", sess.handleSession)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteText(w, "ok")
 	})
@@ -120,13 +132,6 @@ func NewHandler(engineURL string, reportURL ...string) (http.Handler, error) {
 	mux.HandleFunc("/logout", sess.handleLogout)
 	mux.Handle("/", static)
 	return sess.gate(mux), nil
-}
-
-func firstOr(v []string, d string) string {
-	if len(v) > 0 {
-		return v[0]
-	}
-	return d
 }
 
 // reportHandler proxies report requests to mantis-report. Responses stream

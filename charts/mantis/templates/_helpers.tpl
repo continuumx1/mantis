@@ -112,3 +112,15 @@ image.tag to "", not the primary mechanism.
 {{- define "mantis.web.image" -}}
 {{- printf "%s:%s-web" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
 {{- end -}}
+
+{{/*
+The Secret holding the administrator account: auth.existingSecret, or the
+one this chart manages.
+*/}}
+{{- define "mantis.admin.secretName" -}}
+{{- if .Values.auth.existingSecret -}}
+{{- .Values.auth.existingSecret -}}
+{{- else -}}
+{{- printf "%s-admin" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
