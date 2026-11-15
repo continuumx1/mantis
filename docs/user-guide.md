@@ -7,7 +7,7 @@ installed. With the Helm chart, a random password is generated unless you
 set one; the install notes print the command to read it:
 
 ```sh
-kubectl get secret <release>-mantis-admin -n <namespace> \
+kubectl get secret mantis-admin -n <namespace> \
   -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 

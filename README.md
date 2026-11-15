@@ -251,7 +251,7 @@ Sign in as `admin`. Unless you set `auth.adminPassword`, the chart
 generates a password; read it with:
 
 ```bash
-kubectl get secret mantis-mantis-admin -n mantis \
+kubectl get secret mantis-admin -n mantis \
   -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 

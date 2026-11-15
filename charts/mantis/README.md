@@ -68,7 +68,7 @@ There is no default password. Pick one of:
 
 ```bash
 # 1. Let the chart generate one (default), then read it:
-kubectl get secret mantis-mantis-admin -n mantis -o jsonpath='{.data.password}' | base64 -d; echo
+kubectl get secret mantis-admin -n mantis -o jsonpath='{.data.password}' | base64 -d; echo
 
 # 2. Choose it (8+ characters):
 helm upgrade --install mantis ./charts/mantis -n mantis --set auth.adminPassword='<password>'
@@ -80,7 +80,10 @@ kubectl create secret generic mantis-login -n mantis \
 helm upgrade --install mantis ./charts/mantis -n mantis --set auth.existingSecret=mantis-login
 ```
 
-A generated password is kept across upgrades. Changing `auth.adminPassword`
+A generated password is kept across upgrades. When upgrading from 0.3.0,
+use `helm upgrade --reset-then-reuse-values` (or pass your values file):
+plain `--reuse-values` keeps the old values, which lack `auth` and
+`report`, and the upgrade fails. Changing `auth.adminPassword`
 restarts `mantis-web`, which signs everyone out.
 
 ### Using your own build instead

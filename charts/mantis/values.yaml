@@ -59,8 +59,8 @@ engine:
 
 # The administrator account that signs in to Mantis. There is no default
 # password: leave adminPassword empty and the chart generates a random one
-# (kept across upgrades), readable with
-#   kubectl get secret <release>-mantis-admin -n <namespace> \
+# (kept across upgrades), readable with (for a release named "mantis")
+#   kubectl get secret mantis-admin -n <namespace> \
 #     -o jsonpath='{.data.password}' | base64 -d
 # Or set adminPassword (8+ characters), or point existingSecret at your own
 # Secret with keys "username" and "passwordHash" (bcrypt, e.g. from

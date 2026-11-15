@@ -9,11 +9,15 @@ The first stable release. Mantis is now three services — `mantis-web`,
 
 ### Upgrading from 0.3.0
 
+- **Upgrade with new defaults.** Use `helm upgrade --reset-then-reuse-values`
+  (Helm 3.14+) or pass your values file. Plain `--reuse-values` reuses the
+  0.3.0 values, which lack the new `auth` and `report` settings, and the
+  upgrade fails.
 - **Sign-in changed.** The hardcoded `admin`/`admin` login is gone. The
-  chart now generates a random administrator password into the Secret
-  `<release>-mantis-admin` (or uses `auth.adminPassword` /
-  `auth.existingSecret`). Read it with
-  `kubectl get secret <release>-mantis-admin -n <namespace> -o jsonpath='{.data.password}' | base64 -d`.
+  chart now generates a random administrator password into a Secret (or
+  uses `auth.adminPassword` / `auth.existingSecret`); the install notes
+  print the command to read it. For a release named `mantis`:
+  `kubectl get secret mantis-admin -n <namespace> -o jsonpath='{.data.password}' | base64 -d`.
   Without the chart, set `MANTIS_ADMIN_PASSWORD_HASH` (bcrypt) or
   `MANTIS_ADMIN_PASSWORD`; `mantis-web` will not start without one.
 - **A third image**, `cx1tech/mantis:1.0.0-report`, is deployed by default

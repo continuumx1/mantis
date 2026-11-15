@@ -55,7 +55,8 @@ everything instead.
 default password, and `mantis-web` refuses to start without one:
 
 - **Helm:** leave `auth.adminPassword` empty and the chart generates a
-  random 24-character password into the Secret `<release>-mantis-admin`
+  random 24-character password into the Secret `<fullname>-admin`
+  (`mantis-admin` for a release named `mantis`; the install notes name it)
   (kept across upgrades); or set `auth.adminPassword`; or point
   `auth.existingSecret` at your own Secret with keys `username` and
   `passwordHash` (a bcrypt hash, e.g. from `htpasswd -nbBC 10 admin '<password>'`)

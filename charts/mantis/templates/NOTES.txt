@@ -41,5 +41,5 @@ By default this pulls {{ include "mantis.engine.image" . }} and
 from Docker Hub — no local build needed. If you're running your own build
 instead (see build/Dockerfile.*), point image.repository
 at it, or load it directly into a local cluster (e.g.
-`minikube image load mantis-engine:dev`) and set image.pullPolicy to
-"Never".
+`kind load docker-image cx1tech/mantis:dev-engine ...`) and set
+image.tag=dev and image.pullPolicy=Never.

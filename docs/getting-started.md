@@ -70,12 +70,12 @@ free on your machine.
 Sign in as `admin`. With Helm, read the generated password with:
 
 ```bash
-kubectl get secret mantis-mantis-admin -n mantis \
+kubectl get secret mantis-admin -n mantis \
   -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-(The Secret is named `<release>-mantis-admin`; the install notes print the
-exact command.) Run locally, it is the `MANTIS_ADMIN_PASSWORD` you set. See
+(For a release named `mantis` the Secret is `mantis-admin`; the install
+notes print the exact command for yours.) Run locally, it is the `MANTIS_ADMIN_PASSWORD` you set. See
 [Security](security.md#signing-in) before exposing Mantis beyond your own
 machine.
 

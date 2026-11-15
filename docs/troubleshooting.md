@@ -2,7 +2,7 @@
 
 **"Invalid username or password".** The account is the one configured at
 install time; both fields are case-sensitive. With Helm, read the password
-from the `<release>-mantis-admin` Secret (see
+from the admin Secret, `mantis-admin` for a release named `mantis` (see
 [Getting Started](getting-started.md#first-login)). After 10 failures from
 one address, sign-in is refused for 10 minutes ("too many failed
 sign-ins").

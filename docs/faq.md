@@ -16,7 +16,7 @@
 
 **How do I get the admin password?**
 : The Helm chart generates one unless you set `auth.adminPassword`. Read
-  it with `kubectl get secret <release>-mantis-admin -n <namespace> -o jsonpath='{.data.password}' | base64 -d`.
+  it with `kubectl get secret mantis-admin -n <namespace> -o jsonpath='{.data.password}' | base64 -d`.
 
 **Can I export what Mantis shows?**
 : Yes: **Download report** produces a password-protected (AES-256) PDF
