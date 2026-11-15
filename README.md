@@ -25,7 +25,15 @@ interactive web UI. Point it at a cluster and it discovers how your resources
 relate to each other, and draws that as a live, explorable graph — so you see
 not just *what* exists, but the *story* connecting it.
 
-**Mantis 1.0** is the first stable release:
+## Mantis v1.0.0 – Vishwakarma
+
+<p align="center">
+  <a href="https://mantis.continuumx1.com/releases/v1.0.0"><img src="docs/images/releases/mantis-v1.0.0-vishwakarma.jpg" alt="Mantis v1.0.0 – Vishwakarma, The Divine Architect" width="900"></a>
+</p>
+
+**The Divine Architect.** Inspired by Vishwakarma, the divine architect and
+master craftsman in Indian tradition, Mantis v1.0.0 celebrates the spirit of
+building, craftsmanship and engineering. This is our first stable release.
 
 - **Topology** — deterministic, overlap-free graph views by namespace, node,
   workload and dependency, with typed, verified relationships.
@@ -38,7 +46,10 @@ not just *what* exists, but the *story* connecting it.
 - **Secure by default** — strictly read-only, Secret values never fetched,
   and sign-in with a password you configure (no default password).
 
-See the [changelog](CHANGELOG.md) for everything that changed since 0.3.0.
+[Release notes](docs/releases/v1.0.0.md) ·
+[GitHub release](https://github.com/continuumx1/mantis/releases/tag/v1.0.0) ·
+[Changelog](CHANGELOG.md) ·
+[Release page](https://mantis.continuumx1.com/releases/v1.0.0)
 
 Built and maintained by [ContinuumX1 Technologies](https://continuumx1.com).
 

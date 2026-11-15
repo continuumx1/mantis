@@ -2,11 +2,14 @@
 
 **Visual Kubernetes topology, relationship graph and infrastructure reports — read-only, any distribution.**
 
-!!! success "Mantis 1.0"
+!!! success "Mantis v1.0.0 – Vishwakarma · The Divine Architect"
+    [![Mantis v1.0.0 – Vishwakarma](images/releases/mantis-v1.0.0-vishwakarma.jpg){ loading=lazy }](releases/v1.0.0.md)
+
     The first stable release: deterministic topology views, a full
     application UI, watch-based live sync, password-protected PDF
     infrastructure reports, and sign-in with a password you configure.
-    See the [changelog](https://github.com/continuumx1/mantis/blob/main/CHANGELOG.md).
+    [Release notes](releases/v1.0.0.md) ·
+    [changelog](https://github.com/continuumx1/mantis/blob/main/CHANGELOG.md).
 
 Mantis is a **read-only Kubernetes context and investigation tool**. Point
 it at a cluster and it draws the relationships between your resources as a

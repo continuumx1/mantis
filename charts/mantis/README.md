@@ -18,7 +18,7 @@ exact, known-good image, deliberately, not "whatever's currently latest."
 
 | Chart `version` | `appVersion` / image tag | Git tag | Notes |
 |---|---|---|---|
-| `1.0.0` (current) | `1.0.0` | `v1.0.0` | First stable release: deterministic topology views, application UI, watch-based sync, the `mantis-report` service, and a configurable administrator account (generated password, no default). RBAC adds the read-only `watch` verb, `events` and metrics `nodes`. See [CHANGELOG.md](../../CHANGELOG.md). |
+| `1.0.0` (current) | `1.0.0` | `v1.0.0` | **Vishwakarma** — first stable release: deterministic topology views, application UI, watch-based sync, the `mantis-report` service, and a configurable administrator account (generated password, no default). RBAC adds the read-only `watch` verb, `events` and metrics `nodes`. See [CHANGELOG.md](../../CHANGELOG.md). |
 | `0.3.0` | `0.1.0-preview.3` | `v0.3.0` | Adds the static, no-backend Playground demo and the public docs site; mantis-web's UI moved to a neutral charcoal-grey theme. No RBAC or API changes. |
 | `0.2.0` | `0.1.0-preview.2` | `v0.2.0` | 0 known vulnerabilities (Docker Scout) |
 | `0.1.0` | `0.1.0-preview.1` | `v0.1.0-preview.1` | superseded — had unpatched CVEs in `golang.org/x/net`/`x/sys`/`x/text`, fixed in `preview.2` |

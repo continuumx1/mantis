@@ -2,10 +2,15 @@
 
 All notable changes to Mantis. Versions follow [Semantic Versioning](https://semver.org/).
 
-## 1.0.0
+## 1.0.0 – Vishwakarma · The Divine Architect
 
 The first stable release. Mantis is now three services — `mantis-web`,
 `mantis-engine` and `mantis-report` — and leaves Public Preview.
+
+The release is named after Vishwakarma, the divine architect and master
+craftsman in Indian tradition: a dedication to the engineers, architects and
+open-source builders who create the invisible foundations of our digital
+world. See the [release notes](docs/releases/v1.0.0.md).
 
 ### Upgrading from 0.3.0
 

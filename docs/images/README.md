@@ -11,6 +11,9 @@ code. See the repository [NOTICE](../../NOTICE) file.
 | `mantis-muscot.webp` | Mantis mascot (original artwork; also the docs-site logo) |
 | `../../internal/web/ui/brand/*.svg` | The mascot as vectors: full mascot, face mark, favicon, wordmark logos |
 | `mantis-nature-neon-login-screen.jpg` | Login screen background photo |
+| `releases/mantis-v1.0.0-vishwakarma.png` | Official v1.0.0 "Vishwakarma" hero banner (original artwork) |
+| `releases/mantis-v1.0.0-vishwakarma.jpg` | The same banner, re-encoded for the web |
+| `releases/mantis-v1.0.0-social-preview.jpg` | The banner on a 1280×640 canvas for GitHub's social preview |
 
 You may not use these marks in a way that implies your fork or derivative is an
 official Mantis distribution. For any other use of the Mantis name, logo, or mascot,

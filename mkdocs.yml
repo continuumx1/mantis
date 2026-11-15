@@ -109,4 +109,6 @@ nav:
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md
   - Roadmap: roadmap.md
+  - Releases:
+      - "v1.0.0 – Vishwakarma": releases/v1.0.0.md
   - Contributing: contributing.md

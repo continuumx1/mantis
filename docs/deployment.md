@@ -19,7 +19,7 @@ Or from a checkout of the repo: `helm install mantis ./charts/mantis --namespace
 
 | Chart `version` | `appVersion` / image tag | Notes |
 |---|---|---|
-| `1.0.0` (current) | `1.0.0` | First stable release: deterministic topology views, application UI, watch-based sync, `mantis-report` PDF reports, configurable sign-in with no default password. Adds the `watch` verb and `events`/metrics reads to RBAC. See the [changelog](https://github.com/continuumx1/mantis/blob/main/CHANGELOG.md). |
+| `1.0.0` (current) | `1.0.0` | **Vishwakarma** — first stable release ([release notes](releases/v1.0.0.md)): deterministic topology views, application UI, watch-based sync, `mantis-report` PDF reports, configurable sign-in with no default password. Adds the `watch` verb and `events`/metrics reads to RBAC. See the [changelog](https://github.com/continuumx1/mantis/blob/main/CHANGELOG.md). |
 | `0.3.0` | `0.1.0-preview.3` | Adds the Playground demo and docs site; UI theme refresh. No RBAC or API changes. |
 | `0.2.0` | `0.1.0-preview.2` | 0 known vulnerabilities (Docker Scout) |
 | `0.1.0` | `0.1.0-preview.1` | superseded — had unpatched CVEs, fixed in `preview.2` |
