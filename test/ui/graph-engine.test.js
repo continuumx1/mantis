@@ -8,7 +8,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const G = require("../../internal/web/ui/graph-engine.js");
 
-const FIXTURES = path.join(__dirname, "../../internal/web/ui/playground/data");
+// Real graphs captured from mantis-engine (the old Playground scenarios).
+const FIXTURES = path.join(__dirname, "fixtures");
 
 // A small synthetic cluster in the engine's wire format: several
 // namespaces, Deployments with ReplicaSets and Pods across worker nodes,
@@ -261,8 +262,8 @@ test("search: names, kind:, ns: and label: terms", () => {
 });
 
 test("real captured fixtures: every scenario lays out without overlap", () => {
-  for (const sc of fs.readdirSync(FIXTURES)) {
-    const dto = JSON.parse(fs.readFileSync(path.join(FIXTURES, sc, "graph.json"), "utf8"));
+  for (const sc of fs.readdirSync(FIXTURES).filter(f => f.endsWith(".json"))) {
+    const dto = JSON.parse(fs.readFileSync(path.join(FIXTURES, sc), "utf8"));
     const s = storeOf(dto);
     for (const view of VIEWS) {
       const st = G.createViewState(); st.view = view;

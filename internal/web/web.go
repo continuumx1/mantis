@@ -15,11 +15,8 @@ import (
 	"github.com/continuumx1/mantis/internal/httpx"
 )
 
-// "all:" is required, not cosmetic: a bare "//go:embed ui" silently drops
-// any file/dir whose name starts with "." or "_" — which is exactly how the
-// Playground's cluster-scoped fixtures are named (playground/data/*/resources
-// /__Node__*.yaml, __PersistentVolume__*.yaml), so without it those 404 at
-// runtime with no build-time signal that anything is missing.
+// "all:" keeps files whose names start with "." or "_", which a bare
+// "//go:embed ui" silently drops with no build-time signal.
 //
 //go:embed all:ui
 var uiFiles embed.FS

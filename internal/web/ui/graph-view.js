@@ -1,8 +1,6 @@
-// graph-view.js — the Mantis graph UI, shared by index.html (live engine)
-// and playground.html (static fixtures). Everything page-specific — where the
-// graph comes from, login/sign-out, the playground's scenarios and tour — is
-// passed in through MantisApp.mount(options); everything else lives here, so
-// the two pages cannot drift apart.
+// graph-view.js — the Mantis topology UI, mounted by the application shell
+// (app-shell.js) on the Topology page. Everything page-specific — where the
+// graph comes from — is passed in through MantisApp.mount(options).
 //
 // It renders what graph-engine.js computes: projection + deterministic layout.
 // It never moves a card on its own. Only the camera pans and zooms, and only

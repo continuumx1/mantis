@@ -1,4 +1,4 @@
-/* graph-view.css — shared styles for index.html and playground.html.
+/* graph-view.css — styles for the Topology page.
    Every color is a token on :root, redefined for the light theme, so a theme
    switch is a token swap and nothing else. */
 /* Fonts ship with Mantis (SIL OFL, see fonts/): clusters are often offline,

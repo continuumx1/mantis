@@ -1,182 +1,112 @@
 <!doctype html>
-<html lang="en">
+<!-- Generated from index.html by playground/build.js. Do not edit; edit index.html and rebuild. -->
+<html lang="en" data-theme="light">
 <head>
-<meta charset="utf8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mantis Playground — Cluster Resource Graph</title>
-<link rel="icon" type="image/webp" href="mantis-mascot.webp">
+<title>Mantis Playground</title>
+<meta name="description" content="Try the Mantis Kubernetes topology and observability app on a sample cluster, in your browser.">
+<link rel="icon" type="image/svg+xml" href="brand/favicon.svg">
+<link rel="alternate icon" type="image/webp" href="mantis-mascot.webp">
 <script>
+  // Apply the saved theme before first paint, so there is no flash.
   try {
-    if (sessionStorage.getItem("mantis-theme") === "light") document.documentElement.setAttribute("data-theme", "light");
-  } catch (e) { /* sessionStorage unavailable (private mode, etc.) — default theme is fine */ }
+    var t = localStorage.getItem("mantis-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+  } catch (e) {}
 </script>
-
+<!-- graph-view.css styles the Topology page; app-shell.css (loaded after it)
+     is the Mantis design system for everything else, and maps the topology's
+     color tokens onto the same palette. -->
 <link rel="stylesheet" href="graph-view.css">
+<link rel="stylesheet" href="app-shell.css">
 <style>
-  .brand-name { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: .2px; color: var(--faint); }
-  .btn-back { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--brand);
-    background: color-mix(in srgb, var(--brand) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line));
-    border-radius: 7px; padding: 6px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
-    transition: background .15s, border-color .15s; }
-  .btn-back:hover { background: color-mix(in srgb, var(--brand) 20%, var(--panel)); border-color: var(--brand); }
-  /* Playground-only chrome: this file is a fork of index.html (same shared
-     graph-engine.js, same interactions) that reads static captured fixtures
-     instead of a live /api/graph — see PLAYGROUND_SCENARIOS below. These two
-     bars are the only structural additions over the real product UI. */
-  /* One header row: the long scenario name shrinks first, then the counts hide. */
-  header { flex-wrap: nowrap; }
-  header .cluster-chip { flex: 0 1 auto; min-width: 0; }
-  header .cluster-chip b { overflow: hidden; text-overflow: ellipsis; }
-  header .btn-back, header #getMantis, header .brand { flex: none; white-space: nowrap; }
-  @media (max-width: 1520px) { header .stat-group, header .hdr-divider { display: none; } }
-  @media (max-width: 900px) { header .cluster-chip { display: none; } }
-  .pg-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 22px;
-    background: color-mix(in srgb, var(--brand) 13%, var(--ground-2)); border-bottom: 1px solid var(--line);
-    font-family: var(--font-mono); font-size: 12px; color: var(--muted); z-index: 5; }
-  .pg-banner b { color: var(--ink); }
-  .pg-banner .pg-cta { margin-left: auto; flex: none; color: var(--brand); text-decoration: none; font-weight: 600; white-space: nowrap; }
-  .pg-banner .pg-cta:hover { text-decoration: underline; }
-
-  .pg-scenarios { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 22px;
-    background: var(--ground-2); border-bottom: 1px solid var(--line); z-index: 5; }
-  .pg-scenarios-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); flex: none; margin-right: 2px; }
-  .pg-scenario { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 20px; padding: 6px 14px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; text-align: left; }
-  .pg-scenario:hover { color: var(--ink); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .pg-scenario.active { color: var(--ground); background: var(--brand); border-color: var(--brand); font-weight: 600; }
-  .pg-scenario .pg-flavor { opacity: .7; font-weight: 400; }
-  .pg-scenario.active .pg-flavor { opacity: .85; }
-  .pg-tip { padding: 3px 0 0; }
-
-  .pg-banner .pg-tour-start { margin-left: 0; flex: none; color: var(--muted); background: var(--panel); border: 1px solid var(--line);
-    border-radius: 20px; padding: 4px 12px; cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; transition: color .15s, border-color .15s; }
-  .pg-banner .pg-tour-start:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-
-  /* Guided product tour — a linear, click-blocking walkthrough (Escape/Skip
-     ends it at any point). Two decorative layers create the spotlight: a
-     giant box-shadow "hole" the size of the current target (pointer-events:
-     none, purely visual) sitting over a separate full-screen transparent
-     click-blocker (pointer-events: auto) that stops the dimmed app
-     underneath from being interacted with mid-tour — only the card's own
-     buttons are ever clickable while a tour is running. */
-  .pg-tour-block { position: fixed; inset: 0; z-index: 99; background: transparent; }
-  .pg-tour-spotlight { position: fixed; z-index: 99; pointer-events: none; border-radius: 10px;
-    box-shadow: 0 0 0 9999px rgba(4,7,10,.74); transition: top .3s ease, left .3s ease, width .3s ease, height .3s ease;
-    outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent); outline-offset: 4px; }
-  .pg-tour-spotlight.no-target { outline: none; }
-  .pg-tour-card { position: fixed; z-index: 101; width: 320px; max-width: calc(100vw - 28px); padding: 16px 18px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
-    font-family: var(--font-ui); transition: top .3s ease, left .3s ease; }
-  .pg-tour-step { font-family: var(--font-mono); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--brand); font-weight: 700; margin-bottom: 6px; }
-  .pg-tour-card h4 { margin: 0 0 8px; font-size: 15px; color: var(--ink); }
-  .pg-tour-card p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
-  .pg-tour-card p b { color: var(--ink); }
-  .pg-tour-nav { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
-  .pg-tour-btn { font-family: var(--font-mono); font-size: 12px; border-radius: 7px; padding: 7px 13px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
-  .pg-tour-btn.primary { color: var(--ground); background: var(--brand); border: 1px solid var(--brand); font-weight: 600; }
-  .pg-tour-btn.primary:hover { filter: brightness(1.08); }
-  .pg-tour-btn.ghost { color: var(--muted); background: none; border: 1px solid var(--line); }
-  .pg-tour-btn.ghost:hover { color: var(--ink); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
-  .pg-tour-skip { margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--faint); background: none; border: 0; cursor: pointer; text-decoration: underline; }
-  .pg-tour-skip:hover { color: var(--muted); }
-
-  .pg-banner, .pg-scenarios { position: relative; z-index: 6; }
+  /* Playground banner: a fixed bar above the app, which moves down below it. */
+  .pg-bar { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 60; display: flex; align-items: center; gap: 14px;
+    padding: 0 14px; background: #10150d; color: #d9e5c9; font: 13px/1.3 var(--m-font, system-ui, sans-serif); border-bottom: 1px solid #2c3a1c; }
+  .pg-bar b { color: #a6e22e; font-weight: 650; }
+  .pg-bar .pg-msg { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pg-bar a { color: #a6e22e; text-decoration: none; font-weight: 600; white-space: nowrap; }
+  .pg-bar a:hover { text-decoration: underline; }
+  .pg-bar .pg-back { color: #d9e5c9; border: 1px solid #3c4d28; border-radius: 6px; padding: 3px 9px; }
+  .pg-bar .pg-cta { background: #a6e22e; color: #10150d; border-radius: 6px; padding: 4px 10px; }
+  .m-shell { top: 40px; }
+  /* There is no account to sign out of. */
+  #mSignOut { display: none; }
+  @media (max-width: 760px) { .pg-bar .pg-long { display: none; } }
 </style>
 </head>
 <body>
+<div class="pg-bar" role="note">
+  <a class="pg-back" href="https://mantis.continuumx1.com">← Mantis</a>
+  <span class="pg-msg"><b>Mantis Playground</b> · the real Mantis app on a sample cluster<span class="pg-long"> — recorded data, nothing here is live</span></span>
+  <a class="pg-cta" href="https://mantis.continuumx1.com/#get-started" target="_blank" rel="noopener noreferrer">Get Mantis →</a>
+</div>
+<div class="m-shell" id="shell">
+  <aside class="m-sidebar" aria-label="Main navigation">
+    <div class="m-brand"><img src="brand/mantis-mark.svg" alt=""><b>Mantis</b></div>
+    <nav class="m-nav" id="mNav"></nav>
+    <div class="m-side-foot"><button id="mRail" aria-label="Collapse sidebar"></button></div>
+  </aside>
 
-<div id="app">
-  <header>
-    <a class="btn-back" href="https://mantis.continuumx1.com" title="Back to mantis.continuumx1.com">← Back to Mantis</a>
-
-    <div class="brand">
-      <img class="mascot" src="mantis-mascot.webp" alt="Mantis" />
-      <span class="brand-name">· playground</span>
-    </div>
-
-    <div class="search-wrap">
-      <span class="search-ico">⌕</span>
-      <input class="search" id="search" type="text" placeholder="Search resources…" autocomplete="off" spellcheck="false" />
-      <kbd class="search-kbd" data-key="F">Ctrl F</kbd>
-      <div class="search-results" id="searchResults"></div>
-    </div>
-
-    <div class="spacer"></div>
-
-    <div class="cluster-chip"><span class="cluster-label">cluster</span><b id="clusterName">…</b></div>
-
-    <div class="hdr-divider"></div>
-
-    <div class="stat-group">
-      <div class="stat-item"><b id="nCount">0</b><span>resources</span></div>
-      <div class="stat-item"><b id="eCount">0</b><span>relationships</span></div>
-      <div class="stat-item"><b id="nsCount">0</b><span>namespaces</span></div>
-      <span id="autoscalerChip"></span>
-    </div>
-
-    <div class="hdr-divider"></div>
-
-    <button class="icon-btn" id="themeToggle" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
-      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
-      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-    </button>
-
-    <a class="btn" id="getMantis" href="https://mantis.continuumx1.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:var(--brand);font-weight:600">Get Mantis →</a>
-  </header>
-
-  <div class="pg-banner">
-    <span>👀 You're in the <b>Mantis Playground</b> — real captured graphs from real clusters, but this page isn't connected to anything live and never will be.</span>
-    <button class="pg-tour-start" id="pgTourStart">▶ Take the tour</button>
-    <a class="pg-cta" href="https://mantis.continuumx1.com" target="_blank" rel="noopener noreferrer">Install Mantis on your own cluster →</a>
-  </div>
-
-  <div class="pg-scenarios" id="pgScenarios">
-    <span class="pg-scenarios-label">Scenario</span>
-    <!-- Populated by renderScenarioBar() from PLAYGROUND_SCENARIOS below. -->
-  </div>
-
-  <main>
-    <div class="controls">
-      <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
-      <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
-      <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
-      <div class="sync-wrap">
-        <button class="sync-pill on" id="syncPill" aria-haspopup="true" aria-expanded="false">
-          <span class="dot"></span><span id="syncPillLabel">LIVE</span>
-        </button>
-        <div class="sync-menu" id="syncMenu">
-          <div class="sync-menu-title">Sync</div>
-          <div class="sync-status" id="syncStatusLine">Last synced —</div>
-          <div class="sync-warn" id="syncWarnLine">⚠ Connection lost — showing data from <span id="syncWarnTime">—</span>, retrying…</div>
-          <div class="sync-menu-divider"></div>
-          <button class="sync-opt" data-val="3000">3 sec</button>
-          <button class="sync-opt" data-val="10000">10 sec</button>
-          <button class="sync-opt" data-val="30000">30 sec</button>
-          <button class="sync-opt active" data-val="60000">1 min</button>
-          <button class="sync-opt" data-val="300000">5 min</button>
-          <button class="sync-opt" data-val="manual">Manual</button>
+  <div class="m-main">
+    <div class="m-topbar">
+      <button class="m-iconbtn m-hamburger" id="mHamburger" aria-label="Open navigation"><svg class="m-ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <div class="m-title" id="mTitle"></div>
+      <div class="m-grow"></div>
+      <div class="m-ctx m-cluster" id="mCluster" title="Mantis reads one cluster per engine"></div>
+      <select class="m-ctx" id="mNs" aria-label="Namespace"><option value="">All namespaces</option></select>
+      <div class="m-gsearch" role="search">
+        <svg class="m-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="mSearch" type="search" placeholder="Search resources…" autocomplete="off" spellcheck="false" aria-label="Search resources" aria-controls="mSearchResults">
+        <kbd data-key="K">Ctrl K</kbd>
+        <div class="m-gresults" id="mSearchResults" role="listbox"></div>
+      </div>
+      <button class="m-sync" id="mSync" aria-label="Sync status — click to refresh"></button>
+      <button class="m-iconbtn" id="mThemeBtn"></button>
+      <div class="m-menu-wrap">
+        <button class="m-iconbtn" id="mUserBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account"><span class="m-avatar" id="mAvatar">A</span></button>
+        <div class="m-menu" id="mUserMenu" role="menu">
+          <div class="m-menu-h"><b id="mUserName">admin</b><small>Administrator</small></div>
+          <a href="#/access" role="menuitem">Access &amp; authentication</a>
+          <a href="#/settings" role="menuitem">Settings</a>
+          <button data-report role="menuitem">Download report…</button>
+          <button id="mSignOut" role="menuitem">Sign out</button>
         </div>
       </div>
-      <button class="btn" id="syncNow" style="display:none">Sync now</button>
     </div>
 
-    <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
-    <div class="viewbar" id="viewbar"></div>
+    <div class="m-content" id="mContent" tabindex="-1"></div>
 
-    <div class="legend" id="legend">
+    <!-- Topology: the graph renderer (graph-view.js) mounts here unchanged. -->
+    <main class="m-topo" id="topoPage" hidden>
+      <div class="controls">
+        <button class="btn" id="fit" title="Fit the whole graph on screen">Fit</button>
+        <button class="btn" id="expandAll" title="Expand every group in this view">Expand all</button>
+        <button class="btn" id="collapseAll" title="Back to the overview: collapse every group">Overview</button>
+        <button class="btn" data-report title="Download a password-protected PDF report of the cluster">Report</button>
+      </div>
+      <div class="m-topo-search search-wrap">
+        <span class="search-ico">⌕</span>
+        <input class="search" id="search" type="text" placeholder="Find in graph…" autocomplete="off" spellcheck="false" aria-label="Find in graph" />
+        <kbd class="search-kbd" data-key="F">Ctrl F</kbd>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <svg id="canvas" role="img" aria-label="Cluster resource graph"></svg>
+      <div class="viewbar" id="viewbar"></div>
+      <div class="legend" id="legend">
       <div class="legend-body"></div>
       <button class="legend-toggle" id="legendToggle" aria-label="Toggle legend" title="Legend">
         <svg class="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.75" fill="currentColor" stroke="none"/></svg>
         <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-
-    <aside class="panel collapsed" id="panel">
+      <aside class="panel collapsed" id="panel">
       <div class="panel-resizer" id="panelResizer" title="Drag to resize"></div>
       <button class="panel-collapse" id="panelCollapse" title="Clear focus (Esc)" aria-label="Clear focus">✕</button>
       <div class="panel-content" id="panelContent"></div>
     </aside>
-    <div class="ymodal-overlay" id="ymodalOverlay">
+      <div class="ymodal-overlay" id="ymodalOverlay">
       <div class="ymodal">
         <div class="ymodal-head">
           <div class="ymodal-title" id="ymodalTitle"></div>
@@ -196,244 +126,16 @@
         <pre class="yaml ymodal-pre" id="ymodalPre"></pre>
       </div>
     </div>
-    <div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
-    <div class="overlay" id="overlay"><div class="card"><h3>Loading scenario…</h3><p>Reading the captured graph.</p></div></div>
-  </main>
+      <div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg"></span></div>
+      <div class="overlay" id="overlay" style="display:none"></div>
+    </main>
+  </div>
 </div>
 
+<script src="playground-api.js"></script>
 <script src="graph-engine.js"></script>
 <script src="graph-view.js"></script>
-<script>
-// Page glue for the Playground: static fixtures instead of a live engine,
-// the scenario switcher, and the guided tour. The graph UI itself is
-// graph-view.js, exactly the code the real app runs.
-(function () {
-  "use strict";
-  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const wait = ms => new Promise(r => setTimeout(r, ms));
-
-  const PLAYGROUND_SCENARIOS = [
-    { id: "web-app", flavor: "kubeadm", label: "Web application", dataPath: "playground/data/web-app",
-      tip: "A normal app: Deployment → ReplicaSet → Pods, a Service, an Ingress, and an HPA. Click the HorizontalPodAutoscaler to see what it scales." },
-    { id: "stateful-db", flavor: "GKE", label: "Stateful database", dataPath: "playground/data/stateful-db",
-      tip: "A StatefulSet with real per-Pod storage. Click a PersistentVolumeClaim to trace claims → bound-to through to its PersistentVolume, and notice the Secret's values are never shown." },
-    { id: "broken-relationships", flavor: "EKS", label: "Broken relationships", dataPath: "playground/data/broken-relationships",
-      tip: "Three real failures Mantis surfaces instead of hiding: an Ingress routing to a Service that no longer exists (red, dashed), a Deployment referencing a missing ConfigMap, and a Service whose selector matches zero Pods." },
-  ];
-  const scenarioIdFromURL = () => {
-    const q = new URLSearchParams(location.search).get("scenario");
-    return PLAYGROUND_SCENARIOS.some(s => s.id === q) ? q : PLAYGROUND_SCENARIOS[0].id;
-  };
-  let currentScenario = scenarioIdFromURL();
-  const scenario = () => PLAYGROUND_SCENARIOS.find(s => s.id === currentScenario);
-
-  const app = MantisApp.mount({
-    source: {
-      // Static fixtures never change, so "since" is ignored: always a full snapshot.
-      load: () => fetch(scenario().dataPath + "/graph.json", { cache: "no-store" })
-        .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || ("HTTP " + r.status)); })),
-      // playground/data/<scenario>/resources/<sanitized-id>.yaml — the files
-      // cmd/playground-capture wrote, one per resolved non-Secret resource.
-      resource: n => {
-        if (n.kind === "Secret") return Promise.resolve({ ok: false, status: 403, text: "Secret values are never captured or shown — the same rule the real /api/resource handler enforces." });
-        return fetch(scenario().dataPath + "/resources/" + n.id.replace(/\//g, "__") + ".yaml").then(async r => ({ ok: r.ok, status: r.status, text: await r.text() }));
-      },
-    },
-    loadingTitle: "Loading scenario…", loadingText: "Reading the captured graph.", errorTitle: "Could not load this scenario",
-  });
-
-  function renderScenarioBar(){
-    const bar = document.getElementById("pgScenarios");
-    bar.querySelectorAll(".pg-scenario").forEach(b => b.remove());
-    PLAYGROUND_SCENARIOS.forEach(s => {
-      const b = document.createElement("button");
-      b.className = "pg-scenario" + (s.id === currentScenario ? " active" : "");
-      b.innerHTML = esc(s.label) + ' <span class="pg-flavor">· ' + esc(s.flavor) + '</span>';
-      b.title = s.tip;
-      b.addEventListener("click", () => loadScenario(s.id));
-      bar.appendChild(b);
-    });
-  }
-  // loadScenario starts the next scenario from a clean slate — nothing a
-  // user expanded or selected in one cluster carries into an unrelated one.
-  function loadScenario(id){
-    if (id === currentScenario) return Promise.resolve();
-    currentScenario = id;
-    const url = new URL(location.href); url.searchParams.set("scenario", id); history.replaceState(null, "", url);
-    renderScenarioBar();
-    app.reset();
-    return app.firstLoad();
-  }
-
-  // ---- sync pill: the same control as the live app, re-reading the fixture ----
-  const pill = document.getElementById("syncPill"), menu = document.getElementById("syncMenu");
-  const SYNC_LABELS = { "3000": "3s", "10000": "10s", "30000": "30s", "60000": "1m", "300000": "5m" };
-  let autoTimer = null, lastSyncedAt = null;
-  function updatePill(mode){
-    pill.classList.toggle("on", mode !== "manual");
-    document.getElementById("syncPillLabel").textContent = mode === "manual" ? "MANUAL" : (SYNC_LABELS[mode] || "LIVE");
-    document.getElementById("syncStatusLine").textContent = "Last synced " + (lastSyncedAt ? lastSyncedAt.toLocaleTimeString() : "—") + " (static sample data)";
-  }
-  function sync(){ app.load(false).then(() => { lastSyncedAt = new Date(); updatePill(currentMode); }).catch(() => {}); }
-  let currentMode = "60000";
-  function setSync(val, immediate){
-    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-    currentMode = val;
-    menu.querySelectorAll(".sync-opt").forEach(o => o.classList.toggle("active", o.getAttribute("data-val") === val));
-    document.getElementById("syncNow").style.display = val === "manual" ? "" : "none";
-    if (val !== "manual") autoTimer = setInterval(sync, parseInt(val, 10) || 60000);
-    updatePill(val);
-    if (immediate) sync();
-  }
-  pill.addEventListener("click", ev => { ev.stopPropagation(); const open = menu.classList.toggle("open"); pill.setAttribute("aria-expanded", String(open)); });
-  menu.querySelectorAll(".sync-opt").forEach(o => o.addEventListener("click", () => { setSync(o.getAttribute("data-val"), true); menu.classList.remove("open"); }));
-  document.addEventListener("click", ev => { if (!ev.target.closest(".sync-wrap")) menu.classList.remove("open"); });
-  document.getElementById("syncNow").addEventListener("click", sync);
-
-  // ---- guided product tour ----
-  // A short, linear walkthrough of the actual UI — every step drives real app
-  // state (select(), tab switches, a scenario change) rather than pretending.
-  // Every namespace's resources are already on screen together, so unlike the
-  // earlier drill-down build, a step can target any node directly with no
-  // navigation step first.
-  const tourBlock = document.createElement("div"); tourBlock.className = "pg-tour-block";
-  const tourSpotlight = document.createElement("div"); tourSpotlight.className = "pg-tour-spotlight no-target";
-  const tourCard = document.createElement("div"); tourCard.className = "pg-tour-card";
-  [tourBlock, tourSpotlight, tourCard].forEach(el => { el.style.display = "none"; document.body.appendChild(el); });
-  tourBlock.addEventListener("click", ev => ev.stopPropagation());
-
-  const tourState = { active: false, index: 0 };
-
-  const TOUR_STEPS = [
-    { title: "Welcome to the Mantis Playground", target: null,
-      body: "This is the real Mantis UI, running against real captured cluster graphs — nothing here is a mockup. This tour takes about a minute; press <b>Esc</b> anytime to stop, or <b>" + MantisKeys.label("F") + "</b> afterward to search for a resource yourself." },
-    { title: "Three real scenarios", target: () => document.getElementById("pgScenarios"),
-      body: "Each of these is a graph Mantis actually produced against a real cluster — labeled kubeadm, GKE, and EKS so together they show Mantis working identically across distributions, which is the actual point." },
-    { title: "Every namespace, connected", target: () => app.nodeElement("shop-frontend/Deployment/storefront"),
-      body: "Namespaces are groups on one map, linked by their real relationships. Inside each, every application is laid out the same way — owner on the left, Pods in the middle, what they use on the right — and the same cluster always draws the same picture. I selected the <b>storefront</b> Deployment for you; on your own, just click any resource.",
-      onEnter: async () => {
-        if (currentScenario !== "web-app") await tourSwitchScenario("web-app");
-        if (app.state.view !== "namespace") app.setView("namespace");
-        app.jumpTo("shop-frontend/Deployment/storefront", { tab: "summary" });
-        await wait(520);
-      } },
-    { title: "Trace what it depends on", target: () => document.querySelector('.tab[data-tab="relationships"]'),
-      body: "The Relationships tab lists everything this resource depends on and everything that depends on it — click any line to jump straight to that resource, even in another namespace. On the canvas, the trace dims everything unrelated.",
-      onEnter: () => app.setTab("relationships") },
-    { title: "The real manifest, one click away", target: () => document.querySelector('.tab[data-tab="yaml"]'),
-      body: "This is the actual YAML Mantis captured for this resource — not a summary of it. On a real cluster this is a live read of the API server; here it's the same file, just captured ahead of time.",
-      onEnter: () => app.setTab("yaml") },
-    { title: "One graph, four views", target: () => document.getElementById("vbViews"),
-      body: "The same resources, regrouped: by <b>namespace</b>, by the <b>worker node</b> Pods run on, by <b>workload</b>, or as one resource's <b>dependencies</b> — what it uses and what uses it. Switching views never changes the relationships, only how they're arranged." },
-    { title: "Configurable live sync", target: () => document.getElementById("syncPill"),
-      body: "On a real cluster this pill polls the engine on whatever interval you pick — 3 seconds down to manual. In the Playground it's re-reading the same static snapshot, but the mechanism is exactly what you'd see live." },
-    { title: "The differentiator: broken references, surfaced", target: () => app.nodeElement("payments-api/Service/payments-svc-old"),
-      body: "This Ingress routes to a Service that no longer exists. Most tools would just drop that edge. Mantis checked, couldn't find it, and drew it anyway — red, dashed, labeled <b>not found</b> — because a broken reference you can't see is worse than an ugly one you can.",
-      onEnter: async () => {
-        await tourSwitchScenario("broken-relationships");
-        app.jumpTo("payments-api/Service/payments-svc-old", { tab: "summary" });
-        await wait(520);
-      } },
-    { title: "That's Mantis", target: null,
-      body: "Real relationships, real dangling-reference detection, Secret values that never leave the API server. Explore the rest yourself, or install it against your own cluster." },
-  ];
-
-  function tourStepEl(){
-    const wrap = document.createElement("div");
-    const step = document.createElement("div"); step.className = "pg-tour-step";
-    step.textContent = "Step " + (tourState.index+1) + " of " + TOUR_STEPS.length;
-    wrap.appendChild(step);
-    return wrap;
-  }
-
-  async function showTourStep(i){
-    const s = TOUR_STEPS[i];
-    tourState.index = i;
-    if (s.onEnter) await s.onEnter();
-
-    tourCard.innerHTML = "";
-    tourCard.appendChild(tourStepEl());
-    const h = document.createElement("h4"); h.textContent = s.title; tourCard.appendChild(h);
-    const p = document.createElement("p"); p.innerHTML = s.body; tourCard.appendChild(p);
-
-    const nav = document.createElement("div"); nav.className = "pg-tour-nav";
-    if (i > 0){ const back = document.createElement("button"); back.className = "pg-tour-btn ghost"; back.textContent = "← Back"; back.addEventListener("click", prevTourStep); nav.appendChild(back); }
-    const next = document.createElement("button"); next.className = "pg-tour-btn primary";
-    next.textContent = i === TOUR_STEPS.length - 1 ? "Explore on my own" : "Next →";
-    next.addEventListener("click", nextTourStep);
-    nav.appendChild(next);
-    const skip = document.createElement("button"); skip.className = "pg-tour-skip"; skip.textContent = "Skip tour"; skip.addEventListener("click", () => endTour());
-    nav.appendChild(skip);
-    tourCard.appendChild(nav);
-
-    positionTour(s.target ? s.target() : null);
-  }
-
-  function positionTour(target){
-    const margin = 14;
-    const rect = target ? target.getBoundingClientRect() : null;
-    if (rect && rect.width){
-      tourSpotlight.classList.remove("no-target");
-      tourSpotlight.style.top = (rect.top - 8) + "px";
-      tourSpotlight.style.left = (rect.left - 8) + "px";
-      tourSpotlight.style.width = (rect.width + 16) + "px";
-      tourSpotlight.style.height = (rect.height + 16) + "px";
-    } else {
-      tourSpotlight.classList.add("no-target");
-      const cx = window.innerWidth/2, cy = window.innerHeight/2;
-      tourSpotlight.style.top = cy + "px"; tourSpotlight.style.left = cx + "px";
-      tourSpotlight.style.width = "0px"; tourSpotlight.style.height = "0px";
-    }
-    const cw = tourCard.offsetWidth, ch = tourCard.offsetHeight;
-    let top, left;
-    if (rect && rect.width){
-      top = rect.bottom + margin;
-      if (top + ch > window.innerHeight - margin) top = rect.top - ch - margin;
-      top = Math.max(margin, Math.min(top, window.innerHeight - ch - margin));
-      left = rect.left + rect.width/2 - cw/2;
-      left = Math.max(margin, Math.min(left, window.innerWidth - cw - margin));
-    } else {
-      top = (window.innerHeight - ch) / 2;
-      left = (window.innerWidth - cw) / 2;
-    }
-    tourCard.style.top = top + "px"; tourCard.style.left = left + "px";
-  }
-
-  // tourSwitchScenario drives the same loadScenario the scenario bar uses,
-  // then waits for the new fixture to actually land before a later step
-  // tries to select a node in it — local static files, so this settles fast.
-  function tourSwitchScenario(id){
-    if (id === currentScenario) return Promise.resolve();
-    return loadScenario(id).catch(() => {});
-  }
-
-  function nextTourStep(){ if (tourState.index >= TOUR_STEPS.length - 1) endTour(); else showTourStep(tourState.index + 1); }
-  function prevTourStep(){ if (tourState.index > 0) showTourStep(tourState.index - 1); }
-
-  function startTour(){
-    tourState.active = true;
-    try { sessionStorage.setItem("mantis-pg-toured", "1"); } catch (e) {}
-    [tourBlock, tourSpotlight, tourCard].forEach(el => el.style.display = "");
-    showTourStep(0);
-  }
-  function endTour(){
-    tourState.active = false;
-    [tourBlock, tourSpotlight, tourCard].forEach(el => el.style.display = "none");
-  }
-  window.addEventListener("resize", () => { if (tourState.active) positionTour(TOUR_STEPS[tourState.index].target ? TOUR_STEPS[tourState.index].target() : null); });
-  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tourState.active) { ev.stopImmediatePropagation(); endTour(); } }, true);
-  document.getElementById("pgTourStart").addEventListener("click", () => { if (!tourState.active) startTour(); });
-
-  renderScenarioBar();
-  const loaded = app.firstLoad().then(() => { lastSyncedAt = new Date(); updatePill(currentMode); });
-  setSync("60000", false);
-
-  // Auto-start once per tab for a first-time visitor, after the initial
-  // graph has rendered. "Take the tour" in the banner replays it anytime.
-  try {
-    if (!sessionStorage.getItem("mantis-pg-toured") && !location.hash) loaded.then(() => setTimeout(startTour, 700));
-  } catch (e) { /* sessionStorage unavailable — tour just won't auto-start */ }
-})();
-</script>
+<script src="report-layout.js"></script>
+<script src="app-shell.js"></script>
 </body>
 </html>

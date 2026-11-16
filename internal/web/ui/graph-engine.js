@@ -1,5 +1,6 @@
 // graph-engine.js — the DOM-free core of the Mantis graph UI, shared by
-// index.html (the real app), playground.html (the static demo) and the Node
+// the app (index.html, and playground.html, which is the same app on sample
+// data) and the Node
 // test suite (test/ui). It has three layers, each a pure function of the one
 // before it:
 //
@@ -56,7 +57,7 @@
     scheduling: "Scheduling", security: "RBAC", autoscaling: "Autoscaling",
   };
   // Fallbacks for graphs from engines older than typed edges (e.g. the
-  // captured playground fixtures): category and basis by relation type.
+  // captured fixtures in test/ui/fixtures): category and basis by relation type.
   const TYPE_CATEGORY = {
     "controlled-by": "ownership", "runs-on": "scheduling",
     "selects": "networking", "serves": "networking", "routes-to": "networking", "applies-to": "networking",

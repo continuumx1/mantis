@@ -176,8 +176,10 @@ The test suite checks no-overlap, no-line-through-a-card and determinism.
 
 SVG, with viewport culling (only items within 1.6× the viewport are in the
 DOM) and zoom levels of detail (card text drops out when zoomed far out).
-Both `index.html` (live) and `playground.html` (static fixtures) mount the same
-module; each page only supplies where the graph comes from.
+The application shell mounts it on the Topology page and supplies where the
+graph comes from. The [Playground](https://mantis.continuumx1.com/mantis-playground/playground.html)
+is the same app with `/api/*` answered from a recorded sample cluster
+(`internal/web/ui/playground/`).
 
 ## Testing and measuring
 

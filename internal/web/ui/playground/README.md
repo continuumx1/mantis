@@ -1,151 +1,61 @@
 # Mantis Playground
 
-`playground.html` (in the directory above this one) runs the real Mantis UI —
-`graph-engine.js`, `graph-view.js` and `graph-view.css`, the exact files
-`index.html` uses — with one difference: instead of fetching `/api/graph` and
-`/api/resource` from a live `mantis-engine`, it reads static JSON/YAML files
-from `data/` below. There is no server, no auth, and no live cluster behind
-it, which is also what the banner across the top of the page says.
+`playground.html` is the real Mantis app — `index.html` with the same
+`app-shell.js`, `graph-view.js`, `graph-engine.js`, `report-layout.js` and
+styles — running in the browser with no server. One extra script,
+`playground-api.js`, answers the app's `/api/*` requests from recorded data,
+so every page works: dashboard, resource tables and details (YAML included),
+events, topology in every view, and Download report.
 
-It exists so someone can experience the actual Mantis UI — not a mockup of
-it — before installing anything.
+There is no live cluster behind it, by design: a public page connected to an
+always-on cluster would be a real cluster exposed to the internet.
 
-## Keeping it in sync
+## The sample cluster
 
-The graph UI is shared code, so UI changes reach the Playground
-automatically. Only page-specific parts live in `playground.html`: the
-banner, the scenario switcher, the guided tour and the static data source.
-The tour drives the app through the API `MantisApp.mount()` returns
-(`jumpTo`, `setTab`, `setView`), not through private state. Fixtures from
-older engines that lack edge `category`/`basis` fields still work — the UI
-derives them from the relation type.
+A synthetic cluster of 101 resources in five namespaces on three nodes
+(`internal/synth`, seed 8): Deployments, a StatefulSet, a DaemonSet,
+Services, Ingresses, NetworkPolicies, ConfigMaps, Secrets, storage and RBAC,
+with one crash-looping Pod, its `BackOff` warning events, a broken
+reference, and node metrics for the capacity panel. Every response in
+`api.json` is what `mantis-engine` returned for it; `sample-report.pdf` is
+what `mantis-report` generated.
 
-When copying the Playground to the website, copy `graph-engine.js`,
-`graph-view.js` and `graph-view.css` along with `playground.html`.
+Event times are shifted when the page loads so the newest is a few minutes
+old. Reports are generated in advance, so the Playground's report opens with
+the password **`mantis-playground`**; any other password gets a message
+saying so.
 
-## Why static fixtures, not a live demo cluster
+## Files
 
-A public page that talks to a real, always-on cluster is a real cluster
-exposed to the internet, which contradicts the "don't expose Mantis to the
-public internet" guidance the project gives everyone else. Capturing real
-graphs once and serving them as static files gets the same authenticity (this
-is exactly what `mantis-engine` produces against a real cluster — nothing here
-is hand-written) with no live attack surface, no ongoing infrastructure, and
-nothing that can go down.
+| File | What it is |
+|---|---|
+| `../playground.html` | Generated from `../index.html` by `build.js` — do not edit |
+| `../playground-api.js` | Serves `/api/*` from `api.json` (and the report from `sample-report.pdf`) |
+| `api.json` | Recorded graph, events, capacity, and every resource's YAML and JSON |
+| `sample-report.pdf` | The sample cluster's report, encrypted with `mantis-playground` |
+| `capture.js` | Records `api.json` and `sample-report.pdf` from a running `mantis-dev` |
+| `build.js` | Generates `playground.html`; `--check` fails if it is out of date |
 
-## The three scenarios
+## Updating it
 
-| Scenario | Namespaces | Nodes | "Distribution" shown | What it demonstrates |
-|---|---|---|---|---|
-| Web application | 5 (`shop-frontend`, `checkout`, `catalog`, `ingress-nginx`, `monitoring`) | 5 | kubeadm | The common case: Deployments → ReplicaSets → Pods, Services, an Ingress, ConfigMaps, and an HPA — several teams' apps sharing one small cluster. |
-| Stateful database | 5 (`data-platform`, `cache`, `search`, `analytics`, `logging`) | 5 | GKE | Two different StatefulSets with real per-Pod storage (`claims` → `bound-to` through to a PersistentVolume) and two Secrets whose values never reach the UI. |
-| Broken relationships | 2 (`payments-api`, `platform`) | 3 | EKS | Three real failure modes Mantis surfaces instead of hiding: an Ingress routing to a Service that no longer exists (the red, dashed "not found" node), a Deployment referencing a missing ConfigMap, and a Service whose selector matches zero Pods — sitting next to an unrelated namespace that's completely healthy. |
-
-The kubeadm/GKE/EKS labeling is cosmetic (see "How the fixtures are built"
-below) — it exists so the three scenarios read as Mantis working identically
-across different real-world distributions, which is the actual product claim
-being demonstrated.
-
-Each scenario's *one* original namespace (`shop-frontend`, `data-platform`,
-`payments-api`) is a real capture from `mantis-engine` reading a real cluster
-running the manifests in `manifests/` — every node, edge, and manifest there
-came from the engine, not a human. The other namespaces and the extra physical
-Nodes in each scenario are hand-authored by `expand-fixtures.py` (step 4
-below): a single real namespace's worth of relationship data doesn't give a
-first-time visitor — especially one who's never worked with more than a
-handful of resources — much sense of what a cluster with several teams on it
-actually looks like. `expand-fixtures.py` clones the real captured shapes
-(same fields, same relation directions, same attribute formats
-`internal/graph/enrich.go` would produce) rather than inventing a different
-schema, so the added namespaces render identically to genuine engine output;
-only their *source* is synthetic.
-
-## How the fixtures are built
-
-1. **Apply a scenario's manifests** to any real cluster (this was done against
-   a local minikube):
-
-   ```bash
-   kubectl apply -f internal/web/ui/playground/manifests/01-web-app.yaml
-   ```
-
-2. **Capture it** with `cmd/playground-capture`, a dev-only tool that runs the
-   same `graph`/`engine` code the product ships (never built into the
-   `mantis-engine`/`mantis-web` images — see `build/Dockerfile.*`) against
-   whichever cluster the current kubeconfig context points at:
-
-   ```bash
-   go run ./cmd/playground-capture \
-     -namespace shop-frontend \
-     -context-label "playground · web application (sample data)" \
-     -out internal/web/ui/playground/data/web-app
-   ```
-
-   This writes `graph.json` (the exact shape `/api/graph` serves) and one
-   `resources/<id>.yaml` manifest per resolved, non-Secret node — Secrets are
-   never captured, the same rule the real `/api/resource` handler enforces.
-   It also drops any cluster-scoped Node/PersistentVolume left over from a
-   different scenario sharing the same dev cluster (see
-   `pruneForeignClusterScoped` in `cmd/playground-capture/main.go`).
-
-3. **Re-flavor the identity fields** with `sanitize-fixtures.py`: it renames
-   the captured Node from the dev cluster's real name to a distro-flavored one
-   per scenario (`k8s-worker-01` / a GKE-style node name), strips
-   dev-cluster-specific labels and storage-provisioner annotations, and swaps
-   in the matching cloud-flavored equivalents (e.g. a `pd.csi.storage.gke.io`
-   CSI volume instead of a local hostPath one). Nothing about *what happened
-   in the cluster* is changed — only cosmetic identity fields, and only so all
-   three scenarios don't visibly reveal the same one dev cluster they were
-   actually captured from.
-
-   ```bash
-   python3 internal/web/ui/playground/sanitize-fixtures.py
-   ```
-
-4. **Tear the scenario down** before capturing the next one:
-
-   ```bash
-   kubectl delete namespace shop-frontend
-   ```
-
-   Repeat 1–4 for `02-stateful-db.yaml` (`data-platform`) and
-   `03-broken-relationships.yaml` (`payments-api`).
-
-5. **Expand each scenario** with `expand-fixtures.py`: adds the extra
-   namespaces/nodes described in the table above directly to `graph.json` and
-   `resources/`, on top of whatever the three real captures produced. This is
-   the one step that isn't a real capture — see the note above the table for
-   why, and read the script itself for exactly what it adds; every helper it
-   uses (`add_simple_app`, `add_stateful_app`, `add_node`) is a straight
-   template of one of the real captured resources, not an invented shape.
-
-   ```bash
-   python3 internal/web/ui/playground/expand-fixtures.py
-   ```
-
-## Regenerating
-
-Fixtures only need regenerating if `playground.html` should show something new
-(a different scenario, an updated feature). Re-run steps 1–4 end to end for
-each scenario, then step 5 once at the end — `sanitize-fixtures.py` and
-`expand-fixtures.py` both expect to run against freshly captured data, not
-output from a previous run of themselves.
-
-## Serving it locally
-
-`playground.html` uses paths relative to its own directory
-(`playground/data/...`), so any static file server rooted at
-`internal/web/ui/` works:
+After changing `index.html`, rebuild the page (the UI tests fail if you
+forget):
 
 ```bash
-cd internal/web/ui && python3 -m http.server 8099
-# open http://127.0.0.1:8099/playground.html
+node internal/web/ui/playground/build.js
 ```
 
-## Deploying it
+After changing what the engine or report service returns, re-record:
 
-This directory + `playground.html` are the whole artifact — no build step, no
-backend. Point `mantis-playground.continuumx1.com` (see `MANTIS_PLAYGROUND_URL`
-in the website repo) at a static host serving `internal/web/ui/` with
-`playground.html` as the entry point, and flip `MANTIS_PLAYGROUND_LIVE` to
-`true` once it's live.
+```bash
+go run ./cmd/mantis-dev -resources 110 -seed 8 -cluster-name sample-cluster -addr 127.0.0.1:8090
+node internal/web/ui/playground/capture.js http://127.0.0.1:8090
+```
+
+## Publishing it on the website
+
+Copy these from `internal/web/ui/` to the website's
+`public/mantis-playground/`: `playground.html`, `playground-api.js`,
+`app-shell.js`, `app-shell.css`, `graph-engine.js`, `graph-view.js`,
+`graph-view.css`, `report-layout.js`, `mantis-mascot.webp`, `brand/`,
+`fonts/`, and `playground/api.json` + `playground/sample-report.pdf`.

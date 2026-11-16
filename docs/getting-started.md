@@ -1,5 +1,10 @@
 # Getting Started
 
+!!! tip "Try it first"
+    The [Playground](https://mantis.continuumx1.com/mantis-playground/playground.html) runs the full Mantis app in your browser on a
+    100-resource sample cluster — dashboard, topology, resource details,
+    events and a sample report. Nothing to install.
+
 ## Prerequisites
 
 - A Kubernetes cluster — any distribution (minikube, kind, kubeadm, RKE2, EKS, GKE, AKS, …)

@@ -47,6 +47,9 @@ building, craftsmanship and engineering. This is our first stable release.
 - **Secure by default** — strictly read-only, Secret values never fetched,
   and sign-in with a password you configure (no default password).
 
+**Try it without installing:** the [Playground](https://mantis.continuumx1.com/mantis-playground/playground.html) runs the full app in
+your browser on a 100-resource sample cluster.
+
 [Release notes](docs/releases/v1.0.0.md) ·
 [GitHub release](https://github.com/continuumx1/mantis/releases/tag/v1.0.0) ·
 [Changelog](CHANGELOG.md) ·

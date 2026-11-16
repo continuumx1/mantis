@@ -84,6 +84,13 @@ world. See the [release notes](docs/releases/v1.0.0.md).
   engine's snapshot. Stateless and horizontally scalable; streamed
   progress; cancellable.
 
+### Playground
+
+- The Playground is now the full 1.0 app — dashboard, resource pages,
+  events, every topology view and Download report — on a 100-resource
+  sample cluster, generated from `index.html` so it can't drift from the
+  real UI (`internal/web/ui/playground/`).
+
 ### Security
 
 - Configurable administrator account: bcrypt-hashed password, no default.
