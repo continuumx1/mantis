@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 	"time"
@@ -246,5 +247,50 @@ func TestWatchMode_FallsBackToPollWhenWatchForbidden(t *testing.T) {
 	d, _ := s.cache.get()
 	if !hasNode(d, d.Nodes[0].ID) || len(d.Nodes) < 50 {
 		t.Errorf("poll fallback graph too small: %d nodes", len(d.Nodes))
+	}
+}
+
+// A probe that fails to reach the API server (the engine started while the
+// cluster was still coming up) must not be mistaken for RBAC denying that
+// kind: the start fails and is retried, and the kind is watched afterwards.
+// Recording it as "not watched" left the engine without namespaces, unable
+// to build a graph, and never ready.
+func TestWatchCache_ProbeTimeoutIsRetriedNotDenied(t *testing.T) {
+	cs := fake.NewSimpleClientset(synth.Generate(synth.Options{Resources: 60, Seed: 3})...)
+	failures := 1
+	cs.PrependReactor("list", "namespaces", func(clienttesting.Action) (bool, runtime.Object, error) {
+		if failures > 0 {
+			failures--
+			return true, nil, errors.New("dial tcp 10.96.0.1:443: i/o timeout")
+		}
+		return false, nil, nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := startWatchCache(ctx, cs, nil); err == nil {
+		t.Fatal("a probe timeout should fail the start, not mark the kind unwatched")
+	}
+	wc, err := startWatchCache(ctx, cs, nil)
+	if err != nil {
+		t.Fatalf("second start: %v", err)
+	}
+	if _, denied := wc.denied["namespaces"]; denied {
+		t.Fatal("namespaces recorded as not watched after a transient error")
+	}
+}
+
+func TestWatchCache_ForbiddenKindIsNotWatched(t *testing.T) {
+	cs := fake.NewSimpleClientset(synth.Generate(synth.Options{Resources: 60, Seed: 3})...)
+	cs.PrependReactor("list", "secrets", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "", nil)
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	wc, err := startWatchCache(ctx, cs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, denied := wc.denied["secrets"]; !denied {
+		t.Fatal("a forbidden kind should be recorded as not watched")
 	}
 }

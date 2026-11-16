@@ -226,6 +226,12 @@ func startWatchCache(ctx context.Context, cs kubernetes.Interface, dyn dynamic.I
 	var synced []cache.InformerSynced
 	for _, k := range watchedKinds() {
 		if err := k.probe(ctx, cs, probeOpts); err != nil {
+			if !definiteRefusal(err) {
+				// A timeout or connection error says nothing about whether
+				// this kind is readable (the API server may still be coming
+				// up). Fail the start; watchLoop retries.
+				return nil, fmt.Errorf("probe %s: %w", k.resource, err)
+			}
 			wc.denied[k.resource] = err
 			slog.Warn("watch", "event", "kind_not_watched", "resource", k.resource, "reason", err.Error())
 			continue
@@ -246,7 +252,10 @@ func startWatchCache(ctx context.Context, cs kubernetes.Interface, dyn dynamic.I
 		wc.dynFac = dynamicinformer.NewDynamicSharedInformerFactory(dyn, 0)
 		for _, gvr := range watchedCRDs {
 			if _, err := dyn.Resource(gvr).List(ctx, probeOpts); err != nil {
-				continue // CRD not installed (or not readable): treated as absent, exactly as before
+				if !definiteRefusal(err) {
+					return nil, fmt.Errorf("probe %s: %w", gvr.Resource, err)
+				}
+				continue // CRD not installed (or not readable): treated as absent
 			}
 			inf := wc.dynFac.ForResource(gvr).Informer()
 			_ = inf.SetTransform(stripForCache)
@@ -408,3 +417,11 @@ var (
 	_ = (*rbacv1.RoleList)(nil)
 	_ = (*storagev1.StorageClassList)(nil)
 )
+
+// definiteRefusal reports whether a probe error is the API server's answer
+// about the resource itself — not allowed, or not served — as opposed to a
+// failure to get an answer at all (timeout, connection refused, 5xx).
+func definiteRefusal(err error) bool {
+	return apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) ||
+		apierrors.IsNotFound(err) || apierrors.IsMethodNotSupported(err)
+}
