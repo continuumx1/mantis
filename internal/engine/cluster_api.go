@@ -244,6 +244,12 @@ func (s *Server) readCapacity(ctx context.Context) (CapacityDTO, error) {
 		}
 		return out, nil
 	}
+	if len(list.Items) == 0 {
+		// metrics-server answers but has not reported any node yet (it was
+		// just installed or restarted): there is no usage to show.
+		out.MetricsReason = "metrics-server has not reported node metrics yet"
+		return out, nil
+	}
 	out.Metrics = true
 	for _, item := range list.Items {
 		usage, _, _ := unstructuredStringMap(item.Object, "usage")

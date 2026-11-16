@@ -496,7 +496,7 @@
     else {
       const gauge = (label, used, total, f) => '<div class="m-gauge"><div style="font-size:12.5px;font-weight:500">' + label + '</div><div class="m-bar"><span style="width:' + Math.min(100, 100 * used / Math.max(1, total)) + '%;background:var(--m-' + (used / total > .85 ? "crit" : used / total > .7 ? "warn" : "accent") + ')"></span></div><div class="m-gauge-l"><span>' + f(used) + ' used</span><span>' + Math.round(100 * used / Math.max(1, total)) + '% of ' + f(total) + '</span></div></div>';
       b = c.metrics
-        ? gauge("CPU", c.cpuUsageMilli, c.cpuAllocatableMilli, cpu) + gauge("Memory", c.memUsageBytes, c.memAllocatableBytes, mem)
+        ? gauge("CPU", c.cpuUsageMilli || 0, c.cpuAllocatableMilli, cpu) + gauge("Memory", c.memUsageBytes || 0, c.memAllocatableBytes, mem)
         : '<div class="m-kv"><div class="k">Allocatable CPU</div><div class="v">' + cpu(c.cpuAllocatableMilli) + '</div><div class="k">Allocatable memory</div><div class="v">' + mem(c.memAllocatableBytes) + '</div><div class="k">Pod capacity</div><div class="v">' + fmt(c.podCapacity) + '</div></div>' +
           '<div class="m-note neutral" style="margin-top:10px">Live usage is not shown: ' + esc(c.metricsReason || "metrics unavailable") + '. Install <code>metrics-server</code> to see CPU and memory utilization. Mantis does not estimate usage.</div>';
       if (c.metrics) b += '<div class="m-muted" style="font-size:12px;margin-top:10px">Usage from metrics.k8s.io · allocatable from node status · pod capacity ' + fmt(c.podCapacity) + '</div>';
