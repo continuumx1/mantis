@@ -6,21 +6,27 @@ fullnameOverride: ""
 
 imagePullSecrets: []
 
-# Both services share one Docker Hub repo, split by a "-engine"/"-web" tag
-# suffix (e.g. cx1tech/mantis:0.1.0-preview.3-engine). tag is pinned here on
-# purpose, not left to default off .Chart.AppVersion: this chart version
-# (0.3.0) is meant to deploy exactly this image, full stop. Chart 0.1.0
-# pins 0.1.0-preview.1 the same way — see charts/mantis/README.md's
-# version table for how to reach it.
+# All three services share one Docker Hub repo, split by a "-engine"/"-web"/
+# "-report" tag suffix (e.g. cx1tech/mantis:1.0.0-engine). tag is pinned here on purpose,
+# not left to default off .Chart.AppVersion: this chart version (1.0.0) is
+# meant to deploy exactly this image, full stop. Chart 0.1.0 pins
+# 0.1.0-preview.1 the same way — see charts/mantis/README.md's version
+# table for how to reach an older release.
 image:
   repository: cx1tech/mantis
-  tag: "0.1.0-preview.3"
+  tag: "1.0.0"
   pullPolicy: IfNotPresent
 
 # mantis-engine: the only component that talks to Kubernetes (read-only
 # RBAC, see rbac.create below). Never exposed outside the cluster.
 engine:
   replicaCount: 1
+  # How the engine keeps its graph current. "watch" (default): one paginated
+  # list per kind at startup, then Kubernetes watch streams — near-zero steady
+  # load on the API server, changes visible in about a second. "poll": re-list
+  # every syncInterval (needs only get/list; heavier on large clusters).
+  syncMode: watch
+  syncInterval: 20s   # poll mode only
   showAll: false   # MANTIS_SHOW_ALL — include system-managed ConfigMaps/Secrets
 
   service:
@@ -50,6 +56,19 @@ engine:
     readOnlyRootFilesystem: true
     capabilities:
       drop: ["ALL"]
+
+# The administrator account that signs in to Mantis. There is no default
+# password: leave adminPassword empty and the chart generates a random one
+# (kept across upgrades), readable with (for a release named "mantis")
+#   kubectl get secret mantis-admin -n <namespace> \
+#     -o jsonpath='{.data.password}' | base64 -d
+# Or set adminPassword (8+ characters), or point existingSecret at your own
+# Secret with keys "username" and "passwordHash" (bcrypt, e.g. from
+# `htpasswd -nbBC 10 admin '<password>'`) or "password".
+auth:
+  adminUsername: admin
+  adminPassword: ""
+  existingSecret: ""
 
 # mantis-web: serves the UI + login, proxies /api to mantis-engine. This is
 # the one you expose (Ingress / LoadBalancer / port-forward).
@@ -87,6 +106,42 @@ web:
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65532   # same distroless base as engine
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
+# mantis-report: builds password-protected (AES-256) PDF infrastructure
+# reports. No Kubernetes access — it reads mantis-engine's snapshot API.
+# Stateless; scale with replicaCount. Set enabled: false to remove reports.
+report:
+  enabled: true
+  replicaCount: 1
+  maxConcurrent: 2   # simultaneous reports per replica (each holds one cluster snapshot in memory)
+
+  service:
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 512Mi   # a report for ~10,000 resources peaks around 250Mi
+
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
     runAsGroup: 65532
     seccompProfile:
       type: RuntimeDefault

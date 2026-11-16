@@ -2,13 +2,12 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/continuumx1/mantis/internal/graph"
 )
@@ -38,6 +37,8 @@ type SyncProgress struct {
 	LastSyncAt         *time.Time `json:"lastSyncAt,omitempty"`
 	LastDurationMs     int64      `json:"lastDurationMs,omitempty"`
 	LastError          string     `json:"lastError,omitempty"`
+	// Mode is "watch" or "poll" (see SyncModeWatch).
+	Mode string `json:"mode,omitempty"`
 }
 
 // progressTracker is SyncProgress plus the mutex guarding it — read by
@@ -128,8 +129,18 @@ func (s *Server) syncOnce(ctx context.Context) {
 	err := graph.BuildClusterGraphProgressive(ctx, s.client.Clientset, s.client.Dynamic, s.showAll,
 		func(snap graph.ClusterSnapshot) {
 			dto := s.dtoFor(base, snap)
-			s.cache.publish(dto)
 			s.progress.update(snap, dto)
+			// Partial snapshots are only published until the first pass has
+			// completed (see Server.published). After that, publishing the
+			// first namespace of a re-sync would make the whole rest of the
+			// cluster vanish from every client until the pass caught up.
+			if snap.Complete {
+				s.cache.publish(dto)
+				s.published.Store(true)
+			} else if !s.published.Load() {
+				dto.Meta.Partial = true
+				s.cache.publish(dto)
+			}
 		})
 
 	duration := time.Since(start)
@@ -154,31 +165,7 @@ func (s *Server) syncOnce(ctx context.Context) {
 // node-autoscaler badge) once per pass, rather than once per namespace —
 // dtoFor reuses this same base for every snapshot published during the pass.
 func (s *Server) baseMeta(ctx context.Context) MetaDTO {
-	meta := MetaDTO{
-		Context:        s.client.Context,
-		Server:         s.client.Server,
-		NodeAutoscaler: graph.DetectNodeAutoscaler(ctx, s.client.Dynamic, s.client.Clientset),
-	}
-	if nsList, err := s.client.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{}); err == nil {
-		names := make([]string, 0, len(nsList.Items))
-		for i := range nsList.Items {
-			// kube-node-lease is filtered here too, not just in
-			// BuildClusterGraphProgressive's own namespace list — this is what
-			// keeps it out of the namespace *count* and the empty-region list
-			// the UI draws one per NamespaceList entry for, on top of it never
-			// contributing any nodes/edges in the first place.
-			if name := nsList.Items[i].Name; !graph.IsHiddenNamespace(name) {
-				names = append(names, name)
-			}
-		}
-		sort.Strings(names)
-		meta.NamespaceList = names
-		meta.Namespaces = len(names)
-	}
-	if v, err := s.client.Clientset.Discovery().ServerVersion(); err == nil {
-		meta.Version = v.GitVersion
-	}
-	return meta
+	return s.metaFrom(ctx, s.client.Clientset, s.client.Dynamic, s.serverVersion())
 }
 
 // dtoFor projects one ClusterSnapshot into the wire format, against the
@@ -193,6 +180,17 @@ func (s *Server) dtoFor(base MetaDTO, snap graph.ClusterSnapshot) GraphDTO {
 		meta.Namespaces = countNamespaces(snap.Context)
 	}
 	return FromContext(snap.Context, meta)
+}
+
+// clusterID derives a short, stable, opaque identifier from the API server
+// address — the same cluster always gets the same ID, and the address itself
+// is not repeated in every resource reference a client keeps.
+func clusterID(server string) string {
+	if server == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(server))
+	return hex.EncodeToString(sum[:6])
 }
 
 // countNamespaces counts distinct namespaces represented among the graph's

@@ -1,0 +1,60 @@
+name: CI
+
+# Every pull request and every push to main: formatting, vet, Go and UI
+# tests, the Helm chart, and a build of all three images (not pushed).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: gofmt
+        run: |
+          gofmt -l . | tee /tmp/fmt.out
+          test ! -s /tmp/fmt.out
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test -race ./...
+      - name: UI tests
+        run: node --test test/ui/*.test.js
+      - uses: azure/setup-helm@v4
+      - name: helm lint / template
+        run: |
+          helm lint charts/mantis
+          helm template mantis charts/mantis > /dev/null
+          helm template mantis charts/mantis --set report.enabled=false --set networkPolicy.enabled=true > /dev/null
+          helm template mantis charts/mantis --set auth.existingSecret=my-secret > /dev/null
+
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [engine, web, report]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Build mantis-${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile.${{ matrix.service }}
+          push: false
+          tags: mantis-${{ matrix.service }}:ci

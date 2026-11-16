@@ -1,0 +1,81 @@
+{{/*
+mantis-report: builds password-protected PDF infrastructure reports. It has
+no Kubernetes access at all — no ServiceAccount token is mounted — and reads
+everything from mantis-engine's internal snapshot API. It is stateless (each
+report is built and streamed within one request), so it scales by replicas.
+*/}}
+{{- if .Values.report.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mantis.report.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.report.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.report.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mantis.report.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mantis.report.selectorLabels" . | nindent 8 }}
+        {{- with .Values.report.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.report.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.report.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mantis-report
+          image: {{ include "mantis.report.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.report.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MANTIS_REPORT_ADDR
+              value: ":8080"
+            - name: MANTIS_ENGINE_URL
+              value: "http://{{ include "mantis.engine.fullname" . }}:{{ .Values.engine.service.port }}"
+            - name: MANTIS_REPORT_MAX_CONCURRENT
+              value: {{ .Values.report.maxConcurrent | default 2 | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.report.resources | nindent 12 }}
+      {{- with .Values.report.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.report.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.report.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

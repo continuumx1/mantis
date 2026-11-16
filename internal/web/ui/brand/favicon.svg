@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="132 30 760 760">
+  <defs>
+    <path id="mm-body" d="M512 322C668 322 752 410 786 620C806 760 816 900 814 1020C812 1260 690 1402 512 1402C334 1402 212 1260 210 1020C208 900 218 760 238 620C272 410 356 322 512 322Z"/>
+    <clipPath id="mm-clip"><use href="#mm-body"/></clipPath>
+    <path id="mm-wing" d="M226 770C156 806 84 896 44 984C28 1024 48 1058 96 1050C146 1040 190 1018 218 1000Z"/>
+  </defs>
+  <g stroke="#0E1712" stroke-linecap="round" stroke-linejoin="round">
+    <!-- feet -->
+    <ellipse cx="300" cy="1384" rx="58" ry="30" transform="rotate(-28 300 1384)" fill="#8D9886" stroke-width="12"/>
+    <ellipse cx="724" cy="1384" rx="58" ry="30" transform="rotate(28 724 1384)" fill="#8D9886" stroke-width="12"/>
+    <!-- wings -->
+    <g fill="#8D9886" stroke-width="12">
+      <use href="#mm-wing"/>
+      <use href="#mm-wing" transform="matrix(-1 0 0 1 1024 0)"/>
+    </g>
+    <g fill="none" stroke="#A9B3A2" stroke-width="6">
+      <path d="M206 806 74 990M208 856 108 1032M212 908 150 1034M216 962 188 1022"/>
+      <path d="M206 806 74 990M208 856 108 1032M212 908 150 1034M216 962 188 1022" transform="matrix(-1 0 0 1 1024 0)"/>
+    </g>
+    <!-- body with its right-hand shade -->
+    <g clip-path="url(#mm-clip)" stroke="none">
+      <use href="#mm-body" fill="#97CF3B"/>
+      <use href="#mm-body" fill="#BBEA5A" transform="translate(-46 -26)"/>
+    </g>
+    <use href="#mm-body" fill="none" stroke-width="14"/>
+    <!-- antennae -->
+    <g fill="none" stroke-width="15">
+      <path d="M437 408C428 300 334 168 236 102"/>
+      <path d="M587 408C596 300 690 168 788 102"/>
+    </g>
+    <g fill="#A6E23F" stroke-width="12">
+      <circle cx="213" cy="76" r="36"/>
+      <circle cx="811" cy="76" r="36"/>
+    </g>
+    <g fill="#D9F7A6" stroke="none">
+      <circle cx="202" cy="64" r="11"/>
+      <circle cx="800" cy="64" r="11"/>
+    </g>
+    <!-- eyes -->
+    <g fill="#FFFFFF" stroke-width="14">
+      <circle cx="290" cy="485" r="126"/>
+      <circle cx="734" cy="485" r="128"/>
+    </g>
+    <g fill="#0E1712" stroke="none">
+      <circle cx="306" cy="485" r="62"/>
+      <circle cx="718" cy="485" r="62"/>
+    </g>
+    <g fill="#FFFFFF" stroke="none">
+      <circle cx="326" cy="470" r="16"/>
+      <circle cx="738" cy="470" r="16"/>
+    </g>
+    <!-- smile -->
+    <path d="M456 626Q512 690 568 626" fill="none" stroke-width="12"/>
+  </g>
+</svg>

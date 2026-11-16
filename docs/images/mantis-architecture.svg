@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Mantis architecture: browser to mantis-web; mantis-web to mantis-engine and mantis-report; mantis-report to mantis-engine; mantis-engine to the Kubernetes API server">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#475569"/></marker>
+  </defs>
+  <rect width="960" height="400" rx="16" fill="#FFFFFF"/>
+  <!-- cluster boundary -->
+  <rect x="200" y="28" width="736" height="344" rx="14" fill="#F8FAFC" stroke="#CBD5E1" stroke-dasharray="6 5"/>
+  <text x="220" y="54" font-size="13" font-weight="600" fill="#64748B">Kubernetes cluster · namespace mantis</text>
+
+  <!-- browser -->
+  <rect x="24" y="150" width="140" height="84" rx="12" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
+  <text x="94" y="186" text-anchor="middle" font-size="16" font-weight="650" fill="#172033">Browser</text>
+  <text x="94" y="207" text-anchor="middle" font-size="12" fill="#64748B">UI · layout</text>
+
+  <!-- mantis-web -->
+  <rect x="236" y="138" width="184" height="108" rx="12" fill="#ECFCCB" stroke="#65A30D" stroke-width="1.8"/>
+  <text x="328" y="174" text-anchor="middle" font-size="16" font-weight="650" fill="#172033">mantis-web</text>
+  <text x="328" y="196" text-anchor="middle" font-size="12" fill="#3F6212">UI · sign-in</text>
+  <text x="328" y="214" text-anchor="middle" font-size="12" fill="#3F6212">/api proxy</text>
+  <text x="328" y="234" text-anchor="middle" font-size="11" fill="#64748B">Ingress / LoadBalancer</text>
+
+  <!-- mantis-engine -->
+  <rect x="520" y="76" width="200" height="108" rx="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.8"/>
+  <text x="620" y="112" text-anchor="middle" font-size="16" font-weight="650" fill="#172033">mantis-engine</text>
+  <text x="620" y="134" text-anchor="middle" font-size="12" fill="#475569">discovery · watch sync</text>
+  <text x="620" y="152" text-anchor="middle" font-size="12" fill="#475569">graph · relationships</text>
+  <text x="620" y="172" text-anchor="middle" font-size="11" fill="#64748B">ClusterIP · read-only RBAC</text>
+
+  <!-- mantis-report -->
+  <rect x="520" y="232" width="200" height="108" rx="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.8"/>
+  <text x="620" y="268" text-anchor="middle" font-size="16" font-weight="650" fill="#172033">mantis-report</text>
+  <text x="620" y="290" text-anchor="middle" font-size="12" fill="#475569">PDF reports · AES-256</text>
+  <text x="620" y="308" text-anchor="middle" font-size="12" fill="#475569">stateless · scalable</text>
+  <text x="620" y="328" text-anchor="middle" font-size="11" fill="#64748B">ClusterIP · no Kubernetes access</text>
+
+  <!-- API server -->
+  <rect x="772" y="76" width="140" height="108" rx="12" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.8"/>
+  <text x="842" y="120" text-anchor="middle" font-size="15" font-weight="650" fill="#172033">Kubernetes</text>
+  <text x="842" y="140" text-anchor="middle" font-size="15" font-weight="650" fill="#172033">API server</text>
+  <text x="842" y="162" text-anchor="middle" font-size="11" fill="#64748B">get · list · watch</text>
+
+  <g fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#a)">
+    <path d="M164 192H232"/>
+    <path d="M420 172C470 172 470 130 516 130"/>
+    <path d="M420 214C470 214 470 286 516 286"/>
+    <path d="M620 232V188"/>
+    <path d="M720 130H768"/>
+  </g>
+  <g font-size="11" fill="#475569">
+    <text x="198" y="182" text-anchor="middle">HTTPS</text>
+    <text x="456" y="124" text-anchor="middle">/api/*</text>
+    <text x="456" y="270" text-anchor="middle">/api/report</text>
+    <text x="628" y="214">snapshot</text>
+  </g>
+</svg>

@@ -5,31 +5,97 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-// Mantis has no real user store yet. devUsername/devPassword back a
-// public-preview login screen — a single hardcoded credential pair and an
-// in-memory session table — that stands a login gate up in front of the graph
-// while a real auth story lands.
-//
-// admin/admin is fine as *temporary preview/demo access*, published as such on
-// the login page itself. It must never quietly become "the" default once real
-// authentication lands: whoever builds that should be deleting this file's
-// login flow wholesale, not layering onto it. If Mantis is still checking
-// these two constants outside of a preview build, that is a bug, not a
-// deploy detail — grep for devPassword before calling any build "production."
+// Mantis signs in a single administrator account whose credentials the
+// operator configures (see CredentialsFromEnv): there is no built-in default
+// password. Sessions are random tokens held in memory by each mantis-web
+// replica.
 const (
-	devUsername = "admin"
-	devPassword = "admin"
-
 	sessionCookie = "mantis_session"
 	sessionTTL    = 12 * time.Hour
+
+	// A client address that fails maxLoginFailures sign-ins within
+	// loginFailureWindow is refused until that window has passed.
+	maxLoginFailures   = 10
+	loginFailureWindow = 10 * time.Minute
+	minPasswordLength  = 8
 )
+
+// Credentials is the administrator account. The password is held only as a
+// bcrypt hash.
+type Credentials struct {
+	Username string
+	hash     []byte
+}
+
+// NewCredentials builds credentials from a plain password, hashing it.
+func NewCredentials(username, password string) (Credentials, error) {
+	if username == "" {
+		return Credentials{}, errors.New("the admin username must not be empty")
+	}
+	if len([]rune(password)) < minPasswordLength {
+		return Credentials{}, fmt.Errorf("the admin password must be at least %d characters", minPasswordLength)
+	}
+	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return Credentials{}, err
+	}
+	return Credentials{Username: username, hash: h}, nil
+}
+
+// NewCredentialsFromHash builds credentials from a bcrypt hash.
+func NewCredentialsFromHash(username, hash string) (Credentials, error) {
+	if username == "" {
+		return Credentials{}, errors.New("the admin username must not be empty")
+	}
+	hash = strings.TrimSpace(hash)
+	if _, err := bcrypt.Cost([]byte(hash)); err != nil {
+		return Credentials{}, errors.New("MANTIS_ADMIN_PASSWORD_HASH is not a valid bcrypt hash")
+	}
+	return Credentials{Username: username, hash: []byte(hash)}, nil
+}
+
+// CredentialsFromEnv reads the administrator account:
+//
+//	MANTIS_ADMIN_USERNAME       account name (default "admin")
+//	MANTIS_ADMIN_PASSWORD_HASH  bcrypt hash of the password (preferred), or
+//	MANTIS_ADMIN_PASSWORD       the password itself, hashed at startup
+//
+// With neither password variable set it returns an error: mantis-web does
+// not start with a guessable default.
+func CredentialsFromEnv() (Credentials, error) {
+	user := strings.TrimSpace(os.Getenv("MANTIS_ADMIN_USERNAME"))
+	if user == "" {
+		user = "admin"
+	}
+	if h := os.Getenv("MANTIS_ADMIN_PASSWORD_HASH"); strings.TrimSpace(h) != "" {
+		return NewCredentialsFromHash(user, h)
+	}
+	if pw := os.Getenv("MANTIS_ADMIN_PASSWORD"); pw != "" {
+		return NewCredentials(user, pw)
+	}
+	return Credentials{}, errors.New("no admin password configured: set MANTIS_ADMIN_PASSWORD_HASH (a bcrypt hash) or MANTIS_ADMIN_PASSWORD")
+}
+
+// check reports whether username and password match, in time that does not
+// depend on which one is wrong.
+func (c Credentials) check(username, password string) bool {
+	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(c.Username)) == 1
+	passOK := bcrypt.CompareHashAndPassword(c.hash, []byte(password)) == nil
+	return userOK && passOK
+}
 
 // publicPaths lists routes reachable without a session: the login page and its
 // API, logout (so a stale cookie can always be cleared), the liveness probe
@@ -40,20 +106,32 @@ var publicPaths = map[string]bool{
 	"/logout":              true,
 	"/healthz":             true,
 	"/favicon.ico":         true,
+	"/brand/favicon.svg":   true,
 	"/mantis-mascot.webp":  true,
 	"/mantis-login-bg.jpg": true,
 }
 
-// sessions tracks issued session tokens in memory. It resets on every process
-// restart, which is fine for a development-only login gate — nobody expects
-// "stay signed in" guarantees from a hardcoded admin/admin.
+// sessions tracks issued session tokens in memory, plus recent failed
+// sign-ins per client address. A restart signs everyone out.
 type sessions struct {
-	mu     sync.Mutex
-	tokens map[string]time.Time
+	creds    Credentials
+	mu       sync.Mutex
+	tokens   map[string]session
+	failures map[string]*failures
 }
 
-func newSessions() *sessions {
-	return &sessions{tokens: map[string]time.Time{}}
+type session struct {
+	user    string
+	expires time.Time
+}
+
+type failures struct {
+	count int
+	since time.Time
+}
+
+func newSessions(creds Credentials) *sessions {
+	return &sessions{creds: creds, tokens: map[string]session{}, failures: map[string]*failures{}}
 }
 
 // issue mints a new session token and remembers its expiry.
@@ -69,27 +147,92 @@ func (s *sessions) issue() string {
 		tok = hex.EncodeToString([]byte(time.Now().String()))
 	}
 	s.mu.Lock()
-	s.tokens[tok] = time.Now().Add(sessionTTL)
+	s.tokens[tok] = session{user: s.creds.Username, expires: time.Now().Add(sessionTTL)}
+	for t, v := range s.tokens {
+		if time.Now().After(v.expires) {
+			delete(s.tokens, t)
+		}
+	}
 	s.mu.Unlock()
 	return tok
 }
 
-// valid reports whether tok is a live, unexpired session, pruning it if not.
-func (s *sessions) valid(tok string) bool {
+// lookup returns the live session for tok, pruning it if expired.
+func (s *sessions) lookup(tok string) (session, bool) {
 	if tok == "" {
-		return false
+		return session{}, false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	exp, ok := s.tokens[tok]
+	v, ok := s.tokens[tok]
+	if !ok {
+		return session{}, false
+	}
+	if time.Now().After(v.expires) {
+		delete(s.tokens, tok)
+		return session{}, false
+	}
+	return v, true
+}
+
+// valid reports whether tok is a live, unexpired session.
+func (s *sessions) valid(tok string) bool {
+	_, ok := s.lookup(tok)
+	return ok
+}
+
+// clientKey identifies the client for sign-in throttling: the connection's
+// address (not X-Forwarded-For, which a client can set to anything).
+func clientKey(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+// throttled reports whether key has failed too many sign-ins recently.
+func (s *sessions) throttled(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.failures[key]
 	if !ok {
 		return false
 	}
-	if time.Now().After(exp) {
-		delete(s.tokens, tok)
+	if time.Since(f.since) > loginFailureWindow {
+		delete(s.failures, key)
 		return false
 	}
-	return true
+	return f.count >= maxLoginFailures
+}
+
+func (s *sessions) recordFailure(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for k, f := range s.failures {
+		if now.Sub(f.since) > loginFailureWindow {
+			delete(s.failures, k)
+		}
+	}
+	f, ok := s.failures[key]
+	if !ok {
+		f = &failures{since: now}
+		s.failures[key] = f
+	}
+	f.count++
+}
+
+func (s *sessions) clearFailures(key string) {
+	s.mu.Lock()
+	delete(s.failures, key)
+	s.mu.Unlock()
+}
+
+// secureRequest reports whether the browser reached Mantis over HTTPS, directly
+// or through a TLS-terminating proxy, so the session cookie can be marked
+// Secure.
+func secureRequest(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 // revoke drops a session, if present.
@@ -105,20 +248,23 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// handleLogin checks the hardcoded dev credentials and, on success, sets a
-// session cookie. The comparisons are constant-time — cheap insurance even
-// though the credentials are printed on the login page itself in this dev
-// build.
+// handleLogin checks the configured credentials and, on success, sets a
+// session cookie.
 func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
+	key := clientKey(r)
+	if s.throttled(key) {
+		slog.Warn("auth", "event", "login_throttled", "remote_addr", r.RemoteAddr)
+		writeJSONError(w, http.StatusTooManyRequests, "too many failed sign-ins; try again in a few minutes")
+		return
+	}
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	userOK := subtle.ConstantTimeCompare([]byte(req.Username), []byte(devUsername)) == 1
-	passOK := subtle.ConstantTimeCompare([]byte(req.Password), []byte(devPassword)) == 1
-	if !userOK || !passOK {
+	if !s.creds.check(req.Username, req.Password) {
+		s.recordFailure(key)
 		// Never log the submitted username/password — only that an attempt
 		// failed and where from, enough to spot a brute-force pattern without
 		// putting credentials (real or mistyped-but-sensitive) in the log stream.
@@ -126,17 +272,34 @@ func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
+	s.clearFailures(key)
+	slog.Info("auth", "event", "login_succeeded", "remote_addr", r.RemoteAddr)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    s.issue(),
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionTTL.Seconds()),
 	})
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// handleSession returns who is signed in (GET /api/session), for the UI's
+// user menu.
+func (s *sessions) handleSession(w http.ResponseWriter, r *http.Request) {
+	user := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		if v, ok := s.lookup(c.Value); ok {
+			user = v.user
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]string{"username": user, "role": "Administrator"})
 }
 
 // handleLogout revokes the caller's session and clears the cookie.
@@ -145,7 +308,7 @@ func (s *sessions) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.revoke(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secureRequest(r), SameSite: http.SameSiteLaxMode,
 	})
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})

@@ -1,12 +1,15 @@
 # Mantis
 
-**Visual Kubernetes topology and relationship graph — read-only, any distribution.**
+**Visual Kubernetes topology, relationship graph and infrastructure reports — read-only, any distribution.**
 
-!!! warning "Public Preview"
-    Mantis is functional and strictly read-only — safe to point at a real
-    cluster — but its login flow, UI, and interfaces are still evolving
-    ahead of a stable release. See [Public Preview notes](security.md#public-preview-notes)
-    for exactly what that does and doesn't mean.
+!!! success "Mantis v1.0.0 – Vishwakarma · The Divine Architect"
+    [![Mantis v1.0.0 – Vishwakarma](images/releases/mantis-v1.0.0-vishwakarma.jpg){ loading=lazy }](releases/v1.0.0.md)
+
+    The first stable release: deterministic topology views, a full
+    application UI, watch-based live sync, password-protected PDF
+    infrastructure reports, and sign-in with a password you configure.
+    [Release notes](releases/v1.0.0.md) ·
+    [changelog](https://github.com/continuumx1/mantis/blob/main/CHANGELOG.md).
 
 Mantis is a **read-only Kubernetes context and investigation tool**. Point
 it at a cluster and it draws the relationships between your resources as a
@@ -45,6 +48,14 @@ others.
 
     [:octicons-arrow-right-24: Get started](getting-started.md)
 
+- :material-file-lock-outline:{ .lg .middle } **Infrastructure Reports**
+
+    ---
+
+    Export the cluster as a password-protected PDF: topology, inventory, health and findings.
+
+    [:octicons-arrow-right-24: Reports](reports.md)
+
 - :material-graph-outline:{ .lg .middle } **Core Concepts**
 
     ---
@@ -57,7 +68,7 @@ others.
 
     ---
 
-    The read-only guarantee, Secret handling, and what Public Preview means.
+    The read-only guarantee, Secret handling, and how sign-in works.
 
     [:octicons-arrow-right-24: Security](security.md)
 

@@ -40,6 +40,13 @@ var kindGVR = map[string]schema.GroupVersionResource{
 	"HorizontalPodAutoscaler": {Group: "autoscaling", Version: "v2", Resource: "horizontalpodautoscalers"},
 	"VerticalPodAutoscaler":   {Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"},
 	"NodePool":                {Group: "karpenter.sh", Version: "v1", Resource: "nodepools"},
+	"ServiceAccount":          {Group: "", Version: "v1", Resource: "serviceaccounts"},
+	"NetworkPolicy":           {Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"},
+	"StorageClass":            {Group: "storage.k8s.io", Version: "v1", Resource: "storageclasses"},
+	"Role":                    {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "roles"},
+	"RoleBinding":             {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "rolebindings"},
+	"ClusterRole":             {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"},
+	"ClusterRoleBinding":      {Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterrolebindings"},
 }
 
 // handleResource serves the raw YAML manifest of a single resource, addressed by
@@ -98,6 +105,13 @@ func (s *Server) handleResource(w http.ResponseWriter, r *http.Request) {
 
 	// Drop server-managed noise so the manifest reads like something a human wrote.
 	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
+
+	// ?format=json returns the same object as JSON, so the UI can read
+	// status.conditions, annotations and spec fields without a YAML parser.
+	if r.URL.Query().Get("format") == "json" {
+		writeJSON(w, r, obj.Object)
+		return
+	}
 
 	out, err := yaml.Marshal(obj.Object)
 	if err != nil {

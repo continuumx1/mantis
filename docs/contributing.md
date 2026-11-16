@@ -30,7 +30,7 @@ contribution.
 Keep pull requests small and focused, follow [Conventional Commits](https://www.conventionalcommits.org/),
 and include tests for new relationship logic — `internal/graph`'s existing
 tests use a fake Kubernetes client, so no real cluster is needed to
-contribute. `go build ./... && go vet ./... && go test ./...` should pass
+contribute. `go build ./... && go vet ./... && go test ./...` should pass, and for UI changes so should `node --test 'test/ui/*.test.js'` (no npm install needed). `go run ./cmd/mantis-dev` runs the real engine and UI against a synthetic cluster — see [the graph architecture page](graph-architecture.md)
 clean before you open a PR.
 
 Formal `CONTRIBUTING.md` / `CODE_OF_CONDUCT.md` guidelines are on the way;

@@ -25,7 +25,38 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "mantis.web.selectorLabels" . | nindent 14 }}
+        {{- if .Values.report.enabled }}
+        # mantis-report reads the engine's internal snapshot API.
+        - podSelector:
+            matchLabels:
+              {{- include "mantis.report.selectorLabels" . | nindent 14 }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: 8080
+{{- if .Values.report.enabled }}
+---
+# mantis-report accepts traffic only from mantis-web.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mantis.report.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mantis.report.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mantis.report.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mantis.web.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}
 {{- end }}

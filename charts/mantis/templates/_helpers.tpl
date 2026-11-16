@@ -51,6 +51,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-web" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "mantis.report.fullname" -}}
+{{- printf "%s-report" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "mantis.report.selectorLabels" -}}
+{{ include "mantis.selectorLabels" . }}
+app.kubernetes.io/component: report
+{{- end -}}
+
+{{- define "mantis.report.labels" -}}
+{{ include "mantis.labels" . }}
+app.kubernetes.io/component: report
+{{- end -}}
+
+{{- define "mantis.report.image" -}}
+{{- printf "%s:%s-report" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+
 {{- define "mantis.engine.selectorLabels" -}}
 {{ include "mantis.selectorLabels" . }}
 app.kubernetes.io/component: engine
@@ -93,4 +111,16 @@ image.tag to "", not the primary mechanism.
 
 {{- define "mantis.web.image" -}}
 {{- printf "%s:%s-web" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+
+{{/*
+The Secret holding the administrator account: auth.existingSecret, or the
+one this chart manages.
+*/}}
+{{- define "mantis.admin.secretName" -}}
+{{- if .Values.auth.existingSecret -}}
+{{- .Values.auth.existingSecret -}}
+{{- else -}}
+{{- printf "%s-admin" (include "mantis.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
 {{- end -}}
