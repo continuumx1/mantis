@@ -13,8 +13,22 @@
   const ready = realFetch(DATA_URL).then(r => r.json()).then(d => {
     data = d;
     rebaseEvents(d);
+    rebaseCreated(d);
     return d;
   });
+
+  // Creation times are shifted so the newest resource is two days old, in
+  // the graph and in every recorded manifest alike.
+  function rebaseCreated(d) {
+    const times = d.graph.nodes.map(n => Date.parse(n.created)).filter(t => !isNaN(t));
+    if (!times.length) return;
+    const shift = Date.now() - 2 * 86400 * 1000 - Math.max.apply(null, times);
+    const moved = iso => { const t = Date.parse(iso); return isNaN(t) ? iso : new Date(t + shift).toISOString().replace(/\.\d{3}Z$/, "Z"); };
+    d.graph.nodes.forEach(n => { if (n.created) n.created = moved(n.created); });
+    Object.values(d.resources).forEach(r => {
+      r.body = r.body.replace(/(creationTimestamp"?:\s*")([^"]+)(")/g, (m, a, iso, b) => a + moved(iso) + b);
+    });
+  }
 
   // Recorded event times are shifted so the newest one is a few minutes
   // old whenever the Playground is opened, as it would be on a live cluster.

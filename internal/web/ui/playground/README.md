@@ -20,8 +20,8 @@ reference, and node metrics for the capacity panel. Every response in
 `api.json` is what `mantis-engine` returned for it; `sample-report.pdf` is
 what `mantis-report` generated.
 
-Event times are shifted when the page loads so the newest is a few minutes
-old. Reports are generated in advance, so the Playground's report opens with
+Times are shifted when the page loads, so the newest event is a few minutes
+old and the newest resource two days old, as on a live cluster. Reports are generated in advance, so the Playground's report opens with
 the password **`mantis-playground`**; any other password gets a message
 saying so.
 

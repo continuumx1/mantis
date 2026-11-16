@@ -67,6 +67,10 @@ test("the shim answers the app's API like the engine does", async () => {
   const events = (await (await f("/api/events?limit=500")).json()).events;
   const newest = Math.max(...events.map(e => Date.parse(e.last)));
   assert.ok(Date.now() - newest < 10 * 60 * 1000, "event times rebased to recent");
+  const created = g.nodes.map(n => Date.parse(n.created)).filter(t => !isNaN(t));
+  const age = Date.now() - Math.max(...created);
+  assert.ok(age > 86400e3 && age < 3 * 86400e3, "creation times rebased to days old");
+  assert.ok(!/2026-01-01/.test(await (await f(`/api/resource?kind=Deployment&name=${dep.name}&ns=${dep.ns}`)).text()), "manifest timestamps rebased too");
 });
 
 test("the shim's report: the Playground password downloads the recorded PDF", async () => {
