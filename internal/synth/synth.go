@@ -23,6 +23,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -56,9 +57,29 @@ type gen struct {
 	uid    int
 	nodes  []string
 	pvSeq  int
+	events int // Events generated (not counted against budget)
 }
 
 func (g *gen) add(o runtime.Object) { g.objs = append(g.objs, o) }
+
+// event records a Kubernetes Event about an object, timestamped after the
+// objects' creation times so it reads as recent cluster history.
+func (g *gen) event(ns, kind, name, typ, reason, msg string, count int32) {
+	m := g.meta(fmt.Sprintf("%s.%x", name, g.uid), ns, nil)
+	at := metav1.Unix(1767225600+30*86400+int64(g.uid)*7, 0)
+	g.events++ // events are history, not resources: they don't use the budget
+	g.add(&corev1.Event{
+		ObjectMeta:     m,
+		InvolvedObject: corev1.ObjectReference{Kind: kind, Name: name, Namespace: ns},
+		Type:           typ,
+		Reason:         reason,
+		Message:        msg,
+		Count:          count,
+		Source:         corev1.EventSource{Component: "kubelet"},
+		FirstTimestamp: at,
+		LastTimestamp:  at,
+	})
+}
 
 func (g *gen) meta(name, ns string, labels map[string]string) metav1.ObjectMeta {
 	g.uid++
@@ -133,7 +154,7 @@ func (g *gen) run() []runtime.Object {
 
 	// Fill namespaces round-robin with apps until the budget is spent.
 	app := 0
-	for len(g.objs) < g.budget {
+	for len(g.objs)-g.events < g.budget {
 		ns := nsNames[app%len(nsNames)]
 		tier := tiers[(app/len(nsNames))%len(tiers)]
 		name := fmt.Sprintf("%s-%s", ns, tier)
@@ -281,6 +302,13 @@ func (g *gen) workload(ns, name, kind string, replicas int, public bool) {
 			cs.State = corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Reason: "Completed"}}
 		}
 		g.add(&corev1.Pod{ObjectMeta: pm, Spec: ps, Status: corev1.PodStatus{Phase: phase, ContainerStatuses: []corev1.ContainerStatus{cs}}})
+		// The events a kubelet would have recorded for this Pod.
+		if cs.State.Waiting != nil {
+			g.event(ns, "Pod", pod, corev1.EventTypeWarning, "BackOff", "Back-off restarting failed container app in pod "+pod, cs.RestartCount)
+		} else if i == 0 && phase == corev1.PodRunning {
+			g.event(ns, "Pod", pod, corev1.EventTypeNormal, "Pulled", "Container image \"registry.synthetic.local/"+name+":1.4.2\" already present on machine", 1)
+			g.event(ns, "Pod", pod, corev1.EventTypeNormal, "Started", "Started container app", 1)
+		}
 	}
 
 	if kind == "CronJob" || kind == "DaemonSet" {
@@ -335,3 +363,31 @@ func clamp(v, lo, hi int) int {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// NodeMetrics returns metrics.k8s.io NodeMetrics for the synthetic cluster's
+// Nodes, as metrics-server would report them: deterministic per seed, using
+// 20–70% of each node's allocatable CPU and memory.
+func NodeMetrics(objs []runtime.Object, seed int64) []runtime.Object {
+	rng := rand.New(rand.NewSource(seed + 1000))
+	var out []runtime.Object
+	for _, o := range objs {
+		n, ok := o.(*corev1.Node)
+		if !ok {
+			continue
+		}
+		cpu := n.Status.Allocatable.Cpu().MilliValue() * int64(20+rng.Intn(50)) / 100
+		mem := n.Status.Allocatable.Memory().Value() * int64(20+rng.Intn(50)) / 100
+		out = append(out, &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "metrics.k8s.io/v1beta1",
+			"kind":       "NodeMetrics",
+			"metadata":   map[string]interface{}{"name": n.Name},
+			"timestamp":  "2026-01-31T00:00:00Z",
+			"window":     "20s",
+			"usage": map[string]interface{}{
+				"cpu":    fmt.Sprintf("%dm", cpu),
+				"memory": fmt.Sprintf("%dKi", mem/1024),
+			},
+		}})
+	}
+	return out
+}

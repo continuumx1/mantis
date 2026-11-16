@@ -19,8 +19,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"k8s.io/apimachinery/pkg/version"
-	fakediscovery "k8s.io/client-go/discovery/fake"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -29,7 +27,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/continuumx1/mantis/internal/engine"
 	"github.com/continuumx1/mantis/internal/graph"
@@ -49,6 +53,7 @@ func main() {
 	syncEvery := flag.Duration("sync", 3*time.Second, "engine sync interval")
 	dump := flag.String("dump", "", "write the built graph (GraphDTO JSON) to this file and exit")
 	syncMode := flag.String("sync-mode", "watch", "watch (list once, then follow changes) or poll (re-list every -sync)")
+	clusterName := flag.String("cluster-name", "", "context name shown for the synthetic cluster (default synthetic-<resources>)")
 	kube := flag.Bool("kube", false, "read your current kubeconfig context instead of a synthetic cluster (read-only, like the real engine)")
 	flag.Parse()
 
@@ -76,7 +81,7 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		dto := engine.FromContext(gctx, engine.MetaDTO{Context: fmt.Sprintf("synthetic-%d", *resources), Skipped: skipped, Revision: 1})
+		dto := engine.FromContext(gctx, engine.MetaDTO{Context: synthName(*clusterName, *resources), Skipped: skipped, Revision: 1})
 		f, err := os.Create(*dump)
 		if err != nil {
 			fail(err)
@@ -89,7 +94,26 @@ func main() {
 		return
 	}
 
-	client := &mantiskube.Client{Clientset: cs, Context: fmt.Sprintf("synthetic-%d", *resources), Server: "https://synthetic.invalid"}
+	// A dynamic client over the same objects (plus metrics-server style node
+	// metrics), as the engine has against a real cluster: it serves the YAML
+	// view and the dashboard's live usage.
+	dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(clientscheme.Scheme,
+		map[schema.GroupVersionResource]string{
+			{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}:                 "NodeMetricsList",
+			{Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"}: "VerticalPodAutoscalerList",
+			{Group: "karpenter.sh", Version: "v1", Resource: "nodepools"}:                    "NodePoolList",
+			{Group: "karpenter.sh", Version: "v1beta1", Resource: "nodepools"}:               "NodePoolList",
+		},
+		objs...)
+	// Created through their real resource (metrics.k8s.io "nodes"); passed to
+	// the constructor the fake would file them under a guessed resource name.
+	metricsGVR := schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}
+	for _, m := range synth.NodeMetrics(objs, *seed) {
+		if _, err := dyn.Resource(metricsGVR).Create(context.Background(), m.(*unstructured.Unstructured), metav1.CreateOptions{}); err != nil {
+			fail(err)
+		}
+	}
+	client := &mantiskube.Client{Clientset: cs, Dynamic: dyn, Context: synthName(*clusterName, *resources), Server: "https://synthetic.invalid"}
 	if *churn > 0 {
 		go churnLoop(cs, *churn, *seed)
 	}
@@ -170,4 +194,12 @@ func churnLoop(cs *fake.Clientset, every time.Duration, seed int64) {
 func fail(err error) {
 	slog.Error("mantis-dev", "error", err.Error())
 	os.Exit(1)
+}
+
+// synthName is the synthetic cluster's context name.
+func synthName(name string, resources int) string {
+	if name != "" {
+		return name
+	}
+	return fmt.Sprintf("synthetic-%d", resources)
 }
