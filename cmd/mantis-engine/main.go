@@ -9,6 +9,8 @@
 //	MANTIS_SHOW_ALL        include system-managed ConfigMaps/Secrets  (default "false")
 //	MANTIS_SYNC_MODE       "watch" (default: list once, then follow watch streams) or "poll"
 //	MANTIS_SYNC_INTERVAL   poll mode only: re-read interval, e.g. "20s" (default "20s")
+//	MANTIS_CLUSTER_NAME    name shown for the cluster in the UI and reports
+//	                       (default: the kubeconfig context, or "in-cluster")
 //
 // The engine reads the cluster on its own background schedule (see
 // internal/engine/sync.go), not on demand per request — MANTIS_SYNC_INTERVAL
@@ -24,6 +26,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/continuumx1/mantis/internal/engine"
@@ -55,6 +58,13 @@ func main() {
 	if err != nil {
 		slog.Error("startup failed", "event", "kubernetes_connect_failed", "error", err.Error())
 		os.Exit(1)
+	}
+
+	// Inside a cluster there is no context name ("in-cluster"), so let the
+	// operator say which cluster this is: it is shown in the header, the
+	// dashboard and on reports.
+	if name := strings.TrimSpace(os.Getenv("MANTIS_CLUSTER_NAME")); name != "" {
+		client.Context = name
 	}
 
 	server := engine.New(client, showAll, syncInterval)

@@ -60,6 +60,7 @@ reachable beyond your own machine; session cookies are then marked
 |---|---|---|
 | `image.repository` | `cx1tech/mantis` | Shared repo for all images — split by a `-engine`/`-web`/`-report` tag suffix |
 | `image.tag` | chart-pinned | Version tag, before the suffix |
+| `clusterName` | `""` | Name shown for the cluster in the UI and reports; without it Mantis shows `in-cluster` |
 | `auth.adminUsername` | `admin` | Administrator account name |
 | `auth.adminPassword` | `""` | Its password (8+ characters); empty generates a random one, kept across upgrades |
 | `auth.existingSecret` | `""` | Use your own Secret (keys `username`, and `passwordHash` (bcrypt) or `password`) |
@@ -101,6 +102,7 @@ All three services are configured entirely through environment variables.
 | `mantis-engine` | `MANTIS_SHOW_ALL` | `false` | Include system-managed ConfigMaps/Secrets in the graph |
 | `mantis-engine` | `MANTIS_SYNC_MODE` | `watch` | `watch` (list once, then follow changes) or `poll` |
 | `mantis-engine` | `MANTIS_SYNC_INTERVAL` | `20s` | Poll mode only: re-list interval |
+| `mantis-engine` | `MANTIS_CLUSTER_NAME` | kubeconfig context, or `in-cluster` | Name shown for the cluster in the UI and reports |
 | `mantis-web` | `MANTIS_WEB_ADDR` | `:8080` | Listen address |
 | `mantis-web` | `MANTIS_ENGINE_URL` | `http://mantis-engine:8080` | Engine base URL to proxy `/api` to |
 | `mantis-web` | `MANTIS_REPORT_URL` | *(empty)* | Report service URL for `/api/report`; empty disables reports |

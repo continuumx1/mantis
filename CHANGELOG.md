@@ -91,12 +91,22 @@ world. See the [release notes](docs/releases/v1.0.0.md).
   sample cluster, generated from `index.html` so it can't drift from the
   real UI (`internal/web/ui/playground/`).
 
+### Usability
+
+- `clusterName` (`MANTIS_CLUSTER_NAME`) names the cluster in the header,
+  dashboard and reports; in a cluster Kubernetes otherwise gives only
+  "in-cluster".
+- Clearer install notes (wait, open, sign in, next steps; how to see them
+  again) and a sign-in page that says how to find the password.
+
 ### Security
 
 - Configurable administrator account: bcrypt-hashed password, no default.
 - Failed sign-ins limited per client address (10 per 10 minutes).
 - Session cookies marked `Secure` over HTTPS (including behind a
   TLS-terminating proxy).
+- The engine retries when the API server is unreachable at startup instead
+  of treating a timeout as RBAC denial (which left it never ready).
 - `mantis-report` runs without a ServiceAccount token; network policies
   cover web → engine, web → report and report → engine.
 

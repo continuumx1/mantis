@@ -4,7 +4,7 @@
 install time; both fields are case-sensitive. With Helm, read the password
 from the admin Secret, `mantis-admin` for a release named `mantis` (see
 [Getting Started](getting-started.md#first-login)). After 10 failures from
-one address, sign-in is refused for 10 minutes ("too many failed
+one address, sign-in is refused for 10 minutes ("Too many failed
 sign-ins").
 
 **`mantis-web` exits at startup with "no admin password configured".** Set

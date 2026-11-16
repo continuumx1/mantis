@@ -29,7 +29,7 @@
   anywhere in the codebase.
 
 **What permissions does Mantis require?**
-: Read-only `get`/`list` access to the resource kinds it maps, granted to
+: Read-only `get`/`list`/`watch` access to the resource kinds it maps, granted to
   its own ServiceAccount via the Helm chart's ClusterRole. It never asks
   for write access to anything. See [Architecture](architecture.md#rbac-what-the-engines-serviceaccount-needs).
 

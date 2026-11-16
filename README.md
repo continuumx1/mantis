@@ -258,6 +258,7 @@ All three services are configured entirely through environment variables.
 | `mantis-engine` | `MANTIS_SHOW_ALL` | `false` | include system-managed ConfigMaps/Secrets |
 | `mantis-engine` | `MANTIS_SYNC_MODE` | `watch` | `watch` (list once, then follow changes) or `poll` |
 | `mantis-engine` | `MANTIS_SYNC_INTERVAL` | `20s` | poll mode only: re-list interval |
+| `mantis-engine` | `MANTIS_CLUSTER_NAME` | context, or `in-cluster` | name shown for the cluster in the UI and reports |
 | `mantis-web` | `MANTIS_WEB_ADDR` | `:8080` | listen address |
 | `mantis-web` | `MANTIS_ENGINE_URL` | `http://mantis-engine:8080` | engine base URL to proxy `/api` to |
 | `mantis-web` | `MANTIS_REPORT_URL` | *(empty)* | report service URL for `/api/report`; empty disables reports |

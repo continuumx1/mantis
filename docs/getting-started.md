@@ -80,7 +80,12 @@ kubectl get secret mantis-admin -n mantis \
 ```
 
 (For a release named `mantis` the Secret is `mantis-admin`; the install
-notes print the exact command for yours.) Run locally, it is the `MANTIS_ADMIN_PASSWORD` you set. See
+notes print the exact command for yours. See the notes again any time with
+`helm get notes mantis -n mantis`.)
+
+Inside the cluster Kubernetes gives Mantis no cluster name, so it shows
+`in-cluster`. To show a real name in the header and on reports, add
+`--set clusterName=prod-eu-west` (or any name) to the install. Run locally, it is the `MANTIS_ADMIN_PASSWORD` you set. See
 [Security](security.md#signing-in) before exposing Mantis beyond your own
 machine.
 
