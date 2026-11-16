@@ -8,6 +8,11 @@ name: Release
 # and values.yaml's image.tag together in a PR, same as always, is now the
 # whole release process; merging that PR does the rest.
 on:
+  # Also runnable by hand (Actions → Release → Run workflow) to publish the
+  # version in Chart.yaml from the current main — e.g. when a release run
+  # failed before publishing (missing Docker Hub secrets) and fixes landed
+  # since.
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -44,6 +49,11 @@ jobs:
       - name: Only release if version or appVersion actually changed
         id: diff
         run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Run by hand: publishing the version in Chart.yaml." >&2
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           prev_chart=$(git show HEAD^:charts/mantis/Chart.yaml 2>/dev/null | yq e '.version' - || echo "")
           prev_app=$(git show HEAD^:charts/mantis/Chart.yaml 2>/dev/null | yq e '.appVersion' - || echo "")
           if [ "$prev_chart" = "${{ steps.read.outputs.chart_version }}" ] && \

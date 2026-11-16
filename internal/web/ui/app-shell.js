@@ -267,7 +267,12 @@
     if (parts[0] === "settings") return { page: "settings" };
     return { page: "notfound" };
   }
-  window.addEventListener("hashchange", () => { $("mContent").scrollTop = 0; closeDrawer(); render(); });
+  window.addEventListener("hashchange", () => {
+    $("mContent").scrollTop = 0; closeDrawer();
+    // Choosing a page from the account menu should not leave it open.
+    $("mUserMenu").classList.remove("open"); $("mUserBtn").setAttribute("aria-expanded", "false");
+    render();
+  });
 
   // ------------------------------------------------------------------ sidebar
   function buildSidebar() {
@@ -715,7 +720,7 @@
       '<div class="m-note neutral" style="margin-top:12px">To change the password, update the Helm value <code>auth.adminPassword</code> (or your own Secret) and upgrade. Multiple users, roles, OIDC single sign-on and audit logs are on the roadmap; to use your identity provider today, put Mantis behind an authenticating proxy such as oauth2-proxy.</div>' +
       '<div style="margin-top:12px"><button class="m-btn" id="aOut">' + icon("logout") + 'Sign out of this session</button></div></div></div>' +
       '<div class="m-card"><div class="m-card-h"><h2>Kubernetes access</h2><span class="m-badge ok">Read-only</span></div><div class="m-card-b">' +
-      '<div class="m-kv"><div class="k">Identity</div><div class="v">The engine\'s ServiceAccount (or your kubeconfig when run locally)</div><div class="k">Permissions</div><div class="v">get / list only — no create, update, patch or delete anywhere</div><div class="k">Cluster</div><div class="v">' + esc(meta.context || "—") + '</div><div class="k">API server</div><div class="v">' + esc(meta.server || "—") + '</div></div>' +
+      '<div class="m-kv"><div class="k">Identity</div><div class="v">The engine\'s ServiceAccount (or your kubeconfig when run locally)</div><div class="k">Permissions</div><div class="v">get / list / watch only — no create, update, patch or delete anywhere</div><div class="k">Cluster</div><div class="v">' + esc(meta.context || "—") + '</div><div class="k">API server</div><div class="v">' + esc(meta.server || "—") + '</div></div>' +
       ((meta.skipped || []).length ? '<div class="m-note warn" style="margin-top:12px">RBAC does not allow Mantis to list: ' + meta.skipped.map(s => '<code>' + esc(s) + '</code>').join(", ") + '. Those resources are missing from every page, and references to them show as “unverified”.</div>'
         : '<div class="m-note neutral" style="margin-top:12px">Mantis can list every kind it understands in this cluster.</div>') +
       '<p class="m-muted" style="font-size:12px;margin-bottom:0">Everyone signed in to Mantis sees what this one identity can read. Per-user, RBAC-aware access will arrive with multi-user accounts.</p></div></div></div></div>';

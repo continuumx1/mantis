@@ -57,6 +57,11 @@ engine:
     capabilities:
       drop: ["ALL"]
 
+# The name shown for this cluster in the UI header, dashboard and reports
+# (e.g. "prod-eu-west"). Inside a cluster Kubernetes provides no name, so
+# without this Mantis shows "in-cluster".
+clusterName: ""
+
 # The administrator account that signs in to Mantis. There is no default
 # password: leave adminPassword empty and the chart generates a random one
 # (kept across upgrades), readable with (for a release named "mantis")

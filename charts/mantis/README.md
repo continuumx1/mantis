@@ -130,6 +130,7 @@ helm upgrade mantis ./charts/mantis -n mantis \
 |---|---|---|
 | `image.repository` | `cx1tech/mantis` | Shared repo for all images — split by a `-engine`/`-web`/`-report` tag suffix |
 | `image.tag` | hardcoded literal (currently `1.0.0`, see Versions above) | Version tag, before the suffix is appended |
+| `clusterName` | `""` | Name shown for the cluster in the UI and reports (otherwise `in-cluster`) |
 | `auth.adminUsername` | `admin` | Administrator account name |
 | `auth.adminPassword` | `""` | Its password (8+ characters); empty generates one |
 | `auth.existingSecret` | `""` | Use your own Secret instead (see Sign-in) |

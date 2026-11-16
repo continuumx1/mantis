@@ -1,45 +1,47 @@
-Mantis is deployed.
+Mantis {{ .Chart.AppVersion }} is installed in namespace "{{ .Release.Namespace }}".
 
-1. Reach the UI:
+1. Wait until all Pods are Running (about a minute):
+     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. Open Mantis:
 {{- if .Values.web.ingress.enabled }}
 {{- range .Values.web.ingress.hosts }}
-   http{{ if $.Values.web.ingress.tls }}s{{ end }}://{{ .host }}
+     http{{ if $.Values.web.ingress.tls }}s{{ end }}://{{ .host }}
 {{- end }}
 {{- else if eq .Values.web.service.type "LoadBalancer" }}
-   Run:
      kubectl get svc {{ include "mantis.web.fullname" . }} -n {{ .Release.Namespace }} -w
-   and use the EXTERNAL-IP once it's assigned.
+   and open the EXTERNAL-IP once it is assigned.
 {{- else if eq .Values.web.service.type "NodePort" }}
-   Run:
      kubectl get svc {{ include "mantis.web.fullname" . }} -n {{ .Release.Namespace }}
-   and use <any-node-ip>:<the-listed-NodePort>.
+   and open <any-node-ip>:<the NodePort listed>.
 {{- else }}
-   No Ingress and a ClusterIP Service means nothing outside the cluster
-   can reach it yet. For local access:
      kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "mantis.web.fullname" . }} 8081:{{ .Values.web.service.port }}
    then open http://localhost:8081
 {{- end }}
 
-2. Sign in as "{{ .Values.auth.adminUsername | default "admin" }}".
+3. Sign in as "{{ .Values.auth.adminUsername | default "admin" }}".
 {{- if .Values.auth.existingSecret }}
    The password is in your Secret "{{ .Values.auth.existingSecret }}".
 {{- else if .Values.auth.adminPassword }}
    Use the password you set in auth.adminPassword.
 {{- else }}
-   A random password was generated. Read it with:
+   A password was generated for you. Read it with:
      kubectl get secret {{ include "mantis.admin.secretName" . }} -n {{ .Release.Namespace }} -o jsonpath='{.data.password}' | base64 -d; echo
 {{- end }}
-   Expose Mantis over HTTPS (an Ingress with TLS) beyond your own machine.
 
-3. Verify it's actually reading your cluster:
-     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
-   All Pods (engine, web{{ if .Values.report.enabled }}, report{{ end }}) should be Running; mantis-engine's logs will name the
-   cluster context it connected to.
+Next:
+  - Dashboard and Topology show the cluster; press Ctrl K to search.
+{{- if .Values.report.enabled }}
+  - "Download report" (on the dashboard) exports a password-protected PDF.
+{{- end }}
+{{- if not .Values.clusterName }}
+  - Mantis shows this cluster as "in-cluster". To show a real name, add
+      --set clusterName=<name>
+{{- end }}
+{{- if not .Values.web.ingress.enabled }}
+  - To share it beyond your machine, enable the Ingress with TLS
+    (web.ingress.*); sessions use Secure cookies over HTTPS.
+{{- end }}
 
-By default this pulls {{ include "mantis.engine.image" . }} and
-{{ include "mantis.web.image" . }}{{ if .Values.report.enabled }} and {{ include "mantis.report.image" . }}{{ end }} straight
-from Docker Hub — no local build needed. If you're running your own build
-instead (see build/Dockerfile.*), point image.repository
-at it, or load it directly into a local cluster (e.g.
-`kind load docker-image cx1tech/mantis:dev-engine ...`) and set
-image.tag=dev and image.pullPolicy=Never.
+See these notes again:  helm get notes {{ .Release.Name }} -n {{ .Release.Namespace }}
+Documentation:           https://continuumx1.github.io/mantis/

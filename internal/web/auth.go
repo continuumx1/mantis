@@ -254,7 +254,7 @@ func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
 	key := clientKey(r)
 	if s.throttled(key) {
 		slog.Warn("auth", "event", "login_throttled", "remote_addr", r.RemoteAddr)
-		writeJSONError(w, http.StatusTooManyRequests, "too many failed sign-ins; try again in a few minutes")
+		writeJSONError(w, http.StatusTooManyRequests, "Too many failed sign-ins. Try again in a few minutes.")
 		return
 	}
 	var req loginRequest
@@ -269,7 +269,7 @@ func (s *sessions) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// failed and where from, enough to spot a brute-force pattern without
 		// putting credentials (real or mistyped-but-sensitive) in the log stream.
 		slog.Warn("auth", "event", "login_failed", "remote_addr", r.RemoteAddr)
-		writeJSONError(w, http.StatusUnauthorized, "invalid username or password")
+		writeJSONError(w, http.StatusUnauthorized, "Invalid username or password.")
 		return
 	}
 	s.clearFailures(key)

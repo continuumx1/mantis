@@ -48,6 +48,10 @@ spec:
               value: {{ .Values.engine.syncMode | default "watch" | quote }}
             - name: MANTIS_SYNC_INTERVAL
               value: {{ .Values.engine.syncInterval | default "20s" | quote }}
+            {{- with .Values.clusterName }}
+            - name: MANTIS_CLUSTER_NAME
+              value: {{ . | quote }}
+            {{- end }}
           # mantis-engine's own readiness probe (GET /readyz) already
           # confirms the Kubernetes API is reachable — see
           # internal/engine/server.go's handleReady — so it doubles as the

@@ -78,6 +78,7 @@
 
   .hint { margin-top: 22px; text-align: center; font-size: 12.5px; color: var(--faint); line-height: 1.6; }
   .hint b { color: var(--muted); font-family: var(--font-mono); }
+  .hint code { color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap; }
 
   @keyframes shake { 10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);} 30%,50%,70%{transform:translateX(-4px);} 40%,60%{transform:translateX(4px);} }
   .shake { animation: shake .4s; }
@@ -121,7 +122,7 @@
         <button class="submit" type="submit" id="submitBtn">Sign in</button>
       </form>
 
-      <div class="hint">Sign in with the administrator account configured for this installation.<br>Installed with Helm? The install notes show how to read the generated password.</div>
+      <div class="hint">Sign in with the administrator account set up when Mantis was installed.<br>Installed with Helm? The install notes show how to read the password — see them again with <code>helm get notes &lt;release&gt; -n &lt;namespace&gt;</code>.</div>
     </div>
   </div>
 </div>
