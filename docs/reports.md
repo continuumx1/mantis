@@ -16,7 +16,7 @@ Pages from a report generated from a sample cluster:
 
 | Cover | Health summary | Topology | Findings |
 |---|---|---|---|
-| <img src="images/report/cover.jpg" alt="Report cover" width="200"> | <img src="images/report/health.jpg" alt="Cluster health summary page" width="200"> | <img src="images/report/topology.jpg" alt="Topology diagram page" width="200"> | <img src="images/report/findings.jpg" alt="Findings and anomalies page" width="200"> |
+| ![Report cover](images/report/cover.jpg){ width="200" } | ![Cluster health summary page](images/report/health.jpg){ width="200" } | ![Topology diagram page](images/report/topology.jpg){ width="200" } | ![Findings and anomalies page](images/report/findings.jpg){ width="200" } |
 
 ## What the report contains
 
