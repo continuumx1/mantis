@@ -107,6 +107,8 @@ world. See the [release notes](docs/releases/v1.0.0.md).
   TLS-terminating proxy).
 - The engine retries when the API server is unreachable at startup instead
   of treating a timeout as RBAC denial (which left it never ready).
+- Go dependencies updated (`golang.org/x/net` 0.62.0, `golang.org/x/crypto`
+  0.59.0): 0 known vulnerabilities in all three images (Docker Scout).
 - `mantis-report` runs without a ServiceAccount token; network policies
   cover web → engine, web → report and report → engine.
 
